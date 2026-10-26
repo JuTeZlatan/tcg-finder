@@ -2,16 +2,19 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { CARD_LANGS, LANG_NAMES, useCardLang } from '../lib/cardLang';
 import { colors } from '../lib/theme';
 
-export default function LangToggle({ note }) {
+// `langs` : langues proposées (dans l'écran d'un jeu, seulement celles qui existent pour ce jeu) ; par défaut toutes.
+// Si la langue choisie n'y est pas, c'est la langue réellement affichée (`shown`, l'anglais) qui est mise en avant.
+export default function LangToggle({ note, langs = CARD_LANGS, shown }) {
   const { cardLang, setCardLang } = useCardLang();
+  const active = langs.includes(cardLang) ? cardLang : shown;
   return (
     <View style={styles.wrap}>
       <View style={styles.row}>
         <Text style={styles.label}>Cartes en</Text>
         <View style={styles.segment}>
-          {CARD_LANGS.map((l) => (
-            <Pressable key={l} onPress={() => setCardLang(l)} style={[styles.option, cardLang === l && styles.active]}>
-              <Text style={[styles.optionText, cardLang === l && styles.activeText]}>{LANG_NAMES[l]}</Text>
+          {langs.map((l) => (
+            <Pressable key={l} onPress={() => setCardLang(l)} style={[styles.option, active === l && styles.active]}>
+              <Text style={[styles.optionText, active === l && styles.activeText]}>{LANG_NAMES[l]}</Text>
             </Pressable>
           ))}
         </View>

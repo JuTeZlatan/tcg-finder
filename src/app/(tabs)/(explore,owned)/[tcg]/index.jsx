@@ -51,7 +51,7 @@ export default function TcgScreen() {
 
   const header = (
     <View style={styles.header}>
-      <LangToggle note={langNote(tcg, cardLang)} />
+      {tcg.languages.length > 1 ? <LangToggle langs={tcg.languages} shown={lang} note={langNote(tcg, lang)} /> : null}
       <View style={styles.searchRow}>
         <TextInput
           style={[styles.input, { flex: 1 }]}
