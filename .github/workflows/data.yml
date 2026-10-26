@@ -1,0 +1,44 @@
+# Collecte quotidienne de toutes les données de l'appli (catalogues, prix, versions, personnages, prochaines sorties)
+# et publication sur GitHub Pages. L'appli lit ces fichiers chaque jour (EXPO_PUBLIC_DATA_URL) : une extension sortie
+# le jour même y apparaît sans nouvelle version de l'appli.
+# Réglage du dépôt : Settings → Pages → Source : « GitHub Actions ».
+name: Données TCG
+
+on:
+  schedule:
+    - cron: '30 4 * * *' # chaque jour à 4h30 UTC (5h30 / 6h30 en France), après la mise à jour des prix Cardmarket
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Pas de `npm install` : le script de collecte n'utilise que Node.
+      - run: node pipeline/build.mjs --out=site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
