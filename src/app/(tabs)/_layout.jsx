@@ -3,12 +3,19 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../lib/theme';
 import SideMenu from '../../components/SideMenu';
+import { useSettings } from '../../lib/settings';
+import { useAsync } from '../../lib/useAsync';
+import { daysUntil, loadReleases } from '../../lib/releases';
 
 // L'appli s'ouvre sur l'Explorer, même si le bouton « Menu » est le premier de la barre.
 export const unstable_settings = { initialRouteName: '(explore)' };
 
 export default function TabsLayout() {
   const [menuOpen, setMenuOpen] = useState(false);
+  // Badge de l'onglet « Sorties » : sorties suivies qui arrivent dans les 7 jours.
+  const releases = useAsync(() => loadReleases(), []);
+  const followed = new Set(useSettings().settings.followed || []);
+  const dueSoon = (releases.data || []).filter((r) => followed.has(r.key) && daysUntil(r.date) >= 0 && daysUntil(r.date) <= 7).length;
   return (
     <>
     <Tabs
@@ -35,6 +42,16 @@ export default function TabsLayout() {
             e.preventDefault();
             setMenuOpen(true);
           },
+        }}
+      />
+      <Tabs.Screen
+        name="releases"
+        options={{
+          title: 'Sorties',
+          headerTitle: 'Prochaines sorties',
+          tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" color={color} size={size} />,
+          tabBarBadge: dueSoon || undefined,
+          tabBarBadgeStyle: { backgroundColor: colors.accent, color: '#1A1A1A' },
         }}
       />
       <Tabs.Screen

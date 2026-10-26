@@ -12,6 +12,8 @@ const DEFAULTS = {
   setView: 'simple',
   // Site(s) de prix : 'both', 'cardmarket' ou 'tcgplayer' (voir src/lib/prices.js)
   priceSource: 'both',
+  // Sorties suivies (onglet « Sorties ») : clés de src/lib/releases.js
+  followed: [],
 };
 
 const SettingsContext = createContext(null);

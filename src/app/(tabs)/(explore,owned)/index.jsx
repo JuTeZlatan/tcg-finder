@@ -5,7 +5,6 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { TCGS } from '../../../api';
 import LangToggle from '../../../components/LangToggle';
-import Upcoming from '../../../components/Upcoming';
 import { useCollection, summarize, groupBy } from '../../../lib/collection';
 import { LANG_NAMES, useCardLang } from '../../../lib/cardLang';
 import { formatPrice } from '../../../lib/prices';
@@ -35,8 +34,6 @@ export default function Home() {
           <Text style={styles.collectionValue}>{formatPrice(total.value, 'EUR')}</Text>
         </Pressable>
       )}
-
-      <Upcoming />
 
       <LangToggle />
       <View style={styles.grid}>
