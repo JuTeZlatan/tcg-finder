@@ -23,8 +23,7 @@ export default function Home() {
 
   return (
     <ScrollView ref={scrollRef} contentContainerStyle={styles.page}>
-      <Text style={styles.title}>Quel jeu de cartes ?</Text>
-      <Text style={styles.sub}>Choisis ton TCG, trouve ta carte dans ses extensions et découvre sa valeur.</Text>
+      <Text style={styles.title}>Choisis ton TCG</Text>
 
       {items.length > 0 && (
         <Pressable style={({ pressed }) => [styles.collection, pressed && styles.pressed]} onPress={() => router.navigate('/(tabs)/(owned)/collection')}>
@@ -78,7 +77,6 @@ export default function Home() {
 const styles = StyleSheet.create({
   page: { padding: 16, gap: 12 },
   title: { color: colors.text, fontSize: 26, fontWeight: '800' },
-  sub: { color: colors.muted, fontSize: 15, lineHeight: 21 },
   collection: {
     flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surfaceAlt,
     borderRadius: radius, padding: 14, borderWidth: 1, borderColor: colors.accent,
