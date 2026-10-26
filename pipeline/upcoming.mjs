@@ -17,9 +17,15 @@ export async function build(outDir) {
   const inRange = (date) => date >= from && date <= until;
   const out = [];
   for (const [tcg, categoryId] of Object.entries(CATEGORIES)) {
-    for (const g of await tcgcsvGroups(categoryId)) {
+    const groups = await tcgcsvGroups(categoryId);
+    // TCGplayer redate parfois de vieilles extensions (POP Series de 2005 « publiée » aujourd'hui) : on ne garde que les
+    // groupes créés récemment, c.-à-d. dont le numéro (croissant à la création) dépasse 95 % de ceux des extensions
+    // sorties il y a plus d'un an.
+    const oldIds = groups.filter((g) => (g.publishedOn || '').slice(0, 10) < day(-365)).map((g) => g.groupId).sort((a, b) => a - b);
+    const cutoff = oldIds.length ? oldIds[Math.floor(oldIds.length * 0.95)] : 0;
+    for (const g of groups) {
       const date = (g.publishedOn || '').slice(0, 10);
-      if (!inRange(date)) continue;
+      if (!inRange(date) || g.groupId <= cutoff) continue;
       // Visuel : image du booster (ou du produit scellé) chez TCGplayer, quand elle existe déjà.
       const image = (await groupImage(categoryId, g.groupId).catch(() => null)) || null;
       out.push({ tcg, name: g.name, date, code: g.abbreviation || null, image });
