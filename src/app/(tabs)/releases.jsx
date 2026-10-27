@@ -120,6 +120,7 @@ function ReleaseRow({ release: r, followed, expanded, onToggle, onFollow }) {
   const tcg = getTcg(r.tcg);
   const { cardLang } = useCardLang();
   const isSoon = r.days >= 0 && r.days <= SOON_DAYS;
+  const [imageFailed, setImageFailed] = useState(false); // visuel introuvable : icône du jeu
   // Extension déjà dans l'appli ? (cherchée seulement quand la sortie est dépliée)
   const set = useAsync(() => (expanded ? findSetForRelease(r, cardLang) : Promise.resolve(null)), [r.key, expanded, cardLang]);
 
@@ -127,8 +128,8 @@ function ReleaseRow({ release: r, followed, expanded, onToggle, onFollow }) {
     <View style={[styles.card, isSoon && styles.cardSoon, r.days === 0 && styles.cardToday]}>
       <Pressable style={styles.cardMain} onPress={onToggle}>
         <View style={styles.visual}>
-          {r.image ? (
-            <Image source={r.image} style={styles.visualImg} contentFit="contain" tintColor={r.imageTint ? colors.text : undefined} />
+          {r.image && !imageFailed ? (
+            <Image source={r.image} style={styles.visualImg} contentFit="contain" tintColor={r.imageTint ? colors.text : undefined} onError={() => setImageFailed(true)} />
           ) : (
             <Image source={GAME_ICONS[r.tcg]} style={styles.visualIcon} contentFit="contain" />
           )}
