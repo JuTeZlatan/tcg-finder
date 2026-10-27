@@ -13,7 +13,6 @@ import { GAME_ICONS } from '../../../lib/gameIcons';
 
 export default function Home() {
   const { items } = useCollection();
-  const total = useMemo(() => summarize(items), [items]);
   const perTcg = useMemo(() => groupBy(items, (i) => i.tcg), [items]);
   const { cardLang } = useCardLang();
   // Toucher l'onglet « Explorer » déjà ouvert ramène en haut de la page.
@@ -23,17 +22,6 @@ export default function Home() {
   return (
     <ScrollView ref={scrollRef} contentContainerStyle={styles.page}>
       <Text style={styles.title}>Choisis ton TCG</Text>
-
-      {items.length > 0 && (
-        <Pressable style={({ pressed }) => [styles.collection, pressed && styles.pressed]} onPress={() => router.navigate('/(tabs)/(owned)/collection')}>
-          <Ionicons name="albums" size={22} color={colors.accent} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.collectionLabel}>Ma collection</Text>
-            <Text style={styles.collectionMeta}>{total.cards} carte{total.cards > 1 ? 's' : ''} · {total.unique} différente{total.unique > 1 ? 's' : ''}</Text>
-          </View>
-          <Text style={styles.collectionValue}>{formatPrice(total.value, 'EUR')}</Text>
-        </Pressable>
-      )}
 
       <LangToggle />
       <View style={styles.grid}>
@@ -74,13 +62,6 @@ export default function Home() {
 const styles = StyleSheet.create({
   page: { padding: 16, gap: 12 },
   title: { color: colors.text, fontSize: 26, fontWeight: '800' },
-  collection: {
-    flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surfaceAlt,
-    borderRadius: radius, padding: 14, borderWidth: 1, borderColor: colors.accent,
-  },
-  collectionLabel: { color: colors.text, fontWeight: '700', fontSize: 16 },
-  collectionMeta: { color: colors.muted, fontSize: 13 },
-  collectionValue: { color: colors.accent, fontWeight: '800', fontSize: 18 },
   grid: { gap: 10, marginTop: 8 },
   tile: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
