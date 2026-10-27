@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import { router, useScrollToTop } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
@@ -10,7 +10,6 @@ import { colors, radius, percent } from '../../../lib/theme';
 import { LangBadge, StatTile, ProgressBar, ValueChart } from '../../../components/collection';
 import { openItem } from '../../../lib/openItem';
 
-const DAY = 24 * 3600 * 1000;
 
 export default function CollectionScreen() {
   const { loaded, items, history, pricesUpdatedAt, refresh, refreshPrices } = useCollection();
@@ -28,11 +27,6 @@ export default function CollectionScreen() {
   const top = useMemo(() => items.filter((i) => i.price != null).sort((a, b) => b.price - a.price).slice(0, 10), [items]);
   const setCount = useMemo(() => byTcg.reduce((s, t) => s + t.sets, 0), [byTcg]);
 
-  // Prix vieux de plus d'un jour : mise à jour automatique à l'ouverture.
-  useEffect(() => {
-    if (loaded && items.length && !refresh && (!pricesUpdatedAt || Date.now() - pricesUpdatedAt > DAY)) refreshPrices();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loaded]);
 
   if (loaded && !items.length) {
     return (

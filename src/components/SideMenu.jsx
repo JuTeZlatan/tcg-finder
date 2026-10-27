@@ -131,11 +131,6 @@ export default function SideMenu({ open, onClose }) {
                 />
               ))}
             </View>
-            <Row
-              icon="refresh-outline"
-              label={refresh ? `Mise à jour des prix… ${refresh.done}/${refresh.total}` : 'Mettre à jour les prix de ma collection'}
-              onPress={refresh ? undefined : refreshPrices}
-            />
           </Section>
 
           <Section title="Réglages">
@@ -162,16 +157,6 @@ function Section({ title, children }) {
       <Text style={styles.sectionTitle}>{title}</Text>
       {children}
     </View>
-  );
-}
-
-function Row({ icon, label, onPress }) {
-  return (
-    <Pressable style={({ pressed }) => [styles.menuRow, pressed && { opacity: 0.6 }]} onPress={onPress}>
-      <Ionicons name={icon} size={20} color={colors.accent} />
-      <Text style={styles.menuText}>{label}</Text>
-      {onPress ? <Ionicons name="chevron-forward" size={16} color={colors.muted} /> : null}
-    </Pressable>
   );
 }
 
@@ -211,8 +196,6 @@ const styles = StyleSheet.create({
   blockTitle: { color: colors.text, fontWeight: '700' },
   iconGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   sectionTitle: { color: colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
-  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: ITEM_BG, borderRadius: radius, paddingVertical: 12, paddingHorizontal: 12 },
-  menuText: { color: colors.text, fontWeight: '600', flex: 1 },
   label: { color: colors.text, fontWeight: '600', marginTop: 2 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   chip: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: ITEM_BG },

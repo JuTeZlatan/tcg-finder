@@ -176,6 +176,16 @@ export function CollectionProvider({ children }) {
     setRefresh(null);
   }, [patchItem, update]);
 
+  // Prix vieux de plus d'un jour : mise à jour automatique dès le démarrage de l'appli (une fois par jour),
+  // avec les données publiées chaque matin — pas besoin d'ouvrir « Ma collection » ni de bouton.
+  const autoRefreshed = useRef(false);
+  useEffect(() => {
+    if (!loaded || autoRefreshed.current) return;
+    autoRefreshed.current = true;
+    const stale = !state.pricesUpdatedAt || Date.now() - state.pricesUpdatedAt > 24 * 3600 * 1000;
+    if (Object.keys(state.items).length && stale) refreshPrices();
+  }, [loaded, state.items, state.pricesUpdatedAt, refreshPrices]);
+
   const items = useMemo(() => Object.values(state.items), [state.items]);
   const value = useMemo(
     () => ({ loaded, items, history: state.history, pricesUpdatedAt: state.pricesUpdatedAt, refresh, add, setQty, setPurchase, saveCustom, remove, refreshPrices }),
