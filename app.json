@@ -17,7 +17,8 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "package": "com.tcgfinder.app"
+      "package": "com.tcgfinder.app",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -51,7 +52,8 @@
             "extraProguardRules": "# ML Kit (reconnaissance de texte du scanner) : R8 casse ses classes internes sans ces règles.\n-keep class com.google.mlkit.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_text_common.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_common.** { *; }\n-keep class com.google.android.gms.internal.mlkit_common.** { *; }\n-keep class red.infinite.reactnativemlkit.** { *; }"
           }
         }
-      ]
+      ],
+      "@react-native-google-signin/google-signin"
     ],
     "scheme": "tcgfinder",
     "backgroundColor": "#0F1115"

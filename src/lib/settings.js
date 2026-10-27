@@ -14,12 +14,15 @@ const DEFAULTS = {
   priceSource: 'both',
   // Sorties suivies (onglet « Sorties ») : clés de src/lib/releases.js
   followed: [],
+  // Date du dernier changement (sauvegarde en ligne : le plus récent l'emporte)
+  updatedAt: 0,
 };
 
 const SettingsContext = createContext(null);
 
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(DEFAULTS);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
@@ -29,20 +32,22 @@ export function SettingsProvider({ children }) {
         setPreferredSource(saved.priceSource);
         setSettings(saved);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setLoaded(true));
   }, []);
 
-  const update = useCallback((patch) => {
+  // `fromSync` : réglages venus du compte en ligne, qui gardent leur date.
+  const update = useCallback((patch, { fromSync } = {}) => {
     // Source des prix appliquée tout de suite : les calculs lancés juste après (mise à jour de la collection) l'utilisent.
     if (patch.priceSource) setPreferredSource(patch.priceSource);
     setSettings((prev) => {
-      const next = { ...prev, ...patch };
+      const next = { ...prev, ...patch, updatedAt: fromSync ? patch.updatedAt ?? prev.updatedAt : Date.now() };
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
       return next;
     });
   }, []);
 
-  return createElement(SettingsContext.Provider, { value: { settings, update } }, children);
+  return createElement(SettingsContext.Provider, { value: { settings, loaded, update } }, children);
 }
 
 export const useSettings = () => useContext(SettingsContext);

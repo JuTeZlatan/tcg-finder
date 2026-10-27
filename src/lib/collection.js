@@ -7,7 +7,8 @@ import { getTcg, dataLang } from '../api';
 import { averagePrice, getUsdToEur } from './prices';
 
 const STORAGE_KEY = 'collection.v1';
-const EMPTY = { items: {}, history: [], pricesUpdatedAt: null };
+// `deleted` : cartes retirées (clé → date), pour que la sauvegarde en ligne ne les fasse pas revenir.
+const EMPTY = { items: {}, history: [], pricesUpdatedAt: null, deleted: {} };
 const today = () => new Date().toISOString().slice(0, 10);
 
 // `finish` : version de la carte (foil, reverse…) quand ce n'est pas la version de référence.
@@ -113,13 +114,20 @@ export function CollectionProvider({ children }) {
     update((prev) => {
       if (!prev.items[key]) return prev;
       const items = { ...prev.items };
-      if (qty <= 0) delete items[key];
-      else items[key] = { ...items[key], qty, updatedAt: Date.now() };
-      return { ...prev, items };
+      let deleted = prev.deleted;
+      if (qty <= 0) {
+        delete items[key];
+        deleted = { ...prev.deleted, [key]: Date.now() };
+      } else items[key] = { ...items[key], qty, updatedAt: Date.now() };
+      return { ...prev, items, deleted };
     });
   }, [update]);
 
-  const setPurchase = useCallback((key, purchase) => patchItem(key, { purchase }), [patchItem]);
+  const setPurchase = useCallback((key, purchase) => patchItem(key, { purchase, updatedAt: Date.now() }), [patchItem]);
+
+  // Sauvegarde en ligne (src/lib/sync.js) : lecture de l'état complet et fusion avec celui du compte.
+  const getState = useCallback(() => stateRef.current, []);
+  const applySync = useCallback((fn) => update(fn), [update]);
 
   // Carte « Autres » (absente des catalogues) : toutes les informations sont saisies à la main, prix compris ;
   // elle n'est jamais mise à jour automatiquement. (`category` : cartes enregistrées avant sa suppression du formulaire.)
@@ -188,8 +196,8 @@ export function CollectionProvider({ children }) {
 
   const items = useMemo(() => Object.values(state.items), [state.items]);
   const value = useMemo(
-    () => ({ loaded, items, history: state.history, pricesUpdatedAt: state.pricesUpdatedAt, refresh, add, setQty, setPurchase, saveCustom, remove, refreshPrices }),
-    [loaded, items, state.history, state.pricesUpdatedAt, refresh, add, setQty, setPurchase, saveCustom, remove, refreshPrices],
+    () => ({ loaded, items, state, history: state.history, pricesUpdatedAt: state.pricesUpdatedAt, refresh, add, setQty, setPurchase, saveCustom, remove, refreshPrices, getState, applySync }),
+    [loaded, items, state, refresh, add, setQty, setPurchase, saveCustom, remove, refreshPrices, getState, applySync],
   );
   // stateRef n’est lu que dans les actions (add, refreshPrices), jamais pendant le rendu.
   // eslint-disable-next-line react-hooks/refs

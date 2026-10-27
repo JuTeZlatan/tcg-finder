@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { CardLangProvider } from '../lib/cardLang';
 import { CollectionProvider } from '../lib/collection';
 import { SettingsProvider } from '../lib/settings';
+import { SyncProvider } from '../lib/sync';
 import { colors } from '../lib/theme';
 
 export default function RootLayout() {
@@ -12,6 +13,7 @@ export default function RootLayout() {
       <CardLangProvider>
         <CollectionProvider>
           <SettingsProvider>
+          <SyncProvider>
           <StatusBar style="light" />
           <Stack
             screenOptions={{
@@ -24,6 +26,7 @@ export default function RootLayout() {
           >
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           </Stack>
+          </SyncProvider>
           </SettingsProvider>
         </CollectionProvider>
       </CardLangProvider>

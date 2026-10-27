@@ -52,3 +52,6 @@ pipeline/riot-key.txt
 
 # Réglages locaux de Claude Code
 .claude/
+
+# Configuration Firebase (projet perso, fournie à la compilation)
+google-services.json

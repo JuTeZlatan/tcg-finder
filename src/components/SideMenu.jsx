@@ -13,6 +13,7 @@ import { CARD_LANGS, LANG_NAMES, useCardLang } from '../lib/cardLang';
 import { GAME_ICONS } from '../lib/gameIcons';
 import { PRICE_SOURCES, formatPrice } from '../lib/prices';
 import { colors, radius } from '../lib/theme';
+import AccountSection from './AccountSection';
 
 // La photo d'avatar est copiée dans l'espace de l'appli (le cache peut être vidé par le système).
 async function keepAvatar(uri) {
@@ -113,6 +114,10 @@ export default function SideMenu({ open, onClose }) {
               </View>
             </View>
           ) : null}
+
+          <Section title="Compte">
+            <AccountSection />
+          </Section>
 
           <Section title="Prix">
             {/* Site(s) de prix : toute l'appli suit ce choix (fiches, moyennes, valeur de la collection). */}
