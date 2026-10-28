@@ -242,7 +242,7 @@ export default {
   "Prix le plus bas par boutique": "Preço mais baixo por loja",
   "Prix le plus bas, toutes éditions": "Preço mais baixo, todas as edições",
   "Prix moyen": "Preço médio",
-  "Prix pris en compte": "Preços usados",
+  'Source des prix': "Fonte dos preços",
   "Prix TCGplayer (marché). Touche une version pour la voir.": "Preços TCGplayer (mercado). Toca numa versão para a ver.",
   "Prix unitaire": "Preço unitário",
   "Prochaines sorties": "Próximos lançamentos",

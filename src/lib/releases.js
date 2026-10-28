@@ -62,6 +62,24 @@ export async function findSetForRelease(release, cardLang) {
   return best ? { tcg: tcg.id, setId: best.s.id, name: best.s.name } : null;
 }
 
+// Noms des sorties dans la langue des cartes : l'extension est retrouvée dans la liste anglaise (code ou nom proche),
+// puis sous le même identifiant dans la langue choisie. Sans version dans cette langue : nom anglais d'origine.
+// Renvoie Map(clé de la sortie → nom affiché).
+export async function localizedReleaseNames(releases, cardLang) {
+  const names = new Map();
+  if (cardLang === 'en') return names;
+  await Promise.all(releases.map(async (r) => {
+    const tcg = getTcg(r.tcg);
+    if (!tcg || dataLang(tcg, cardLang) !== cardLang) return;
+    const en = await findSetForRelease(r, 'en').catch(() => null);
+    if (!en) return;
+    const sets = await tcg.getSets(cardLang).catch(() => []);
+    const own = sets.find((s) => String(s.id) === String(en.setId));
+    if (own?.name) names.set(r.key, own.name);
+  }));
+  return names;
+}
+
 // Rubrique Cardmarket de chaque jeu.
 const CARDMARKET_GAME = {
   pokemon: 'Pokemon', magic: 'Magic', yugioh: 'YuGiOh', onepiece: 'OnePiece', lorcana: 'Lorcana', riftbound: 'Riftbound',

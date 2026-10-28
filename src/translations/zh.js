@@ -242,7 +242,7 @@ export default {
   "Prix le plus bas par boutique": "各店铺最低价",
   "Prix le plus bas, toutes éditions": "最低价（所有版次）",
   "Prix moyen": "平均价",
-  "Prix pris en compte": "价格来源",
+  'Source des prix': "价格来源",
   "Prix TCGplayer (marché). Touche une version pour la voir.": "TCGplayer 价格（市场价）。点击版本查看。",
   "Prix unitaire": "单价",
   "Prochaines sorties": "即将发售",

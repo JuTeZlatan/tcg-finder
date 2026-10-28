@@ -159,8 +159,8 @@ export default function SideMenu({ open, onClose, initialPage = 'main' }) {
 
           <Section title={t('Prix')}>
             {/* Site(s) de prix : toute l'appli suit ce choix (fiches, moyennes, valeur de la collection). */}
-            <Text style={styles.label}>{t('Prix pris en compte')}</Text>
-            <View style={styles.row}>
+            <Text style={styles.label}>{t('Source des prix')}</Text>
+            <View style={styles.chipRow}>
               {Object.entries(PRICE_SOURCES).map(([k, label]) => (
                 <Chip
                   key={k}
@@ -175,7 +175,7 @@ export default function SideMenu({ open, onClose, initialPage = 'main' }) {
               ))}
             </View>
             <Text style={styles.label}>{t('Devise')}</Text>
-            <View style={styles.row}>
+            <View style={styles.chipRow}>
               {Object.entries(CURRENCIES).map(([k, label]) => (
                 <Chip key={k} label={t(label)} active={(settings.currency || 'EUR') === k} onPress={() => update({ currency: k })} />
               ))}
@@ -185,11 +185,11 @@ export default function SideMenu({ open, onClose, initialPage = 'main' }) {
 
           <Section title={t('Cartes')}>
             <Text style={styles.label}>{t('Langue des cartes')}</Text>
-            <View style={styles.row}>
+            <View style={styles.chipRow}>
               {CARD_LANGS.map((l) => <Chip key={l} label={t(LANG_NAMES[l])} active={cardLang === l} onPress={() => setCardLang(l)} />)}
             </View>
             <Text style={styles.label}>{t('Affichage des extensions')}</Text>
-            <View style={styles.row}>
+            <View style={styles.chipRow}>
               <Chip label={t('Simplifié')} active={settings.setView !== 'master'} onPress={() => update({ setView: 'simple' })} />
               <Chip label={t('Master set')} active={settings.setView === 'master'} onPress={() => update({ setView: 'master' })} />
             </View>
@@ -226,7 +226,8 @@ function Section({ title, children }) {
 function Chip({ label, active, onPress }) {
   return (
     <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
+      {/* une seule ligne par rangée : le texte rétrécit plutôt que de passer à la ligne */}
+      <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7}>{label}</Text>
     </Pressable>
   );
 }
@@ -261,7 +262,9 @@ const styles = StyleSheet.create({
   sectionTitle: { color: colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
   label: { color: colors.text, fontWeight: '600', marginTop: 2 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  chip: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: ITEM_BG },
+  // rangée de choix des réglages : toujours sur une ligne, boutons de même largeur
+  chipRow: { flexDirection: 'row', gap: 6 },
+  chip: { flex: 1, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 6, borderRadius: 999, backgroundColor: ITEM_BG },
   chipActive: { backgroundColor: colors.accent },
   chipText: { color: colors.muted, fontWeight: '600' },
   chipTextActive: { color: '#1A1A1A' },
