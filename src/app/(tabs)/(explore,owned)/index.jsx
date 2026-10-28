@@ -6,11 +6,12 @@ import { Ionicons } from '@expo/vector-icons';
 import { TCGS } from '../../../api';
 import LangToggle from '../../../components/LangToggle';
 import { useCollection, summarize, groupBy } from '../../../lib/collection';
-import { LANG_NAMES, useCardLang } from '../../../lib/cardLang';
+import { useCardLang } from '../../../lib/cardLang';
 import { formatPrice } from '../../../lib/prices';
 import { colors, radius } from '../../../lib/theme';
 import { GAME_ICONS } from '../../../lib/gameIcons';
 import { useSettings } from '../../../lib/settings';
+import { plural, t } from '../../../lib/i18n';
 
 export default function Home() {
   useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
@@ -23,33 +24,33 @@ export default function Home() {
 
   return (
     <ScrollView ref={scrollRef} contentContainerStyle={styles.page}>
-      <Text style={styles.title}>Choisis ton TCG</Text>
+      <Text style={styles.title}>{t('Choisis ton TCG')}</Text>
 
       <LangToggle />
       <View style={styles.grid}>
-        {TCGS.map((t) => {
-          const owned = perTcg.get(t.id);
+        {TCGS.map((g) => {
+          const owned = perTcg.get(g.id);
           const s = owned && summarize(owned);
           // Jeu sans cartes dans la langue choisie : grisé et non sélectionnable.
-          const available = t.languages.includes(cardLang);
+          const available = g.languages.includes(cardLang);
           return (
             <Pressable
-              key={t.id}
+              key={g.id}
               disabled={!available}
-              style={({ pressed }) => [styles.tile, { borderLeftColor: t.color }, pressed && styles.pressed, !available && styles.disabled]}
-              onPress={() => router.push({ pathname: '/[tcg]', params: { tcg: t.id } })}
+              style={({ pressed }) => [styles.tile, { borderLeftColor: g.color }, pressed && styles.pressed, !available && styles.disabled]}
+              onPress={() => router.push({ pathname: '/[tcg]', params: { tcg: g.id } })}
             >
-              <Image source={GAME_ICONS[t.id]} style={styles.gameIcon} contentFit="contain" />
+              <Image source={GAME_ICONS[g.id]} style={styles.gameIcon} contentFit="contain" />
               <View style={{ flex: 1 }}>
-                <Text style={styles.tileName}>{t.name}</Text>
+                <Text style={styles.tileName}>{g.name}</Text>
                 <Text style={styles.tileTagline}>
-                  {available ? t.tagline : `Pas de cartes en ${LANG_NAMES[cardLang].toLowerCase()}`}
+                  {available ? t(g.tagline) : t('Pas de cartes dans cette langue')}
                 </Text>
               </View>
               {s ? (
                 <View style={styles.ownedBox}>
                   <Text style={styles.ownedValue}>{formatPrice(s.value, 'EUR')}</Text>
-                  <Text style={styles.ownedCount}>{s.cards} carte{s.cards > 1 ? 's' : ''}</Text>
+                  <Text style={styles.ownedCount}>{plural(s.cards, '{n} carte', '{n} cartes')}</Text>
                 </View>
               ) : null}
               {available ? <Ionicons name="chevron-forward" size={18} color={colors.muted} /> : null}

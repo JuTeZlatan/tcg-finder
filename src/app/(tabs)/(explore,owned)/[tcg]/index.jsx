@@ -8,6 +8,7 @@ import { useCardLang } from '../../../../lib/cardLang';
 import { colors, radius } from '../../../../lib/theme';
 import LangToggle from '../../../../components/LangToggle';
 import { Loading, ErrorView } from '../../../../components/Status';
+import { t } from '../../../../lib/i18n';
 
 const GAP = 10;
 
@@ -55,7 +56,7 @@ export default function TcgScreen() {
       <View style={styles.searchRow}>
         <TextInput
           style={[styles.input, { flex: 1 }]}
-          placeholder="Chercher une carte par son nom…"
+          placeholder={t('Chercher une carte par son nom…')}
           placeholderTextColor={colors.muted}
           value={query}
           onChangeText={setQuery}
@@ -63,12 +64,12 @@ export default function TcgScreen() {
           returnKeyType="search"
         />
         <Pressable style={styles.button} onPress={search}>
-          <Text style={styles.buttonText}>OK</Text>
+          <Text style={styles.buttonText}>{t('OK')}</Text>
         </Pressable>
       </View>
       {tcg.getCharacters ? (
         <View style={styles.tabs}>
-          {[['sets', 'Extensions'], ['characters', tcg.charactersLabel]].map(([k, label]) => (
+          {[['sets', t('Extensions')], ['characters', t(tcg.charactersLabel)]].map(([k, label]) => (
             <Pressable key={k} onPress={() => { setTab(k); setFilter(''); }} style={[styles.tab, tab === k && styles.tabActive]}>
               <Text style={[styles.tabText, tab === k && styles.tabTextActive]}>{label}</Text>
             </Pressable>
@@ -77,10 +78,10 @@ export default function TcgScreen() {
       ) : null}
       {showCharacters ? (
         <>
-          <Text style={styles.section}>{tcg.charactersLabel} {characters.data ? `(${shownCharacters.length})` : ''}</Text>
+          <Text style={styles.section}>{t(tcg.charactersLabel)} {characters.data ? `(${shownCharacters.length})` : ''}</Text>
           {tcg.characterOrder ? (
             <View style={styles.orderRow}>
-              {[['alpha', 'A → Z'], ['number', tcg.characterOrder]].map(([k, label]) => (
+              {[['alpha', 'A → Z'], ['number', t(tcg.characterOrder)]].map(([k, label]) => (
                 <Pressable key={k} onPress={() => setOrder(k)} style={[styles.chip, order === k && styles.chipActive]}>
                   <Text style={[styles.chipText, order === k && styles.chipTextActive]}>{label}</Text>
                 </Pressable>
@@ -89,23 +90,23 @@ export default function TcgScreen() {
           ) : null}
         </>
       ) : (
-        <Text style={styles.section}>Extensions {sets.data ? `(${shownSets.length})` : ''}</Text>
+        <Text style={styles.section}>{t('Extensions')}{' '}{sets.data ? `(${shownSets.length})` : ''}</Text>
       )}
       <TextInput
         style={styles.input}
-        placeholder={showCharacters ? `Filtrer les ${tcg.charactersLabel.toLowerCase()}…` : 'Filtrer les extensions…'}
+        placeholder={showCharacters ? t('Filtrer…') : t('Filtrer les extensions…')}
         placeholderTextColor={colors.muted}
         value={filter}
         onChangeText={setFilter}
       />
       {showCharacters ? (
         <>
-          {characters.loading && <Loading text="Chargement…" />}
+          {characters.loading && <Loading text={t('Chargement…')} />}
           {characters.error && <ErrorView error={characters.error} onRetry={characters.retry} />}
         </>
       ) : (
         <>
-          {sets.loading && <Loading text="Chargement des extensions…" />}
+          {sets.loading && <Loading text={t('Chargement des extensions…')} />}
           {sets.error && <ErrorView error={sets.error} onRetry={sets.retry} />}
         </>
       )}

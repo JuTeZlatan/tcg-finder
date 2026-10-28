@@ -9,6 +9,7 @@ import { initializeFirestore } from 'firebase/firestore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
 import services from '../../google-services.json';
+import { t } from './i18n';
 
 const client = services.client.find((c) => c.client_info.android_client_info.package_name === 'com.tcgfinder.app') || services.client[0];
 const projectId = services.project_info.project_id;
@@ -71,12 +72,12 @@ export async function signOut() {
 // Messages d'erreur Firebase en clair.
 export function authErrorMessage(e) {
   const code = e?.code || '';
-  if (code.includes('invalid-email')) return 'Adresse e-mail invalide.';
-  if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return 'E-mail ou mot de passe incorrect. Mot de passe perdu ? Touche « Mot de passe oublié ».';
-  if (code.includes('email-already-in-use')) return 'Un compte existe déjà avec cet e-mail : connecte-toi.';
-  if (code.includes('weak-password')) return 'Mot de passe trop court (6 caractères minimum).';
-  if (code.includes('too-many-requests')) return 'Trop d’essais : réessaie dans quelques minutes.';
-  if (code.includes('network')) return 'Pas de connexion internet.';
-  if (code.includes('DEVELOPER_ERROR') || String(e?.message).includes('DEVELOPER_ERROR')) return 'Connexion Google mal configurée (empreinte SHA de l’appli manquante dans Firebase).';
-  return e?.message || 'Erreur inconnue.';
+  if (code.includes('invalid-email')) return t('Adresse e-mail invalide.');
+  if (code.includes('invalid-credential') || code.includes('wrong-password') || code.includes('user-not-found')) return t('E-mail ou mot de passe incorrect. Mot de passe perdu ? Touche « Mot de passe oublié ».');
+  if (code.includes('email-already-in-use')) return t('Un compte existe déjà avec cet e-mail : connecte-toi.');
+  if (code.includes('weak-password')) return t('Mot de passe trop court (6 caractères minimum).');
+  if (code.includes('too-many-requests')) return t('Trop d’essais : réessaie dans quelques minutes.');
+  if (code.includes('network')) return t('Pas de connexion internet.');
+  if (code.includes('DEVELOPER_ERROR') || String(e?.message).includes('DEVELOPER_ERROR')) return t('Connexion Google mal configurée (empreinte SHA de l’appli manquante dans Firebase).');
+  return e?.message || t('Erreur inconnue.');
 }

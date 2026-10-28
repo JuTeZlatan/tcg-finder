@@ -4,6 +4,7 @@ import { memo } from '../api/http';
 import { loadBundledFile } from '../api/bundledData';
 import { loadData } from '../api/dataSource';
 import { getTcg, dataLang } from '../api';
+import { t } from './i18n';
 
 export const DAY = 86400000;
 export const SOON_DAYS = 14;
@@ -28,11 +29,11 @@ export function daysUntil(date) {
 }
 
 export function countdown(days) {
-  if (days === 0) return 'Aujourd’hui';
-  if (days === 1) return 'Demain';
-  if (days > 1) return `Dans ${days} jours`;
-  if (days === -1) return 'Sortie hier';
-  return `Sortie il y a ${-days} jours`;
+  if (days === 0) return t('Aujourd’hui');
+  if (days === 1) return t('Demain');
+  if (days > 1) return t('Dans {n} jours', { n: days });
+  if (days === -1) return t('Sortie hier');
+  return t('Sortie il y a {n} jours', { n: -days });
 }
 
 const norm = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();

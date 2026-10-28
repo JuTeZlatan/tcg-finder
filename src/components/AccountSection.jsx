@@ -5,14 +5,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { authErrorMessage, resendVerification, resetPassword, signInWithEmail, signInWithGoogle, signOut, signUpWithEmail } from '../lib/firebase';
 import { useSync } from '../lib/sync';
 import { colors, radius } from '../lib/theme';
+import { locale, t } from '../lib/i18n';
 
 const ITEM_BG = 'rgba(25, 28, 35, 0.85)'; // colors.surface, comme le reste du menu
 
 function syncLabel(status) {
-  if (status.state === 'syncing') return 'Sauvegarde en cours…';
-  if (status.state === 'error') return `Sauvegarde impossible : ${status.error}`;
-  if (status.at) return `Collection sauvegardée à ${new Date(status.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`;
-  return 'Collection sauvegardée automatiquement';
+  if (status.state === 'syncing') return t('Sauvegarde en cours…');
+  if (status.state === 'error') return t('Sauvegarde impossible : {0}', { 0: status.error });
+  if (status.at) return t('Collection sauvegardée à {0}', { 0: new Date(status.at).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit' }) });
+  return t('Collection sauvegardée automatiquement');
 }
 
 export default function AccountSection() {
@@ -37,9 +38,9 @@ export default function AccountSection() {
 
   if (user === undefined) return null;
 
-  const askSignOut = () => Alert.alert('Se déconnecter ?', 'Ta collection reste sur ce téléphone et dans ton compte.', [
-    { text: 'Annuler', style: 'cancel' },
-    { text: 'Se déconnecter', style: 'destructive', onPress: () => signOut() },
+  const askSignOut = () => Alert.alert(t('Se déconnecter ?'), t('Ta collection reste sur ce téléphone et dans ton compte.'), [
+    { text: t('Annuler'), style: 'cancel' },
+    { text: t('Se déconnecter'), style: 'destructive', onPress: () => signOut() },
   ]);
 
   // Compte e-mail pas encore confirmé : la sauvegarde attend le clic sur le lien reçu.
@@ -48,33 +49,33 @@ export default function AccountSection() {
       <View style={styles.block}>
         <View style={styles.row}>
           <Ionicons name="mail-unread-outline" size={20} color={colors.accent} />
-          <Text style={[styles.title, { flex: 1 }]}>Confirme ton adresse e-mail</Text>
+          <Text style={[styles.title, { flex: 1 }]}>{t('Confirme ton adresse e-mail')}</Text>
         </View>
         <Text style={styles.muted}>
-          Un lien a été envoyé à {user.email}. Ouvre-le (pense aux spams), puis reviens ici : la sauvegarde démarrera ensuite.
+          {t('Un lien a été envoyé à {email}. Ouvre-le (pense aux spams), puis reviens ici : la sauvegarde démarrera ensuite.', { email: user.email })}
         </Text>
         <Pressable
           style={styles.primary}
           disabled={busy}
           onPress={() => attempt(async () => {
-            if (!(await checkVerified())) setMessage({ error: true, text: 'Adresse pas encore confirmée : ouvre le lien reçu par e-mail.' });
+            if (!(await checkVerified())) setMessage({ error: true, text: t('Adresse pas encore confirmée : ouvre le lien reçu par e-mail.') });
           })}
         >
-          <Text style={styles.primaryText}>J’ai confirmé mon adresse</Text>
+          <Text style={styles.primaryText}>{t('J’ai confirmé mon adresse')}</Text>
         </Pressable>
         <Pressable
           style={styles.secondary}
           disabled={busy}
           onPress={() => attempt(async () => {
             await resendVerification();
-            setMessage({ text: 'Nouvel e-mail de confirmation envoyé.' });
+            setMessage({ text: t('Nouvel e-mail de confirmation envoyé.') });
           })}
         >
           <Ionicons name="refresh" size={18} color={colors.text} />
-          <Text style={styles.secondaryText}>Renvoyer l’e-mail</Text>
+          <Text style={styles.secondaryText}>{t('Renvoyer l’e-mail')}</Text>
         </Pressable>
         <Pressable onPress={askSignOut}>
-          <Text style={[styles.muted, { textAlign: 'center' }]}>Se déconnecter</Text>
+          <Text style={[styles.muted, { textAlign: 'center' }]}>{t('Se déconnecter')}</Text>
         </Pressable>
         {busy ? <ActivityIndicator color={colors.accent} /> : null}
         {message ? <Text style={[styles.muted, message.error && { color: colors.danger }]}>{message.text}</Text> : null}
@@ -88,7 +89,7 @@ export default function AccountSection() {
         <View style={styles.row}>
           <Ionicons name="cloud-done" size={20} color={colors.success} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.title} numberOfLines={1}>{user.email || user.displayName || 'Compte connecté'}</Text>
+            <Text style={styles.title} numberOfLines={1}>{user.email || user.displayName || t('Compte connecté')}</Text>
             <Pressable onPress={syncNow} disabled={status.state === 'syncing'}>
               <Text style={[styles.muted, status.state === 'error' && { color: colors.danger }]}>{syncLabel(status)}</Text>
             </Pressable>
@@ -100,7 +101,7 @@ export default function AccountSection() {
           onPress={askSignOut}
         >
           <Ionicons name="log-out-outline" size={18} color={colors.text} />
-          <Text style={styles.secondaryText}>Se déconnecter</Text>
+          <Text style={styles.secondaryText}>{t('Se déconnecter')}</Text>
         </Pressable>
       </View>
     );
@@ -108,16 +109,16 @@ export default function AccountSection() {
 
   return (
     <View style={styles.block}>
-      <Text style={styles.muted}>Connecte-toi pour sauvegarder ta collection et la retrouver sur un autre téléphone.</Text>
+      <Text style={styles.muted}>{t('Connecte-toi pour sauvegarder ta collection et la retrouver sur un autre téléphone.')}</Text>
       {!form ? (
         <>
           <Pressable style={styles.primary} onPress={() => attempt(signInWithGoogle)} disabled={busy}>
             <Ionicons name="logo-google" size={18} color="#1A1A1A" />
-            <Text style={styles.primaryText}>Se connecter avec Google</Text>
+            <Text style={styles.primaryText}>{t('Se connecter avec Google')}</Text>
           </Pressable>
           <Pressable style={styles.secondary} onPress={() => setForm('signin')} disabled={busy}>
             <Ionicons name="mail-outline" size={18} color={colors.text} />
-            <Text style={styles.secondaryText}>Se connecter avec un e-mail</Text>
+            <Text style={styles.secondaryText}>{t('Se connecter avec un e-mail')}</Text>
           </Pressable>
         </>
       ) : (
@@ -136,7 +137,7 @@ export default function AccountSection() {
             style={styles.input}
             value={password}
             onChangeText={setPassword}
-            placeholder={form === 'signup' ? 'Mot de passe (6 caractères min.)' : 'Mot de passe'}
+            placeholder={form === 'signup' ? t('Mot de passe (6 caractères min.)') : t('Mot de passe')}
             placeholderTextColor={colors.muted}
             secureTextEntry
             autoComplete={form === 'signup' ? 'new-password' : 'current-password'}
@@ -146,27 +147,27 @@ export default function AccountSection() {
             disabled={busy || !email || !password}
             onPress={() => attempt(() => (form === 'signup' ? signUpWithEmail : signInWithEmail)(email, password))}
           >
-            <Text style={styles.primaryText}>{form === 'signup' ? 'Créer mon compte' : 'Se connecter'}</Text>
+            <Text style={styles.primaryText}>{form === 'signup' ? t('Créer mon compte') : t('Se connecter')}</Text>
           </Pressable>
           <View style={styles.links}>
             <Pressable onPress={() => { setForm(form === 'signup' ? 'signin' : 'signup'); setMessage(null); }}>
-              <Text style={styles.link}>{form === 'signup' ? 'J’ai déjà un compte' : 'Créer un compte'}</Text>
+              <Text style={styles.link}>{form === 'signup' ? t('J’ai déjà un compte') : t('Créer un compte')}</Text>
             </Pressable>
             {form === 'signin' ? (
               <Pressable
                 onPress={() => (email
                   ? attempt(async () => {
                     await resetPassword(email);
-                    setMessage({ text: 'Si un compte existe pour cette adresse, un e-mail vient d’être envoyé : suis son lien pour choisir un nouveau mot de passe (pense aux spams).' });
+                    setMessage({ text: t('Si un compte existe pour cette adresse, un e-mail vient d’être envoyé : suis son lien pour choisir un nouveau mot de passe (pense aux spams).') });
                   })
-                  : setMessage({ error: true, text: 'Indique ton e-mail ci-dessus.' }))}
+                  : setMessage({ error: true, text: t('Indique ton e-mail ci-dessus.') }))}
               >
-                <Text style={styles.link}>Mot de passe oublié</Text>
+                <Text style={styles.link}>{t('Mot de passe oublié')}</Text>
               </Pressable>
             ) : null}
           </View>
           <Pressable onPress={() => { setForm(null); setMessage(null); }}>
-            <Text style={[styles.muted, { textAlign: 'center' }]}>Retour</Text>
+            <Text style={[styles.muted, { textAlign: 'center' }]}>{t('Retour')}</Text>
           </Pressable>
         </>
       )}

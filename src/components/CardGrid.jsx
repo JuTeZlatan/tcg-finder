@@ -6,6 +6,7 @@ import { useAsync } from '../lib/useAsync';
 import { colors, radius } from '../lib/theme';
 import { Loading, ErrorView } from './Status';
 import { QuickAdd } from './collection';
+import { plural, t } from '../lib/i18n';
 
 const GAP = 10;
 const PADDING = 16;
@@ -43,15 +44,15 @@ export default function CardGrid({ tcg, lang, load, deps, setId, headerExtra }) 
           {headerExtra}
           <TextInput
             style={styles.input}
-            placeholder="Filtrer par nom ou numéro…"
+            placeholder={t('Filtrer par nom ou numéro…')}
             placeholderTextColor={colors.muted}
             value={filter}
             onChangeText={setFilter}
           />
-          {cards.data && <Text style={styles.count}>{shown.length} cartes</Text>}
-          {cards.loading && <Loading text="Chargement des cartes…" />}
+          {cards.data && <Text style={styles.count}>{plural(shown.length, '{n} carte', '{n} cartes')}</Text>}
+          {cards.loading && <Loading text={t('Chargement des cartes…')} />}
           {cards.error && <ErrorView error={cards.error} onRetry={cards.retry} />}
-          {cards.data && !cards.data.length && <Text style={styles.count}>Aucune carte trouvée.</Text>}
+          {cards.data && !cards.data.length && <Text style={styles.count}>{t('Aucune carte trouvée.')}</Text>}
         </View>
       }
       renderItem={({ item: c }) => (
@@ -60,7 +61,7 @@ export default function CardGrid({ tcg, lang, load, deps, setId, headerExtra }) 
             {c.image ? (
               <Image source={c.image} style={styles.img} contentFit="cover" recyclingKey={c.id} transition={100} />
             ) : (
-              <Text style={styles.noImg}>Pas d’image</Text>
+              <Text style={styles.noImg}>{t('Pas d’image')}</Text>
             )}
             <QuickAdd tcgId={tcg.id} lang={lang} setId={c.setId ?? setId} card={c} version={'label' in c ? { finish: c.finish, label: c.label } : null} />
           </View>

@@ -14,6 +14,7 @@ import { Loading } from '../../../../../components/Status';
 import { openItem } from '../../../../../lib/openItem';
 import { versionKey } from '../../../../../lib/masterSet';
 import { useSettings } from '../../../../../lib/settings';
+import { plural, t } from '../../../../../lib/i18n';
 
 const FILTERS = [
   ['owned', 'Possédées'],
@@ -112,26 +113,26 @@ export default function CollectionSetScreen() {
             <View style={styles.hero}>
               <View style={styles.rowBetween}>
                 <Text style={styles.heroValue}>{formatPrice(s.value, 'EUR')}</Text>
-                <Text style={styles.heroCount}>{s.cards} exemplaire{s.cards > 1 ? 's' : ''}</Text>
+                <Text style={styles.heroCount}>{plural(s.cards, '{n} exemplaire', '{n} exemplaires')}</Text>
               </View>
               {setTotal ? (
                 <>
                   <ProgressBar value={distinct / setTotal} color={distinct >= setTotal ? colors.success : tcg.color} height={8} />
                   <Text style={styles.muted}>
-                    {distinct}/{setTotal} cartes · {percent(Math.min(1, distinct / setTotal))} complétée
-                    {setTotal > distinct ? ` · il en manque ${setTotal - distinct}` : ' · extension complète !'}
+                    {t('{owned}/{total} cartes · {pct} complétée', { owned: distinct, total: setTotal, pct: percent(Math.min(1, distinct / setTotal)) })}
+                    {setTotal > distinct ? ` · ${t('il en manque {n}', { n: setTotal - distinct })}` : ` · ${t('extension complète !')}`}
                   </Text>
-                  {extra ? <Text style={styles.muted}>+ {extra} cartes secrètes ou spéciales hors numérotation</Text> : null}
+                  {extra ? <Text style={styles.muted}>{t('+ {n} cartes secrètes ou spéciales hors numérotation', { n: extra })}</Text> : null}
                 </>
               ) : (
-                <Text style={styles.muted}>{distinct} carte{distinct > 1 ? 's' : ''} différente{distinct > 1 ? 's' : ''}</Text>
+                <Text style={styles.muted}>{plural(distinct, '{n} carte différente', '{n} cartes différentes')}</Text>
               )}
             </View>
             {tcg.getVersions ? (
               <View style={styles.chips}>
                 {MODES.map(([k, label]) => (
                   <Pressable key={k} onPress={() => setMode(k)} style={[styles.chip, mode === k && styles.chipActive]}>
-                    <Text style={[styles.chipText, mode === k && styles.chipTextActive]}>{label}</Text>
+                    <Text style={[styles.chipText, mode === k && styles.chipTextActive]}>{t(label)}</Text>
                   </Pressable>
                 ))}
               </View>
@@ -140,19 +141,19 @@ export default function CollectionSetScreen() {
               <View style={styles.hero}>
                 <ProgressBar value={masterOwned / versionList.length} color={masterOwned >= versionList.length ? colors.success : tcg.color} height={8} />
                 <Text style={styles.muted}>
-                  Master set : {masterOwned}/{versionList.length} versions · {percent(masterOwned / versionList.length)}
-                  {versionList.length > masterOwned ? ` · il en manque ${versionList.length - masterOwned}` : ' · master set complet !'}
+                  {t('Master set : {owned}/{total} versions · {pct}', { owned: masterOwned, total: versionList.length, pct: percent(masterOwned / versionList.length) })}
+                  {versionList.length > masterOwned ? t(' · il en manque {0}', { 0: versionList.length - masterOwned }) : t(' · master set complet !')}
                 </Text>
               </View>
             ) : null}
             <View style={styles.chips}>
               {FILTERS.map(([k, label]) => (
                 <Pressable key={k} onPress={() => setFilter(k)} style={[styles.chip, filter === k && styles.chipActive]}>
-                  <Text style={[styles.chipText, filter === k && styles.chipTextActive]}>{label}</Text>
+                  <Text style={[styles.chipText, filter === k && styles.chipTextActive]}>{t(label)}</Text>
                 </Pressable>
               ))}
             </View>
-            {(master ? versions.loading : filter !== 'owned' && full.loading) ? <Loading text="Chargement de l'extension…" /> : null}
+            {(master ? versions.loading : filter !== 'owned' && full.loading) ? <Loading text={t('Chargement de l\'extension…')} /> : null}
           </View>
         }
         renderItem={({ item: c }) => (
@@ -162,7 +163,7 @@ export default function CollectionSetScreen() {
           >
             <View style={[styles.imgBox, !c.qty && { opacity: 0.35 }]}>
               {c.image ? <Image source={c.image} style={{ width: '100%', height: '100%' }} contentFit="cover" recyclingKey={c.id} /> : null}
-              {c.qty ? <Text style={styles.qty}>×{c.qty}</Text> : null}
+              {c.qty ? <Text style={styles.qty}>{t('×')}{c.qty}</Text> : null}
               {c.key && c.lang && tcgId !== 'custom' ? <LangBadge lang={c.lang} /> : null}
             </View>
             <Text style={styles.name} numberOfLines={1}>{c.name}</Text>

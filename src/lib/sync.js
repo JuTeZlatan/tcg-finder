@@ -12,6 +12,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { db, isVerified, onUser } from './firebase';
 import { useCollection } from './collection';
 import { useSettings } from './settings';
+import { t } from './i18n';
 
 const PUSH_DELAY = 3000;
 const SYNCED_SETTINGS = ['pseudo', 'avatar', 'setView', 'priceSource', 'currency', 'followed', 'updatedAt'];
@@ -140,7 +141,7 @@ export function SyncProvider({ children }) {
       await job();
       setStatus({ state: 'ok', at: Date.now(), error: null });
     } catch (e) {
-      setStatus({ state: 'error', at: Date.now(), error: e?.code === 'permission-denied' ? 'Accès refusé par Firebase (règles Firestore).' : e?.message || 'Erreur' });
+      setStatus({ state: 'error', at: Date.now(), error: e?.code === 'permission-denied' ? t('Accès refusé par Firebase (règles Firestore).') : e?.message || t('Erreur') });
     }
   }, []);
 

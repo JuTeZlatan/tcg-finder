@@ -15,6 +15,7 @@ import { useCollection } from '../../../../../lib/collection';
 import { defaultFinish, finishLabel, finishesOf, storedFinish } from '../../../../../lib/finishes';
 import { Ionicons } from '@expo/vector-icons';
 import { marketLinks } from '../../../../../lib/marketLinks';
+import { locale, t } from '../../../../../lib/i18n';
 
 export default function CardScreen() {
   useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
@@ -38,13 +39,13 @@ export default function CardScreen() {
   // Site(s) de prix choisi(s) dans le menu : prix moyen et blocs affichés en dépendent.
   const { priceSource } = useSettings().settings;
   const avg = c && fx.data ? averagePrice(c.prices, fx.data, { recent: isRecentSet(set?.date), finish: chosen, source: priceSource }) : null;
-  const priceTitle = priceSource === 'both' ? 'Prix moyen' : `Prix ${PRICE_SOURCES[priceSource]}`;
+  const priceTitle = priceSource === 'both' ? t('Prix moyen') : t('Prix {0}', { 0: PRICE_SOURCES[priceSource] });
 
   return (
     <>
       <Stack.Screen options={{ title: c?.name ?? '' }} />
       <ScrollView contentContainerStyle={styles.page}>
-        {card.loading && <Loading text="Chargement de la carte…" />}
+        {card.loading && <Loading text={t('Chargement de la carte…')} />}
         {card.error && <ErrorView error={card.error} onRetry={card.retry} />}
         {c && (
           <>
@@ -53,7 +54,7 @@ export default function CardScreen() {
             ) : null}
             <Text style={styles.name}>{c.name}</Text>
             {/* Nom traduit par nos soins (Riftbound en français) : le nom anglais officiel reste affiché. */}
-            {c.nameEn ? <Text style={styles.muted}>Nom officiel : {c.nameEn} · traduction non officielle</Text> : null}
+            {c.nameEn ? <Text style={styles.muted}>{t('Nom officiel : {name} · traduction non officielle', { name: c.nameEn })}</Text> : null}
             {c.subtitle ? <Text style={styles.muted}>{c.subtitle}</Text> : null}
 
             <FinishPicker prices={c.prices} value={finish} onChange={setFinish} ownedFinishes={ownedFinishes} />
@@ -64,19 +65,19 @@ export default function CardScreen() {
                 <>
                   <Text style={styles.avgValue}>{formatPrice(avg.value, 'EUR')}</Text>
                   {priceSource === 'both' ? (
-                    <Text style={styles.muted}>Moyenne de {avg.sources.join(' + ')}{avg.sources.length > 1 ? '' : ' (une seule source)'}</Text>
+                    <Text style={styles.muted}>{avg.sources.length > 1 ? t('Moyenne de {sources}', { sources: avg.sources.join(' + ') }) : t('Moyenne de {sources} (une seule source)', { sources: avg.sources.join(' + ') })}</Text>
                   ) : null}
                   {avg.divergent ? (
                     <Text style={styles.warning}>
-                      ⚠ Les sites donnent des prix très différents : vérifie la version exacte (édition, version alternative) avant d’acheter ou de vendre.
+                      {t('⚠ Les sites donnent des prix très différents : vérifie la version exacte (édition, version alternative) avant d’acheter ou de vendre.')}
                     </Text>
                   ) : null}
                   {avg.recent ? (
-                    <Text style={styles.muted}>Extension sortie il y a moins de 40 jours : les prix bougent encore beaucoup.</Text>
+                    <Text style={styles.muted}>{t('Extension sortie il y a moins de 40 jours : les prix bougent encore beaucoup.')}</Text>
                   ) : null}
                 </>
               ) : (
-                <Text style={styles.muted}>{fx.loading ? 'Calcul…' : (priceSource === 'both' ? 'Aucun prix disponible pour cette carte.' : `Pas de prix ${PRICE_SOURCES[priceSource]} pour cette carte.`)}</Text>
+                <Text style={styles.muted}>{fx.loading ? t('Calcul…') : (priceSource === 'both' ? t('Aucun prix disponible pour cette carte.') : t('Pas de prix {0} pour cette carte.', { 0: PRICE_SOURCES[priceSource] }))}</Text>
               )}
             </View>
 
@@ -86,7 +87,7 @@ export default function CardScreen() {
               <View key={sourceLabel(p)} style={styles.block}>
                 <Text style={styles.blockTitle}>
                   {sourceLabel(p)}
-                  {p.updated ? <Text style={styles.muted}>  · maj {new Date(p.updated).toLocaleDateString('fr-FR')}</Text> : null}
+                  {p.updated ? <Text style={styles.muted}>{'  · '}{t('maj {date}', { date: new Date(p.updated).toLocaleDateString(locale()) })}</Text> : null}
                 </Text>
                 {p.items.filter((i) => i.value != null).map((i, idx) => (
                   <View key={idx} style={styles.priceRow}>
@@ -99,7 +100,7 @@ export default function CardScreen() {
 
             {c.versions?.length ? (
               <>
-                <Text style={styles.section}>Autres versions de cette carte</Text>
+                <Text style={styles.section}>{t('Autres versions de cette carte')}</Text>
                 <View style={styles.block}>
                   {c.versions.map((v) => (
                     <Pressable key={v.url} style={styles.versionRow} onPress={() => Linking.openURL(v.url)}>
@@ -110,12 +111,12 @@ export default function CardScreen() {
                       </Text>
                     </Pressable>
                   ))}
-                  <Text style={styles.mutedLeft}>Prix TCGplayer (marché). Touche une version pour la voir.</Text>
+                  <Text style={styles.mutedLeft}>{t('Prix TCGplayer (marché). Touche une version pour la voir.')}</Text>
                 </View>
               </>
             ) : null}
 
-            <Text style={styles.section}>Informations</Text>
+            <Text style={styles.section}>{t('Informations')}</Text>
             <View style={styles.block}>
               {c.details.map(([key, value]) => (
                 <View key={key} style={styles.detailRow}>
@@ -126,7 +127,7 @@ export default function CardScreen() {
             </View>
 
 
-            <Text style={styles.section}>Acheter, vendre, comparer</Text>
+            <Text style={styles.section}>{t('Acheter, vendre, comparer')}</Text>
             <View style={styles.marketRow}>
               {marketLinks(tcg.id, c, lang).map((m) => (
                 <Pressable key={m.key} style={styles.marketBtn} onPress={() => Linking.openURL(m.url)}>
@@ -138,13 +139,12 @@ export default function CardScreen() {
             <View style={styles.links}>
               {c.links.map((l) => (
                 <Pressable key={l.label} style={styles.link} onPress={() => Linking.openURL(l.url)}>
-                  <Text style={styles.linkText}>Voir sur {l.label} ↗</Text>
+                  <Text style={styles.linkText}>{t('Voir sur {site}', { site: l.label })} ↗</Text>
                 </Pressable>
               ))}
             </View>
             <Text style={styles.footer}>
-              Prix indicatifs (toutes langues confondues chez Cardmarket), à vérifier sur les places de marché.
-              Taux USD→EUR du jour : {fx.data?.toFixed(3) ?? '…'}.
+              {t('Prix indicatifs (toutes langues confondues chez Cardmarket), à vérifier sur les places de marché. Taux USD→EUR du jour : {rate}.', { rate: fx.data?.toFixed(3) ?? '…' })}
             </Text>
           </>
         )}

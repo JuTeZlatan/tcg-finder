@@ -6,12 +6,15 @@ import SideMenu from '../../components/SideMenu';
 import { useSettings } from '../../lib/settings';
 import { useAsync } from '../../lib/useAsync';
 import { daysUntil, loadReleases } from '../../lib/releases';
+import { t, takeReopenMenu } from '../../lib/i18n';
 
 // L'appli s'ouvre sur l'Explorer, même si le bouton « Menu » est le premier de la barre.
 export const unstable_settings = { initialRouteName: '(explore)' };
 
 export default function TabsLayout() {
-  const [menuOpen, setMenuOpen] = useState(false);
+  // Rouvert d'office juste après un changement de langue (l'appli vient d'être redessinée).
+  const [menuOpen, setMenuOpen] = useState(takeReopenMenu);
+  const [menuPage] = useState(() => (menuOpen ? 'language' : 'main'));
   // Badge de l'onglet « Sorties » : sorties suivies qui arrivent dans les 7 jours.
   const releases = useAsync(() => loadReleases(), []);
   const followed = new Set(useSettings().settings.followed || []);
@@ -34,7 +37,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="menu"
         options={{
-          title: 'Menu',
+          title: t('Menu'),
           tabBarIcon: ({ color, size }) => <Ionicons name="person-circle-outline" color={color} size={size} />,
         }}
         listeners={{
@@ -47,8 +50,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="releases"
         options={{
-          title: 'Sorties',
-          headerTitle: 'Prochaines sorties',
+          title: t('Sorties'),
+          headerTitle: t('Prochaines sorties'),
           tabBarIcon: ({ color, size }) => <Ionicons name="calendar-outline" color={color} size={size} />,
           tabBarBadge: dueSoon || undefined,
           tabBarBadgeStyle: { backgroundColor: colors.accent, color: '#1A1A1A' },
@@ -57,7 +60,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="(explore)"
         options={{
-          title: 'Explorer',
+          title: t('Explorer'),
           headerShown: false, // en-têtes gérés par la pile de l'onglet
           tabBarIcon: ({ color, size }) => <Ionicons name="search" color={color} size={size} />,
         }}
@@ -65,21 +68,21 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="scan"
         options={{
-          title: 'Scanner',
-          headerTitle: 'Scanner une carte',
+          title: t('Scanner'),
+          headerTitle: t('Scanner une carte'),
           tabBarIcon: ({ color, size }) => <Ionicons name="scan" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="(owned)"
         options={{
-          title: 'Ma collection',
+          title: t('Ma collection'),
           headerShown: false,
           tabBarIcon: ({ color, size }) => <Ionicons name="albums" color={color} size={size} />,
         }}
       />
     </Tabs>
-    <SideMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+    <SideMenu open={menuOpen} initialPage={menuPage} onClose={() => setMenuOpen(false)} />
     </>
   );
 }

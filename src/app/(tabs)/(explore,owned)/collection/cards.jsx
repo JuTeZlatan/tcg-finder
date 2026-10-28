@@ -9,6 +9,7 @@ import { openItem } from '../../../../lib/openItem';
 import { formatPrice } from '../../../../lib/prices';
 import { colors, radius } from '../../../../lib/theme';
 import { useSettings } from '../../../../lib/settings';
+import { plural, t } from '../../../../lib/i18n';
 
 const SORTS = [
   ['value', 'Valeur totale'],
@@ -33,7 +34,7 @@ export default function AllCardsScreen() {
   const [tcgFilter, setTcgFilter] = useState(params.tcg || null);
   const [sort, setSort] = useState('value');
   const [query, setQuery] = useState('');
-  const ownedTcgs = [...TCGS, CUSTOM_TCG].filter((t) => items.some((i) => i.tcg === t.id));
+  const ownedTcgs = [...TCGS, CUSTOM_TCG].filter((tg) => items.some((i) => i.tcg === tg.id));
 
   const q = query.trim().toLowerCase();
   const list = items
@@ -43,7 +44,7 @@ export default function AllCardsScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: 'Toutes mes cartes' }} />
+      <Stack.Screen options={{ title: t('Toutes mes cartes') }} />
       <FlatList
         data={list}
         keyExtractor={(i) => i.key}
@@ -54,30 +55,30 @@ export default function AllCardsScreen() {
           <View style={{ gap: 10, marginBottom: 4 }}>
             <TextInput
               style={styles.input}
-              placeholder="Chercher dans ma collection (nom, extension, numéro)…"
+              placeholder={t('Chercher dans ma collection (nom, extension, numéro)…')}
               placeholderTextColor={colors.muted}
               value={query}
               onChangeText={setQuery}
             />
             <View style={styles.chips}>
               <Pressable onPress={() => setTcgFilter(null)} style={[styles.chip, !tcgFilter && styles.chipActive]}>
-                <Text style={[styles.chipText, !tcgFilter && styles.chipTextActive]}>Tous</Text>
+                <Text style={[styles.chipText, !tcgFilter && styles.chipTextActive]}>{t('Tous')}</Text>
               </Pressable>
-              {ownedTcgs.map((t) => (
-                <Pressable key={t.id} onPress={() => setTcgFilter(t.id)} style={[styles.chip, tcgFilter === t.id && { backgroundColor: t.color }]}>
-                  <Text style={[styles.chipText, tcgFilter === t.id && styles.chipTextActive]}>{t.name}</Text>
+              {ownedTcgs.map((tg) => (
+                <Pressable key={tg.id} onPress={() => setTcgFilter(tg.id)} style={[styles.chip, tcgFilter === tg.id && { backgroundColor: tg.color }]}>
+                  <Text style={[styles.chipText, tcgFilter === tg.id && styles.chipTextActive]}>{t(tg.name)}</Text>
                 </Pressable>
               ))}
             </View>
             <View style={styles.chips}>
               {SORTS.map(([k, label]) => (
                 <Pressable key={k} onPress={() => setSort(k)} style={[styles.chipSmall, sort === k && styles.chipActive]}>
-                  <Text style={[styles.chipText, sort === k && styles.chipTextActive]}>{label}</Text>
+                  <Text style={[styles.chipText, sort === k && styles.chipTextActive]}>{t(label)}</Text>
                 </Pressable>
               ))}
             </View>
             <Text style={styles.summary}>
-              {list.length} cartes différentes · {s.cards} exemplaires · {formatPrice(s.value, 'EUR')}
+              {[plural(list.length, '{n} carte différente', '{n} cartes différentes'), plural(s.cards, '{n} exemplaire', '{n} exemplaires'), formatPrice(s.value, 'EUR')].join(' · ')}
             </Text>
           </View>
         }
@@ -96,14 +97,14 @@ export default function AllCardsScreen() {
               </Text>
               <Text style={styles.meta}>
                 {i.lang.toUpperCase()} · ×{i.qty}
-                {i.price != null ? ` · ${formatPrice(i.price, 'EUR')} l'unité` : ' · prix inconnu'}
-                {i.divergent ? ' · ⚠ écart entre sites' : ''}
+                {i.price != null ? t(' · {0} l\'unité', { 0: formatPrice(i.price, 'EUR') }) : t(' · prix inconnu')}
+                {i.divergent ? t(' · ⚠ écart entre sites') : ''}
               </Text>
             </View>
             <Text style={styles.value}>{i.price != null ? formatPrice(i.price * i.qty, 'EUR') : '—'}</Text>
           </Pressable>
         )}
-        ListEmptyComponent={<Text style={styles.meta}>Aucune carte ne correspond.</Text>}
+        ListEmptyComponent={<Text style={styles.meta}>{t('Aucune carte ne correspond.')}</Text>}
       />
     </>
   );

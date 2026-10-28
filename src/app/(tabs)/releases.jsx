@@ -14,9 +14,10 @@ import { useSettings } from '../../lib/settings';
 import { useCardLang } from '../../lib/cardLang';
 import { SOON_DAYS, countdown, daysUntil, findSetForRelease, loadReleases, releaseLinks } from '../../lib/releases';
 import { colors, radius } from '../../lib/theme';
+import { locale, t } from '../../lib/i18n';
 
-const MONTH = (date) => new Date(`${date}T12:00:00`).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
-const FULL_DATE = (date) => new Date(`${date}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+const MONTH = (date) => new Date(`${date}T12:00:00`).toLocaleDateString(locale(), { month: 'long', year: 'numeric' });
+const FULL_DATE = (date) => new Date(`${date}T12:00:00`).toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' });
 
 export default function ReleasesScreen() {
   const data = useAsync(() => loadReleases(), []);
@@ -36,7 +37,7 @@ export default function ReleasesScreen() {
   const recent = visible.filter((r) => r.days < 0).reverse();
   const mine = upcoming.filter((r) => followed.has(r.key));
   const soon = upcoming.filter((r) => r.days <= SOON_DAYS).length;
-  const gamesWithReleases = TCGS.filter((t) => all.some((r) => r.tcg === t.id && r.days >= 0));
+  const gamesWithReleases = TCGS.filter((tg) => all.some((r) => r.tcg === tg.id && r.days >= 0));
 
   // Frise : sorties à venir regroupées par mois (les sorties suivies sont déjà en tête de page).
   const months = [];
@@ -72,23 +73,23 @@ export default function ReleasesScreen() {
 
       {/* En bref */}
       <View style={styles.stats}>
-        <Stat value={upcoming.length} label="à venir" />
-        <Stat value={soon} label="dans 2 semaines" accent />
-        <Stat value={mine.length} label="suivies" />
+        <Stat value={upcoming.length} label={t('à venir')} />
+        <Stat value={soon} label={t('dans 2 semaines')} accent />
+        <Stat value={mine.length} label={t('suivies')} />
       </View>
 
       {/* Filtres */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
-        <Chip label="Tous" active={filter === 'all'} onPress={() => setFilter('all')} />
-        {myGames.size ? <Chip label="Mes jeux" icon="albums" active={filter === 'mine'} onPress={() => setFilter('mine')} /> : null}
-        {gamesWithReleases.map((t) => (
-          <Chip key={t.id} label={t.name} image={GAME_ICONS[t.id]} active={filter === t.id} onPress={() => setFilter(t.id)} />
+        <Chip label={t('Tous')} active={filter === 'all'} onPress={() => setFilter('all')} />
+        {myGames.size ? <Chip label={t('Mes jeux')} icon="albums" active={filter === 'mine'} onPress={() => setFilter('mine')} /> : null}
+        {gamesWithReleases.map((tg) => (
+          <Chip key={tg.id} label={tg.name} image={GAME_ICONS[tg.id]} active={filter === tg.id} onPress={() => setFilter(tg.id)} />
         ))}
       </ScrollView>
 
       {mine.length ? (
         <View style={{ gap: 8 }}>
-          <Text style={styles.section}>Mes sorties suivies</Text>
+          <Text style={styles.section}>{t('Mes sorties suivies')}</Text>
           {mine.map(row)}
         </View>
       ) : null}
@@ -99,12 +100,12 @@ export default function ReleasesScreen() {
           {list.map(row)}
         </View>
       ))}
-      {!data.loading && !upcoming.length ? <Text style={styles.hint}>Aucune sortie annoncée pour ce filtre.</Text> : null}
+      {!data.loading && !upcoming.length ? <Text style={styles.hint}>{t('Aucune sortie annoncée pour ce filtre.')}</Text> : null}
 
       {recent.length ? (
         <View style={{ gap: 8 }}>
           <Pressable style={styles.recentHead} onPress={() => setShowRecent((v) => !v)}>
-            <Text style={styles.section}>Sorties récentes ({recent.length})</Text>
+            <Text style={styles.section}>{t('Sorties récentes ({n})', { n: recent.length })}</Text>
             <Ionicons name={showRecent ? 'chevron-up' : 'chevron-down'} size={18} color={colors.muted} />
           </Pressable>
           {showRecent ? recent.map(row) : null}
@@ -140,7 +141,7 @@ function ReleaseRow({ release: r, followed, expanded, onToggle, onFollow }) {
           <Text style={styles.name} numberOfLines={2}>{r.name}</Text>
           <Text style={[styles.when, isSoon && styles.whenSoon]}>{countdown(r.days)} · {FULL_DATE(r.date)}</Text>
         </View>
-        <Pressable onPress={onFollow} hitSlop={10} accessibilityLabel={followed ? 'Ne plus suivre' : 'Suivre cette sortie'}>
+        <Pressable onPress={onFollow} hitSlop={10} accessibilityLabel={followed ? t('Ne plus suivre') : t('Suivre cette sortie')}>
           <Ionicons name={followed ? 'star' : 'star-outline'} size={22} color={followed ? colors.accent : colors.muted} />
         </Pressable>
       </Pressable>
@@ -153,12 +154,12 @@ function ReleaseRow({ release: r, followed, expanded, onToggle, onFollow }) {
               onPress={() => router.navigate({ pathname: '/(tabs)/(explore)/[tcg]/set/[setId]', params: { tcg: set.data.tcg, setId: set.data.setId, name: set.data.name } })}
             >
               <Ionicons name="albums-outline" size={18} color="#1A1A1A" />
-              <Text style={styles.primaryText}>Voir les cartes de l’extension</Text>
+              <Text style={styles.primaryText}>{t('Voir les cartes de l’extension')}</Text>
             </Pressable>
           ) : (
-            <Text style={styles.hint}>Les cartes ne sont pas encore publiées : elles apparaîtront ici dès que les sources les mettront en ligne.</Text>
+            <Text style={styles.hint}>{t('Les cartes ne sont pas encore publiées : elles apparaîtront ici dès que les sources les mettront en ligne.')}</Text>
           )}
-          <Text style={styles.label}>{r.days >= 0 ? 'Précommander / comparer' : 'Acheter / comparer'}</Text>
+          <Text style={styles.label}>{r.days >= 0 ? t('Précommander / comparer') : t('Acheter / comparer')}</Text>
           <View style={styles.linkRow}>
             {releaseLinks(r).map((l) => (
               <Pressable key={l.key} style={styles.link} onPress={() => Linking.openURL(l.url)}>

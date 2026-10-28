@@ -16,6 +16,7 @@ import { colors, radius } from '../../lib/theme';
 import { useFinishChoice } from '../../components/collection';
 import { useSettings } from '../../lib/settings';
 import { finishLabel, storedFinish } from '../../lib/finishes';
+import { t } from '../../lib/i18n';
 
 export default function ScanScreen() {
   useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
@@ -47,12 +48,12 @@ export default function ScanScreen() {
     return (
       <View style={styles.center}>
         <Ionicons name="camera-outline" size={56} color={colors.muted} />
-        <Text style={styles.title}>Scanner une carte</Text>
+        <Text style={styles.title}>{t('Scanner une carte')}</Text>
         <Text style={styles.muted}>
-          L’appareil photo sert à lire le code imprimé sur la carte (en bas). La photo reste sur ton téléphone.
+          {t('L’appareil photo sert à lire le code imprimé sur la carte (en bas). La photo reste sur ton téléphone.')}
         </Text>
         <Pressable style={styles.primary} onPress={requestPermission}>
-          <Text style={styles.primaryText}>Autoriser l’appareil photo</Text>
+          <Text style={styles.primaryText}>{t('Autoriser l’appareil photo')}</Text>
         </Pressable>
       </View>
     );
@@ -72,7 +73,7 @@ export default function ScanScreen() {
         />
       ) : null}
       <View style={styles.overlay} pointerEvents="box-none">
-        <Text style={styles.hint}>Cadre la carte entière, bien éclairée.{'\n'}Le code en bas (ex. OP09-119, 004/084) doit être net.{'\n'}Cartes en {LANG_NAMES[cardLang]?.toLowerCase()}.</Text>
+        <Text style={styles.hint}>{t('Cadre la carte entière, bien éclairée.')}{'\n'}{t('Le code en bas (ex. OP09-119, 004/084) doit être net.')}{'\n'}{t('Langue des cartes')} : {t(LANG_NAMES[cardLang])}.</Text>
         <View style={styles.frame} pointerEvents="none">
           <View style={[styles.corner, { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4 }]} />
           <View style={[styles.corner, { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4 }]} />
@@ -80,7 +81,7 @@ export default function ScanScreen() {
           <View style={[styles.corner, { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4 }]} />
         </View>
         <View style={styles.controls}>
-          <Pressable style={styles.sideBtn} onPress={() => setTorch((t) => !t)}>
+          <Pressable style={styles.sideBtn} onPress={() => setTorch((tg) => !tg)}>
             <Ionicons name={torch ? 'flash' : 'flash-off'} size={24} color={colors.text} />
           </Pressable>
           <Pressable style={[styles.shutter, (!ready || state.step === 'analyzing') && { opacity: 0.5 }]} onPress={scan} disabled={!ready || state.step === 'analyzing'}>
@@ -89,7 +90,7 @@ export default function ScanScreen() {
           {/* Reconnaissance uniquement avec l'appareil photo : espace vide pour centrer le déclencheur. */}
           <View style={[styles.sideBtn, { backgroundColor: 'transparent' }]} />
         </View>
-        {state.step === 'analyzing' ? <Text style={styles.analyzing}>Lecture de la carte…</Text> : null}
+        {state.step === 'analyzing' ? <Text style={styles.analyzing}>{t('Lecture de la carte…')}</Text> : null}
       </View>
     </View>
   );
@@ -100,7 +101,7 @@ function NewScanButton({ onPress }) {
   return (
     <Pressable style={styles.newScan} onPress={onPress} hitSlop={8}>
       <Ionicons name="scan" size={18} color={colors.accent} />
-      <Text style={styles.newScanText}>Nouveau scan</Text>
+      <Text style={styles.newScanText}>{t('Nouveau scan')}</Text>
     </Pressable>
   );
 }
@@ -113,24 +114,24 @@ function Result({ state, setState, onRetry }) {
       <ScrollView contentContainerStyle={styles.resultPage}>
         <NewScanButton onPress={onRetry} />
         <Ionicons name="help-circle-outline" size={56} color={colors.muted} style={{ alignSelf: 'center' }} />
-        <Text style={styles.title}>Carte non reconnue</Text>
+        <Text style={styles.title}>{t('Carte non reconnue')}</Text>
         <Text style={styles.muted}>
           {state.error
-            ? `Erreur : ${state.error}`
-            : 'Aucun code de carte lisible. Rapproche-toi, évite les reflets (sleeve brillante) et vérifie que le bas de la carte est net.'}
+            ? t('Erreur : {0}', { 0: state.error })
+            : t('Aucun code de carte lisible. Rapproche-toi, évite les reflets (sleeve brillante) et vérifie que le bas de la carte est net.')}
         </Text>
         {state.text ? (
           <View style={styles.box}>
-            <Text style={styles.boxTitle}>Texte lu</Text>
+            <Text style={styles.boxTitle}>{t('Texte lu')}</Text>
             <Text style={styles.muted} numberOfLines={8}>{state.text}</Text>
           </View>
         ) : null}
         <Pressable style={styles.primary} onPress={onRetry}>
           <Ionicons name="scan" size={18} color="#1A1A1A" />
-          <Text style={styles.primaryText}>Réessayer</Text>
+          <Text style={styles.primaryText}>{t('Réessayer')}</Text>
         </Pressable>
         <Pressable style={styles.secondary} onPress={() => router.navigate('/(tabs)/(explore)')}>
-          <Text style={styles.secondaryText}>Chercher à la main</Text>
+          <Text style={styles.secondaryText}>{t('Chercher à la main')}</Text>
         </Pressable>
         {/* Carte hors catalogue : saisie manuelle (rangée dans « Autres ») avec la photo et le nom lus. */}
         <Pressable
@@ -140,7 +141,7 @@ function Result({ state, setState, onRetry }) {
             params: { photo: state.photo ?? '', name: nameCandidates((state.text || '').split('\n'))[0] ?? '' },
           })}
         >
-          <Text style={styles.secondaryText}>L’ajouter à la main (dans « Autres »)</Text>
+          <Text style={styles.secondaryText}>{t('L’ajouter à la main (dans « Autres »)')}</Text>
         </Pressable>
       </ScrollView>
     );
@@ -151,7 +152,7 @@ function Result({ state, setState, onRetry }) {
       <ScannedCard key={`${best.tcgId}|${best.id}|${best.lang}`} c={best} />
       {candidates.length > 1 ? (
         <>
-          <Text style={styles.section}>Pas la bonne version ? ({candidates.length} possibilités)</Text>
+          <Text style={styles.section}>{t('Pas la bonne version ? ({n} possibilités)', { n: candidates.length })}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {candidates.map((c, i) => (
               <Pressable key={`${c.tcgId}|${c.id}|${c.lang}`} onPress={() => setState({ ...state, selected: i })} style={[styles.alt, i === selected && styles.altActive]}>
@@ -165,7 +166,7 @@ function Result({ state, setState, onRetry }) {
       ) : null}
       <Pressable style={styles.primary} onPress={onRetry}>
         <Ionicons name="scan" size={18} color="#1A1A1A" />
-        <Text style={styles.primaryText}>Scanner une autre carte</Text>
+        <Text style={styles.primaryText}>{t('Scanner une autre carte')}</Text>
       </Pressable>
     </ScrollView>
   );
@@ -194,11 +195,11 @@ function ScannedCard({ c }) {
       <View style={styles.badgeRow}>
         <Text style={[styles.badge, { backgroundColor: tcg.color }]}>{tcg.name}</Text>
         <Text style={styles.badgeOutline}>{c.lang.toUpperCase()}</Text>
-        <Text style={styles.why} numberOfLines={1}>{c.why.startsWith('nom') ? `Reconnue par le ${c.why}` : `Code lu : ${c.why}`}</Text>
+        <Text style={styles.why} numberOfLines={1}>{c.why.startsWith('nom') ? t('Reconnue par son nom') : t('Code lu : {0}', { 0: c.why })}</Text>
       </View>
       {c.why.startsWith('nom') ? (
         <Text style={styles.nameOnly}>
-          ⚠ Code de la carte illisible : reconnue par son nom. Vérifie la version (édition, version alternative) dans les choix plus bas, le prix peut beaucoup varier.
+          {t('⚠ Code de la carte illisible : reconnue par son nom. Vérifie la version (édition, version alternative) dans les choix plus bas, le prix peut beaucoup varier.')}
         </Text>
       ) : null}
       {image ? <Image source={image} style={styles.cardImg} contentFit="contain" transition={150} /> : null}
@@ -208,9 +209,9 @@ function ScannedCard({ c }) {
       <View style={styles.priceBox}>
         {info.loading ? <ActivityIndicator color={colors.accent} /> : (
           <>
-            <Text style={styles.priceLabel}>Prix moyen{chosen ? ` · ${finishLabel(card.prices, chosen)}` : ''}</Text>
+            <Text style={styles.priceLabel}>{t('Prix moyen')}{chosen ? ` · ${finishLabel(card.prices, chosen)}` : ''}</Text>
             <Text style={styles.priceValue}>{avg ? formatPrice(avg.value, 'EUR') : '—'}</Text>
-            {avg ? <Text style={styles.mutedCenter}>Moyenne de {avg.sources.join(' + ')}</Text> : null}
+            {avg ? <Text style={styles.mutedCenter}>{t('Moyenne de {sources}', { sources: avg.sources.join(' + ') })}</Text> : null}
           </>
         )}
       </View>
@@ -222,13 +223,13 @@ function ScannedCard({ c }) {
         })}
       >
         <Ionicons name={owned ? 'add-circle' : 'albums'} size={20} color="#1A1A1A" />
-        <Text style={styles.primaryText}>{owned ? `Ajouter un exemplaire (j'en ai ${owned})` : 'Ajouter à ma collection'}</Text>
+        <Text style={styles.primaryText}>{owned ? t('Ajouter un exemplaire (j\'en ai {0})', { 0: owned }) : t('Ajouter à ma collection')}</Text>
       </Pressable>
       <Pressable
         style={styles.secondary}
         onPress={() => router.push({ pathname: '/(tabs)/(explore)/[tcg]/card/[cardId]', params: { tcg: c.tcgId, cardId: c.id, setId: c.setId ?? '' } })}
       >
-        <Text style={styles.secondaryText}>Voir la fiche complète</Text>
+        <Text style={styles.secondaryText}>{t('Voir la fiche complète')}</Text>
       </Pressable>
     </View>
   );

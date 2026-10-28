@@ -14,6 +14,7 @@ import { GAME_ICONS } from '../lib/gameIcons';
 import { CURRENCIES, PRICE_SOURCES, formatPrice } from '../lib/prices';
 import { colors, radius } from '../lib/theme';
 import AccountSection from './AccountSection';
+import { APP_LANGS, plural, t, useI18n } from '../lib/i18n';
 
 // La photo d'avatar est copiée dans l'espace de l'appli (le cache peut être vidé par le système).
 async function keepAvatar(uri) {
@@ -38,7 +39,7 @@ export function Avatar({ avatar, pseudo, size = 72 }) {
   );
 }
 
-export default function SideMenu({ open, onClose }) {
+export default function SideMenu({ open, onClose, initialPage = 'main' }) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const panelWidth = Math.min(340, width * 0.82);
@@ -47,11 +48,13 @@ export default function SideMenu({ open, onClose }) {
   // Ouverture : la fenêtre apparaît tout de suite (l'animation d'entrée suit) ; elle ne disparaît qu'après la sortie.
   if (open && !visible) setVisible(true);
   const [choosingAvatar, setChoosingAvatar] = useState(false);
-  // 'main' (profil, compte) ou 'settings' (page Réglages) ; le menu se rouvre toujours sur la page principale.
-  const [page, setPage] = useState('main');
+  // 'main' (profil, compte), 'settings' (page Réglages) ou 'language' (langue de l'appli) ;
+  // une fois refermé, le menu se rouvre sur la page principale.
+  const [page, setPage] = useState(initialPage);
   if (!open && !visible && page !== 'main') setPage('main');
   const { settings, update } = useSettings();
   const { cardLang, setCardLang } = useCardLang();
+  const { appLang, setAppLang } = useI18n();
   const { items, refresh, refreshPrices } = useCollection();
   const total = useMemo(() => summarize(items), [items]);
 
@@ -74,18 +77,25 @@ export default function SideMenu({ open, onClose }) {
     setChoosingAvatar(false);
   };
 
+  const backTo = (title) => (
+    <Pressable style={styles.back} onPress={() => setPage('main')} hitSlop={8}>
+      <Ionicons name="chevron-back" size={22} color={colors.text} />
+      <Text style={styles.pageTitle}>{title}</Text>
+    </Pressable>
+  );
+
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose} statusBarTranslucent>
       {/* Conteneur plein écran : sans lui, Android ignore les touchers hors du menu (zone assombrie). */}
       <View style={styles.root}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer le menu" />
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('Fermer le menu')} />
       <Animated.View style={[styles.panel, { width: panelWidth, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 8, transform: [{ translateX: x }] }]}>
         <ScrollView contentContainerStyle={{ gap: 18, paddingHorizontal: 18, paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
           {page === 'main' ? (
           <>
           {/* Profil : avatar rond (touche pour le changer) et pseudo */}
           <View style={styles.profile}>
-            <Pressable onPress={() => setChoosingAvatar((v) => !v)} accessibilityLabel="Changer d'avatar">
+            <Pressable onPress={() => setChoosingAvatar((v) => !v)} accessibilityLabel={t('Changer d’avatar')}>
               <Avatar avatar={settings.avatar} pseudo={settings.pseudo} />
               <View style={styles.editBadge}><Ionicons name="camera" size={13} color="#1A1A1A" /></View>
             </Pressable>
@@ -94,21 +104,21 @@ export default function SideMenu({ open, onClose }) {
                 style={styles.pseudo}
                 value={settings.pseudo}
                 onChangeText={(pseudo) => update({ pseudo })}
-                placeholder="Ton pseudo"
+                placeholder={t('Ton pseudo')}
                 placeholderTextColor={colors.muted}
                 maxLength={24}
               />
-              <Text style={styles.muted}>{total.cards} carte{total.cards > 1 ? 's' : ''} · {formatPrice(total.value, 'EUR')}</Text>
+              <Text style={styles.muted}>{plural(total.cards, '{n} carte', '{n} cartes')} · {formatPrice(total.value, 'EUR')}</Text>
             </View>
           </View>
 
           {choosingAvatar ? (
             <View style={styles.block}>
-              <Text style={styles.blockTitle}>Choisir un avatar</Text>
+              <Text style={styles.blockTitle}>{t('Choisir un avatar')}</Text>
               <View style={styles.row}>
-                <Option icon="camera" label="Photo" onPress={() => pickPhoto(true)} />
-                <Option icon="images" label="Galerie" onPress={() => pickPhoto(false)} />
-                <Option icon="close-circle-outline" label="Aucun" onPress={() => { update({ avatar: null }); setChoosingAvatar(false); }} />
+                <Option icon="camera" label={t('Photo')} onPress={() => pickPhoto(true)} />
+                <Option icon="images" label={t('Galerie')} onPress={() => pickPhoto(false)} />
+                <Option icon="close-circle-outline" label={t('Aucun')} onPress={() => { update({ avatar: null }); setChoosingAvatar(false); }} />
               </View>
               <View style={styles.iconGrid}>
                 {Object.keys(GAME_ICONS).map((id) => (
@@ -120,32 +130,41 @@ export default function SideMenu({ open, onClose }) {
             </View>
           ) : null}
 
-          <Section title="Compte">
+          <Section title={t('Compte')}>
             <AccountSection />
           </Section>
 
-          <Pressable style={styles.navRow} onPress={() => setPage('settings')}>
-            <Ionicons name="settings-outline" size={20} color={colors.accent} />
-            <Text style={styles.navText}>Réglages</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
-          </Pressable>
+          <View style={{ gap: 8 }}>
+            <NavRow icon="settings-outline" label={t('Réglages')} onPress={() => setPage('settings')} />
+            <NavRow icon="language-outline" label={t('Langue')} value={APP_LANGS[appLang]} onPress={() => setPage('language')} />
+          </View>
+          </>
+          ) : page === 'language' ? (
+          <>
+          {/* Page « Langue » : langue de toute l'appli (textes, dates, nombres) */}
+          {backTo(t('Langue'))}
+          <View style={{ gap: 8 }}>
+            {Object.entries(APP_LANGS).map(([k, label]) => (
+              <Pressable key={k} style={[styles.navRow, appLang === k && styles.navRowActive]} onPress={() => setAppLang(k)}>
+                <Text style={[styles.navText, appLang === k && { color: colors.accent }]}>{label}</Text>
+                {appLang === k ? <Ionicons name="checkmark" size={20} color={colors.accent} /> : null}
+              </Pressable>
+            ))}
+          </View>
           </>
           ) : (
           <>
           {/* Page « Réglages » : prix, devise, langue des cartes, affichage des extensions */}
-          <Pressable style={styles.back} onPress={() => setPage('main')} hitSlop={8}>
-            <Ionicons name="chevron-back" size={22} color={colors.text} />
-            <Text style={styles.pageTitle}>Réglages</Text>
-          </Pressable>
+          {backTo(t('Réglages'))}
 
-          <Section title="Prix">
+          <Section title={t('Prix')}>
             {/* Site(s) de prix : toute l'appli suit ce choix (fiches, moyennes, valeur de la collection). */}
-            <Text style={styles.label}>Prix pris en compte</Text>
+            <Text style={styles.label}>{t('Prix pris en compte')}</Text>
             <View style={styles.row}>
               {Object.entries(PRICE_SOURCES).map(([k, label]) => (
                 <Chip
                   key={k}
-                  label={label}
+                  label={t(label)}
                   active={settings.priceSource === k}
                   onPress={() => {
                     if (settings.priceSource === k) return;
@@ -155,24 +174,24 @@ export default function SideMenu({ open, onClose }) {
                 />
               ))}
             </View>
-            <Text style={styles.label}>Devise</Text>
+            <Text style={styles.label}>{t('Devise')}</Text>
             <View style={styles.row}>
               {Object.entries(CURRENCIES).map(([k, label]) => (
-                <Chip key={k} label={label} active={(settings.currency || 'EUR') === k} onPress={() => update({ currency: k })} />
+                <Chip key={k} label={t(label)} active={(settings.currency || 'EUR') === k} onPress={() => update({ currency: k })} />
               ))}
             </View>
-            <Text style={styles.muted}>Tous les prix sont convertis au taux de change du jour.</Text>
+            <Text style={styles.muted}>{t('Tous les prix sont convertis au taux de change du jour.')}</Text>
           </Section>
 
-          <Section title="Cartes">
-            <Text style={styles.label}>Langue des cartes</Text>
+          <Section title={t('Cartes')}>
+            <Text style={styles.label}>{t('Langue des cartes')}</Text>
             <View style={styles.row}>
-              {CARD_LANGS.map((l) => <Chip key={l} label={LANG_NAMES[l]} active={cardLang === l} onPress={() => setCardLang(l)} />)}
+              {CARD_LANGS.map((l) => <Chip key={l} label={t(LANG_NAMES[l])} active={cardLang === l} onPress={() => setCardLang(l)} />)}
             </View>
-            <Text style={styles.label}>Affichage des extensions</Text>
+            <Text style={styles.label}>{t('Affichage des extensions')}</Text>
             <View style={styles.row}>
-              <Chip label="Simplifié" active={settings.setView !== 'master'} onPress={() => update({ setView: 'simple' })} />
-              <Chip label="Master set" active={settings.setView === 'master'} onPress={() => update({ setView: 'master' })} />
+              <Chip label={t('Simplifié')} active={settings.setView !== 'master'} onPress={() => update({ setView: 'simple' })} />
+              <Chip label={t('Master set')} active={settings.setView === 'master'} onPress={() => update({ setView: 'master' })} />
             </View>
           </Section>
           </>
@@ -181,6 +200,17 @@ export default function SideMenu({ open, onClose }) {
       </Animated.View>
       </View>
     </Modal>
+  );
+}
+
+function NavRow({ icon, label, value, onPress }) {
+  return (
+    <Pressable style={styles.navRow} onPress={onPress}>
+      <Ionicons name={icon} size={20} color={colors.accent} />
+      <Text style={styles.navText} numberOfLines={1}>{label}</Text>
+      {value ? <Text style={styles.navValue} numberOfLines={1}>{value}</Text> : null}
+      <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+    </Pressable>
   );
 }
 
@@ -236,7 +266,9 @@ const styles = StyleSheet.create({
   chipText: { color: colors.muted, fontWeight: '600' },
   chipTextActive: { color: '#1A1A1A' },
   navRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: ITEM_BG, borderRadius: radius, padding: 14 },
+  navRowActive: { borderWidth: 1, borderColor: colors.accent },
   navText: { color: colors.text, fontWeight: '700', fontSize: 16, flex: 1 },
+  navValue: { color: colors.muted, fontWeight: '600', maxWidth: 120 },
   back: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   pageTitle: { color: colors.text, fontSize: 22, fontWeight: '800' },
   option: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: colors.border },

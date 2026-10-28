@@ -3,6 +3,7 @@
 // et la barre d'onglets reste visible sur tous les écrans.
 import { Stack } from 'expo-router';
 import { colors } from '../../../lib/theme';
+import { t } from '../../../lib/i18n';
 
 export const unstable_settings = {
   anchor: 'index',
@@ -21,8 +22,8 @@ export default function TabStack() {
         contentStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Stack.Screen name="index" options={{ title: 'TCG Finder' }} />
-      <Stack.Screen name="collection" options={{ title: 'Ma collection' }} />
+      <Stack.Screen name="index" options={{ title: t('TCG Finder') }} />
+      <Stack.Screen name="collection" options={{ title: t('Ma collection') }} />
     </Stack>
   );
 }

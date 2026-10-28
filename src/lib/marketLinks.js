@@ -1,3 +1,4 @@
+import { t } from './i18n';
 // Liens de recherche eBay / Vinted pour une carte. On ouvre simplement le site (pas de collecte automatique) :
 // les pages publiques d'eBay permettent même d'afficher les ventes réussies.
 // La recherche = nom de la carte + son numéro, rien d'autre (c'est ce qui donne les meilleurs résultats),
@@ -42,8 +43,8 @@ export function marketQuery(tcgId, card, lang) {
 export function marketLinks(tcgId, card, lang) {
   const q = encodeURIComponent(marketQuery(tcgId, card, lang));
   return [
-    { key: 'ebay', label: 'Annonces eBay', icon: 'pricetag-outline', url: `https://www.ebay.fr/sch/i.html?_nkw=${q}` },
-    { key: 'ebay-sold', label: 'Ventes réussies eBay', icon: 'checkmark-done-outline', url: `https://www.ebay.fr/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1` },
-    { key: 'vinted', label: 'Annonces Vinted', icon: 'storefront-outline', url: `https://www.vinted.fr/catalog?search_text=${q}` },
+    { key: 'ebay', label: t('Annonces eBay'), icon: 'pricetag-outline', url: `https://www.ebay.fr/sch/i.html?_nkw=${q}` },
+    { key: 'ebay-sold', label: t('Ventes réussies eBay'), icon: 'checkmark-done-outline', url: `https://www.ebay.fr/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1` },
+    { key: 'vinted', label: t('Annonces Vinted'), icon: 'storefront-outline', url: `https://www.vinted.fr/catalog?search_text=${q}` },
   ];
 }

@@ -1,6 +1,7 @@
 // Prix moyen d'une carte : moyenne des prix de référence de chaque source (Cardmarket, TCGplayer…), en euros.
 import { getJSON, memo } from '../api/http';
 import { pricesForFinish } from './finishes';
+import { locale } from './i18n';
 
 // Taux de change du jour (BCE via Frankfurter). En cas d'échec, taux approximatif.
 export const getUsdToEur = memo(async () => {
@@ -88,6 +89,8 @@ export function formatPrice(value, currency) {
   if (currency === 'TIX') return `${value.toFixed(2)} tix`;
   const converted = convert(value, currency);
   const shown = converted == null ? currency : displayCurrency;
-  formatters[shown] ??= new Intl.NumberFormat('fr-FR', { style: 'currency', currency: shown, currencyDisplay: 'narrowSymbol' });
-  return formatters[shown].format(converted ?? value);
+  const id = `${locale()}|${shown}`;
+  formatters[id] ??= new Intl.NumberFormat(locale(), { style: 'currency', currency: shown, currencyDisplay: 'narrowSymbol' });
+  // Certains moteurs ignorent narrowSymbol en français (« £GB », « $US ») : symbole court forcé.
+  return formatters[id].format(converted ?? value).replace(/£GB|GB£/, '£').replace(/\$US|US\$/, '$');
 }

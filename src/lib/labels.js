@@ -1,5 +1,7 @@
-// Libellés de l'interface (en français). Les connecteurs renvoient des clés ; une clé inconnue s'affiche telle quelle
+// Libellés de l'interface (en français, traduits par t()). Les connecteurs renvoient des clés ; une clé inconnue s'affiche telle quelle
 // (c'est le cas des libellés déjà traduits par la source, ex. la galerie officielle Riftbound).
+import { t } from './i18n';
+
 const FIELD = {
   set: 'Extension', number: 'Numéro', category: 'Catégorie', rarity: 'Rareté', hp: 'PV', types: 'Type(s)',
   stage: 'Stade', evolveFrom: 'Évolue de', trainerType: 'Type de dresseur', weakness: 'Faiblesse',
@@ -32,14 +34,14 @@ const SOURCE = {
 const TEXT = { effect: 'Effet', description: 'Description', text: 'Texte', flavor: 'Ambiance' };
 const RARITY = { common: 'Commune', uncommon: 'Peu commune', rare: 'Rare', mythic: 'Mythique', special: 'Spéciale', bonus: 'Bonus' };
 
-export const fieldLabel = (key) => FIELD[key] ?? key;
-export const textTitle = (t) => t.title || TEXT[t.titleKey] || '';
-export const sourceLabel = (p) => p.source ?? SOURCE[p.sourceKey] ?? p.sourceKey;
-export const fieldValue = (key, value) => (key === 'rarity' && RARITY[value]) || value;
+export const fieldLabel = (key) => (FIELD[key] ? t(FIELD[key]) : key);
+export const textTitle = (x) => x.title || (TEXT[x.titleKey] ? t(TEXT[x.titleKey]) : '');
+export const sourceLabel = (p) => p.source ?? (SOURCE[p.sourceKey] ? t(SOURCE[p.sourceKey]) : p.sourceKey);
+export const fieldValue = (key, value) => (key === 'rarity' && RARITY[value] ? t(RARITY[value]) : value);
 
 export function priceLabel(item) {
   if (item.text) return item.text;
-  const label = PRICE[item.label] ?? item.label ?? '';
-  const variant = item.name || (item.variant ? VARIANT[item.variant] ?? item.variant : null);
+  const label = PRICE[item.label] ? t(PRICE[item.label]) : item.label ?? '';
+  const variant = item.name || (item.variant ? (VARIANT[item.variant] ? t(VARIANT[item.variant]) : item.variant) : null);
   return variant ? `${label} (${variant})` : label;
 }

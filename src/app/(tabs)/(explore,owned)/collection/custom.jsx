@@ -9,6 +9,7 @@ import { Directory, File, Paths } from 'expo-file-system';
 import { useCollection } from '../../../../lib/collection';
 import { colors, radius } from '../../../../lib/theme';
 import { CURRENCY_SYMBOLS, fromStoredEur, getDisplayCurrency, toStoredEur } from '../../../../lib/prices';
+import { t } from '../../../../lib/i18n';
 
 // Prix saisis dans la devise choisie, enregistrés en euros.
 const toNumber = (s) => {
@@ -21,9 +22,9 @@ const toText = (v) => (v == null ? '' : String(fromStoredEur(v)).replace('.', ',
 const marketSearches = (text) => {
   const q = encodeURIComponent(text);
   return [
-    { label: 'Ventes réussies eBay', url: `https://www.ebay.fr/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1` },
-    { label: 'Annonces eBay', url: `https://www.ebay.fr/sch/i.html?_nkw=${q}` },
-    { label: 'Annonces Vinted', url: `https://www.vinted.fr/catalog?search_text=${q}` },
+    { label: t('Ventes réussies eBay'), url: `https://www.ebay.fr/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1` },
+    { label: t('Annonces eBay'), url: `https://www.ebay.fr/sch/i.html?_nkw=${q}` },
+    { label: t('Annonces Vinted'), url: `https://www.vinted.fr/catalog?search_text=${q}` },
   ];
 };
 
@@ -69,7 +70,7 @@ export default function CustomCardScreen() {
 
   const save = async () => {
     if (!form.name.trim()) {
-      Alert.alert('Nom manquant', 'Indique au moins le nom de la carte.');
+      Alert.alert(t('Nom manquant'), t('Indique au moins le nom de la carte.'));
       return;
     }
     const image = await keepPhoto(form.image).catch(() => form.image);
@@ -89,14 +90,14 @@ export default function CustomCardScreen() {
   };
 
   const del = () =>
-    Alert.alert('Retirer cette carte ?', 'Elle sera supprimée de ta collection.', [
-      { text: 'Annuler', style: 'cancel' },
-      { text: 'Retirer', style: 'destructive', onPress: () => { remove(existing.key); router.back(); } },
+    Alert.alert(t('Retirer cette carte ?'), t('Elle sera supprimée de ta collection.'), [
+      { text: t('Annuler'), style: 'cancel' },
+      { text: t('Retirer'), style: 'destructive', onPress: () => { remove(existing.key); router.back(); } },
     ]);
 
   return (
     <>
-      <Stack.Screen options={{ title: existing ? 'Autre carte' : 'Ajouter une autre carte' }} />
+      <Stack.Screen options={{ title: existing ? t('Autre carte') : t('Ajouter une autre carte') }} />
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <View style={styles.photoRow}>
           <View style={styles.photo}>
@@ -105,32 +106,32 @@ export default function CustomCardScreen() {
           <View style={{ flex: 1, gap: 8 }}>
             <Pressable style={styles.photoBtn} onPress={() => pickPhoto(true)}>
               <Ionicons name="camera" size={18} color={colors.accent} />
-              <Text style={styles.photoBtnText}>Prendre en photo</Text>
+              <Text style={styles.photoBtnText}>{t('Prendre en photo')}</Text>
             </Pressable>
             <Pressable style={styles.photoBtn} onPress={() => pickPhoto(false)}>
               <Ionicons name="images" size={18} color={colors.accent} />
-              <Text style={styles.photoBtnText}>Choisir une photo</Text>
+              <Text style={styles.photoBtnText}>{t('Choisir une photo')}</Text>
             </Pressable>
-            <Text style={styles.hint}>La photo sert d’image à la carte dans ta collection.</Text>
+            <Text style={styles.hint}>{t('La photo sert d’image à la carte dans ta collection.')}</Text>
           </View>
         </View>
 
-        <Field label="Nom de la carte *" value={form.name} onChangeText={set('name')} />
+        <Field label={t('Nom de la carte *')} value={form.name} onChangeText={set('name')} />
 
-        <Field label="Jeu / série" value={form.series} onChangeText={set('series')} placeholder="ex. nom du jeu ou de l’extension" />
+        <Field label={t('Jeu / série')} value={form.series} onChangeText={set('series')} placeholder={t('ex. nom du jeu ou de l’extension')} />
 
         <View style={styles.row2}>
-          <Field label="Année" value={form.year} onChangeText={set('year')} style={{ flex: 1 }} />
-          <Field label="Numéro" value={form.number} onChangeText={set('number')} style={{ flex: 1 }} />
+          <Field label={t('Année')} value={form.year} onChangeText={set('year')} style={{ flex: 1 }} />
+          <Field label={t('Numéro')} value={form.number} onChangeText={set('number')} style={{ flex: 1 }} />
         </View>
 
         <View style={styles.row2}>
-          <Field label={`Prix estimé (${CURRENCY_SYMBOLS[getDisplayCurrency()]}, à l'unité)`} value={form.price} onChangeText={set('price')} keyboardType="decimal-pad" placeholder="—" style={{ flex: 1 }} />
-          <Field label={`Prix d'achat (${CURRENCY_SYMBOLS[getDisplayCurrency()]})`} value={form.purchase} onChangeText={set('purchase')} keyboardType="decimal-pad" placeholder="—" style={{ flex: 1 }} />
+          <Field label={t('Prix estimé ({0}, à l\'unité)', { 0: CURRENCY_SYMBOLS[getDisplayCurrency()] })} value={form.price} onChangeText={set('price')} keyboardType="decimal-pad" placeholder="—" style={{ flex: 1 }} />
+          <Field label={t('Prix d\'achat ({0})', { 0: CURRENCY_SYMBOLS[getDisplayCurrency()] })} value={form.purchase} onChangeText={set('purchase')} keyboardType="decimal-pad" placeholder="—" style={{ flex: 1 }} />
         </View>
 
         <View style={styles.qtyRow}>
-          <Text style={styles.label}>Quantité</Text>
+          <Text style={styles.label}>{t('Quantité')}</Text>
           <View style={styles.stepper}>
             <Pressable style={styles.stepBtn} onPress={() => set('qty')(Math.max(1, form.qty - 1))}><Ionicons name="remove" size={18} color={colors.text} /></Pressable>
             <Text style={styles.qty}>{form.qty}</Text>
@@ -138,16 +139,15 @@ export default function CustomCardScreen() {
           </View>
         </View>
 
-        <Field label="Notes (version, numérotée, gradée…)" value={form.notes} onChangeText={set('notes')} multiline />
+        <Field label={t('Notes (version, numérotée, gradée…)')} value={form.notes} onChangeText={set('notes')} multiline />
 
         <Text style={styles.hint}>
-          Carte hors catalogue, rangée dans « Autres » : les informations et le prix sont ceux que tu saisis.
-          Le bouton « Ventes réussies eBay » de la fiche peut t’aider à estimer le prix.
+          {t('Carte hors catalogue, rangée dans « Autres » : les informations et le prix sont ceux que tu saisis. Le bouton « Ventes réussies eBay » de la fiche peut t’aider à estimer le prix.')}
         </Text>
 
         <Pressable style={styles.save} onPress={save}>
           <Ionicons name="checkmark" size={20} color="#1A1A1A" />
-          <Text style={styles.saveText}>{existing ? 'Enregistrer' : 'Ajouter à ma collection'}</Text>
+          <Text style={styles.saveText}>{existing ? t('Enregistrer') : t('Ajouter à ma collection')}</Text>
         </Pressable>
         {existing ? (
           <>
@@ -157,7 +157,7 @@ export default function CustomCardScreen() {
               </Pressable>
             ))}
             <Pressable style={styles.delete} onPress={del}>
-              <Text style={styles.deleteText}>Retirer de ma collection</Text>
+              <Text style={styles.deleteText}>{t('Retirer de ma collection')}</Text>
             </Pressable>
           </>
         ) : null}

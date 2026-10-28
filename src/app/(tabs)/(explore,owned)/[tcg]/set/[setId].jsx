@@ -6,6 +6,7 @@ import { useSettings } from '../../../../../lib/settings';
 import { getTcg, dataLang } from '../../../../../api';
 import { useCardLang } from '../../../../../lib/cardLang';
 import CardGrid from '../../../../../components/CardGrid';
+import { t } from '../../../../../lib/i18n';
 
 export default function SetScreen() {
   const { tcg: tcgId, setId, name } = useLocalSearchParams();
@@ -17,7 +18,7 @@ export default function SetScreen() {
   const master = mode === 'master' && !!tcg.getVersions;
   const toggle = tcg.getVersions ? (
     <View style={styles.chips}>
-      {[['simple', 'Simplifié'], ['master', 'Master set']].map(([k, label]) => (
+      {[['simple', t('Simplifié')], ['master', t('Master set')]].map(([k, label]) => (
         <Pressable key={k} onPress={() => setMode(k)} style={[styles.chip, mode === k && styles.chipActive]}>
           <Text style={[styles.chipText, mode === k && styles.chipTextActive]}>{label}</Text>
         </Pressable>

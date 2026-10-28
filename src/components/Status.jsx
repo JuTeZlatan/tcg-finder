@@ -1,11 +1,12 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { t } from '../lib/i18n';
 import { colors } from '../lib/theme';
 
-export function Loading({ text = 'Chargement…' }) {
+export function Loading({ text }) {
   return (
     <View style={styles.row}>
       <ActivityIndicator color={colors.accent} />
-      <Text style={styles.muted}>{text}</Text>
+      <Text style={styles.muted}>{text ?? t('Chargement…')}</Text>
     </View>
   );
 }
@@ -13,10 +14,10 @@ export function Loading({ text = 'Chargement…' }) {
 export function ErrorView({ error, onRetry }) {
   return (
     <View style={styles.error}>
-      <Text style={styles.errorText}>Impossible de charger les données : {error?.message || String(error)}</Text>
+      <Text style={styles.errorText}>{t('Impossible de charger les données : {error}', { error: error?.message || String(error) })}</Text>
       {onRetry && (
         <Pressable onPress={onRetry}>
-          <Text style={styles.retry}>Réessayer</Text>
+          <Text style={styles.retry}>{t('Réessayer')}</Text>
         </Pressable>
       )}
     </View>

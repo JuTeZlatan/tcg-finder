@@ -8,6 +8,7 @@ import { formatPrice } from '../../../../../lib/prices';
 import { colors, radius, percent } from '../../../../../lib/theme';
 import { StatTile, ProgressBar } from '../../../../../components/collection';
 import { useSettings } from '../../../../../lib/settings';
+import { plural, t } from '../../../../../lib/i18n';
 
 const SORTS = [
   ['value', 'Valeur'],
@@ -38,7 +39,7 @@ export default function CollectionTcgScreen() {
 
   return (
     <>
-      <Stack.Screen options={{ title: `Ma collection · ${tcg?.name ?? ''}` }} />
+      <Stack.Screen options={{ title: t('Ma collection · {0}', { 0: tcg ? t(tcg.name) : '' }) }} />
       <FlatList
         data={sets}
         keyExtractor={(s) => String(s.setId)}
@@ -50,26 +51,26 @@ export default function CollectionTcgScreen() {
               <Text style={styles.heroValue}>{formatPrice(total.value, 'EUR')}</Text>
               {total.gain != null ? (
                 <Text style={{ color: total.gain >= 0 ? colors.success : colors.danger, fontWeight: '700' }}>
-                  {total.gain >= 0 ? '▲' : '▼'} {formatPrice(Math.abs(total.gain), 'EUR')} vs prix d’achat
+                  {total.gain >= 0 ? '▲' : '▼'} {formatPrice(Math.abs(total.gain), 'EUR')}{' '}{t('vs prix d’achat')}
                 </Text>
               ) : null}
             </View>
             <View style={styles.statsRow}>
-              <StatTile label="Cartes" value={String(total.cards)} sub={`${total.unique} différentes`} />
-              <StatTile label="Extensions" value={String(sets.length)} sub={complete ? `${complete} complète${complete > 1 ? 's' : ''}` : 'en cours'} />
+              <StatTile label={t('Cartes')} value={String(total.cards)} sub={plural(total.unique, '{n} différente', '{n} différentes')} />
+              <StatTile label={t('Extensions')} value={String(sets.length)} sub={complete ? plural(complete, '{n} complète', '{n} complètes') : t('en cours')} />
             </View>
             <Pressable
               style={styles.allButton}
               onPress={() => router.push({ pathname: '/collection/cards', params: { tcg: tcgId } })}
             >
               <Ionicons name="list" size={18} color={colors.text} />
-              <Text style={styles.allText}>Toutes mes cartes {tcg?.name}</Text>
+              <Text style={styles.allText}>{t('Toutes mes cartes')}{' '}{tcg?.name}</Text>
               <Ionicons name="chevron-forward" size={18} color={colors.muted} />
             </Pressable>
             <View style={styles.chips}>
               {SORTS.map(([k, label]) => (
                 <Pressable key={k} onPress={() => setSort(k)} style={[styles.chip, sort === k && styles.chipActive]}>
-                  <Text style={[styles.chipText, sort === k && styles.chipTextActive]}>{label}</Text>
+                  <Text style={[styles.chipText, sort === k && styles.chipTextActive]}>{t(label)}</Text>
                 </Pressable>
               ))}
             </View>
@@ -87,7 +88,7 @@ export default function CollectionTcgScreen() {
             {s.completion != null ? <ProgressBar value={s.completion} color={s.completion === 1 ? colors.success : tcg?.color} /> : null}
             <View style={styles.rowBetween}>
               <Text style={styles.muted}>
-                {s.setCount ? `${s.distinct}/${s.setCount} cartes · ${percent(s.completion)}` : `${s.distinct} cartes différentes`}
+                {s.setCount ? t('{owned}/{total} cartes · {pct}', { owned: s.distinct, total: s.setCount, pct: percent(s.completion) }) : plural(s.distinct, '{n} carte différente', '{n} cartes différentes')}
                 {s.cards > s.distinct ? ` · ${s.cards} exemplaires` : ''}
               </Text>
               <Text style={styles.muted}>{s.langs.map((l) => l.toUpperCase()).join(' / ')}</Text>

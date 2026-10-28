@@ -9,6 +9,7 @@ import { defaultFinish, finishLabel, finishesOf, isThinPrice, storedFinish } fro
 import { useAsync } from '../lib/useAsync';
 import { colors, radius } from '../lib/theme';
 import { useSettings } from '../lib/settings';
+import { locale, t } from '../lib/i18n';
 
 // Badge de langue posé sur l'image d'une carte de la collection (chaque langue est un exemplaire distinct).
 export function LangBadge({ lang }) {
@@ -39,20 +40,20 @@ export function ValueChart({ history }) {
   useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const points = history.slice(-30);
   if (points.length < 2) {
-    return <Text style={styles.chartEmpty}>L’évolution de la valeur s’affichera ici au fil des jours.</Text>;
+    return <Text style={styles.chartEmpty}>{t('L’évolution de la valeur s’affichera ici au fil des jours.')}</Text>;
   }
   const max = Math.max(...points.map((p) => p.value), 0.01);
   const min = Math.min(...points.map((p) => p.value));
   const first = points[0].value;
   const last = points[points.length - 1].value;
   const diff = last - first;
-  const fmtDate = (d) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  const fmtDate = (d) => new Date(d).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
   return (
     <View style={{ gap: 8 }}>
       <View style={styles.chartHead}>
-        <Text style={styles.chartTitle}>Évolution</Text>
+        <Text style={styles.chartTitle}>{t('Évolution')}</Text>
         <Text style={[styles.chartDiff, { color: diff >= 0 ? colors.success : colors.danger }]}>
-          {diff >= 0 ? '+' : ''}{formatPrice(diff, 'EUR')} depuis le {fmtDate(points[0].date)}
+          {diff >= 0 ? '+' : ''}{t('{amount} depuis le {date}', { amount: formatPrice(diff, 'EUR'), date: fmtDate(points[0].date) })}
         </Text>
       </View>
       <View style={styles.chart}>
@@ -64,7 +65,7 @@ export function ValueChart({ history }) {
       </View>
       <View style={styles.chartHead}>
         <Text style={styles.chartAxis}>{fmtDate(points[0].date)}</Text>
-        <Text style={styles.chartAxis}>max {formatPrice(max, 'EUR')}</Text>
+        <Text style={styles.chartAxis}>{t('max {amount}', { amount: formatPrice(max, 'EUR') })}</Text>
         <Text style={styles.chartAxis}>{fmtDate(points[points.length - 1].date)}</Text>
       </View>
     </View>
@@ -82,8 +83,8 @@ function FinishChooser({ request, onClose }) {
       <View style={styles.sheetWrap}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
         <View style={styles.sheet}>
-        <Text style={styles.sheetTitle}>Quelle version as-tu ?</Text>
-        <Text style={styles.sheetSub} numberOfLines={2}>{request.title} · le prix dépend de la version</Text>
+        <Text style={styles.sheetTitle}>{t('Quelle version as-tu ?')}</Text>
+        <Text style={styles.sheetSub} numberOfLines={2}>{request.title} · {t('le prix dépend de la version')}</Text>
         {finishesOf(request.prices).map((f) => {
           const stored = storedFinish(request.prices, f);
           const avg = fx.data ? averagePrice(request.prices, fx.data, { finish: stored }) : null;
@@ -98,14 +99,14 @@ function FinishChooser({ request, onClose }) {
             >
               <View style={{ flex: 1 }}>
                 <Text style={styles.sheetRowText}>{finishLabel(request.prices, f)}</Text>
-                {isThinPrice(request.prices, f) ? <Text style={styles.sheetRowNote}>Peu de ventes : prix indicatif</Text> : null}
+                {isThinPrice(request.prices, f) ? <Text style={styles.sheetRowNote}>{t('Peu de ventes : prix indicatif')}</Text> : null}
               </View>
               <Text style={styles.sheetRowPrice}>{avg ? formatPrice(avg.value, 'EUR') : '—'}</Text>
             </Pressable>
           );
         })}
         <Pressable style={styles.sheetCancel} onPress={onClose}>
-          <Text style={styles.sheetCancelText}>Annuler</Text>
+          <Text style={styles.sheetCancelText}>{t('Annuler')}</Text>
         </Pressable>
         </View>
       </View>
@@ -153,10 +154,10 @@ export function QuickAdd({ tcgId, lang, setId, card, version = null }) {
         disabled={busy}
         onPress={onPress}
         style={({ pressed }) => [styles.quick, qty > 0 && styles.quickOwned, pressed && { transform: [{ scale: 0.9 }] }]}
-        accessibilityLabel={`Ajouter ${card.name} à ma collection`}
+        accessibilityLabel={t('Ajouter {0} à ma collection', { 0: card.name })}
       >
         {busy ? <ActivityIndicator size="small" color="#1A1A1A" />
-          : qty > 0 ? <Text style={styles.quickText}>×{qty}</Text> : <Ionicons name="add" size={18} color="#1A1A1A" />}
+          : qty > 0 ? <Text style={styles.quickText}>{t('×')}{qty}</Text> : <Ionicons name="add" size={18} color="#1A1A1A" />}
       </Pressable>
       {chooser}
     </>
@@ -171,7 +172,7 @@ export function FinishPicker({ prices, value, onChange, ownedFinishes = [] }) {
   const current = value || defaultFinish(finishes);
   return (
     <View style={styles.finishBox}>
-      <Text style={styles.editorLabel}>Version</Text>
+      <Text style={styles.editorLabel}>{t('Version')}</Text>
       <View style={styles.finishRow}>
         {finishes.map((f) => (
           <Pressable key={f} onPress={() => onChange(f)} style={[styles.finishChip, current === f && styles.finishChipActive]}>
@@ -217,7 +218,7 @@ export function CollectionEditor({ tcgId, lang, setId, card, unitPrice, finish =
       {chooser}
       <View style={styles.editorHead}>
         <Ionicons name="albums" size={18} color={colors.accent} />
-        <Text style={styles.editorTitle}>Ma collection</Text>
+        <Text style={styles.editorTitle}>{t('Ma collection')}</Text>
         {finish ? <Text style={styles.langBadge} numberOfLines={1}>{finishLabel(card.prices, finish)}</Text> : null}
         <Text style={styles.langBadge}>{lang.toUpperCase()}</Text>
       </View>
@@ -230,12 +231,12 @@ export function CollectionEditor({ tcgId, lang, setId, card, unitPrice, finish =
           })}
         >
           <Ionicons name="add-circle" size={20} color="#1A1A1A" />
-          <Text style={styles.addButtonText}>Ajouter à ma collection</Text>
+          <Text style={styles.addButtonText}>{t('Ajouter à ma collection')}</Text>
         </Pressable>
       ) : (
         <>
           <View style={styles.qtyRow}>
-            <Text style={styles.editorLabel}>Quantité</Text>
+            <Text style={styles.editorLabel}>{t('Quantité')}</Text>
             <View style={styles.stepper}>
               <Pressable style={styles.stepBtn} onPress={() => setQty(key, item.qty - 1)} hitSlop={6}>
                 <Ionicons name={item.qty === 1 ? 'trash-outline' : 'remove'} size={18} color={colors.text} />
@@ -247,11 +248,11 @@ export function CollectionEditor({ tcgId, lang, setId, card, unitPrice, finish =
             </View>
           </View>
           <View style={styles.qtyRow}>
-            <Text style={styles.editorLabel}>Valeur de mes exemplaires</Text>
+            <Text style={styles.editorLabel}>{t('Valeur de mes exemplaires')}</Text>
             <Text style={styles.editorValue}>{unitPrice != null ? formatPrice(unitPrice * item.qty, 'EUR') : '—'}</Text>
           </View>
           <View style={styles.qtyRow}>
-            <Text style={styles.editorLabel}>Prix d’achat (par carte)</Text>
+            <Text style={styles.editorLabel}>{t('Prix d’achat (par carte)')}</Text>
             <View style={styles.purchaseBox}>
               <TextInput
                 style={styles.purchaseInput}
@@ -268,15 +269,15 @@ export function CollectionEditor({ tcgId, lang, setId, card, unitPrice, finish =
           </View>
           {item.purchase != null && unitPrice != null ? (
             <Text style={[styles.gain, { color: unitPrice >= item.purchase ? colors.success : colors.danger }]}>
-              {unitPrice >= item.purchase ? 'Plus-value' : 'Moins-value'} : {formatPrice((unitPrice - item.purchase) * item.qty, 'EUR')}
+              {unitPrice >= item.purchase ? t('Plus-value') : t('Moins-value')} : {formatPrice((unitPrice - item.purchase) * item.qty, 'EUR')}
             </Text>
           ) : null}
-          <Text style={styles.editorHint}>Ajoutée le {new Date(item.addedAt).toLocaleDateString('fr-FR')}</Text>
+          <Text style={styles.editorHint}>{t('Ajoutée le {date}', { date: new Date(item.addedAt).toLocaleDateString(locale()) })}</Text>
         </>
       )}
       {otherLangs.length ? (
         <Text style={styles.editorHint}>
-          Tu as aussi {otherLangs.map((i) => `${i.qty} en ${i.lang.toUpperCase()}`).join(', ')}.
+          {t('Tu as aussi : {list}.', { list: otherLangs.map((i) => `${i.qty} × ${i.lang.toUpperCase()}`).join(', ') })}
         </Text>
       ) : null}
     </View>

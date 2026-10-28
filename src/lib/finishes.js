@@ -5,6 +5,8 @@
 // Un bloc `versions: true` liste des versions vendues comme produits séparés (Pokémon : motifs, tampons, Shadowless…),
 // avec un prix chacune ; il n'entre pas dans le prix des autres versions.
 
+import { t } from './i18n';
+
 const ORDER = ['normal', 'holo', 'reverse', 'foil', 'cold foil', 'holofoil', 'etched', 'firstEdition', 'firstEditionHolo', 'unlimited', 'unlimitedHolo', 'limited'];
 
 export const FINISH_NAMES = {
@@ -12,7 +14,7 @@ export const FINISH_NAMES = {
   firstEdition: '1re édition', firstEditionHolo: '1re édition holo', unlimited: 'Unlimited', unlimitedHolo: 'Unlimited holo',
   limited: 'Édition limitée', 'cold foil': 'Cold foil', holofoil: 'Holofoil',
 };
-export const finishName = (f) => FINISH_NAMES[f] ?? f;
+export const finishName = (f) => (FINISH_NAMES[f] ? t(FINISH_NAMES[f]) : f);
 
 // Prix qui ne correspondent pas à une version physique (tickets MTGO…).
 const isPhysical = (item) => item.currency === 'EUR' || item.currency === 'USD';

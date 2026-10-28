@@ -8,7 +8,6 @@ import pokemon from './pokemon';
 import magic from './magic';
 import yugioh from './yugioh';
 import { createStaticTcg } from './staticTcg';
-import { LANG_NAMES } from '../lib/cardLang';
 
 // Personnage d'une carte des jeux collectés (null : action, lieu, objet… qui ne représentent pas un personnage).
 const typeOf = (c) => String(c.details?.find(([k]) => k === 'type' || k === 'Card Type')?.[1] || '');
@@ -91,7 +90,7 @@ export const dataLang = (tcg, lang) => (tcg.languages.includes(lang) ? lang : 'e
 // Message affiché sous le sélecteur de langue pour un jeu donné.
 export function langNote(tcg, lang) {
   if (!tcg.languages.includes(lang)) {
-    return `Pas de version ${LANG_NAMES[lang]?.toLowerCase() ?? lang} disponible pour ce jeu : cartes affichées en anglais.`;
+    return 'Pas de version dans cette langue pour ce jeu : cartes affichées en anglais.';
   }
   return tcg.note?.[lang] ?? null;
 }
