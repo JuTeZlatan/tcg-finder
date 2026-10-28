@@ -9,9 +9,11 @@ import { formatPrice } from '../../../lib/prices';
 import { colors, radius, percent } from '../../../lib/theme';
 import { LangBadge, StatTile, ProgressBar, ValueChart } from '../../../components/collection';
 import { openItem } from '../../../lib/openItem';
+import { useSettings } from '../../../lib/settings';
 
 
 export default function CollectionScreen() {
+  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const { loaded, items, history, pricesUpdatedAt, refresh, refreshPrices } = useCollection();
   // Toucher l'onglet « Ma collection » déjà ouvert ramène en haut de la page.
   const scrollRef = useRef(null);

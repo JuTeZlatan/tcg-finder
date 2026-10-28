@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { marketLinks } from '../../../../../lib/marketLinks';
 
 export default function CardScreen() {
+  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const { tcg: tcgId, cardId, setId, finish: finishParam, lang: langParam } = useLocalSearchParams();
   const tcg = getTcg(tcgId);
   // Ouverte depuis la collection : langue de l'exemplaire ; sinon la langue des cartes choisie dans l'appli.

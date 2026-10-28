@@ -14,7 +14,7 @@ import { useCollection } from './collection';
 import { useSettings } from './settings';
 
 const PUSH_DELAY = 3000;
-const SYNCED_SETTINGS = ['pseudo', 'avatar', 'setView', 'priceSource', 'followed', 'updatedAt'];
+const SYNCED_SETTINGS = ['pseudo', 'avatar', 'setView', 'priceSource', 'currency', 'followed', 'updatedAt'];
 const PRICE_FIELDS = ['price', 'priceAt', 'divergent'];
 
 const docId = (key) => encodeURIComponent(key);

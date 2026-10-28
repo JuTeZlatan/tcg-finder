@@ -10,8 +10,10 @@ import { LANG_NAMES, useCardLang } from '../../../lib/cardLang';
 import { formatPrice } from '../../../lib/prices';
 import { colors, radius } from '../../../lib/theme';
 import { GAME_ICONS } from '../../../lib/gameIcons';
+import { useSettings } from '../../../lib/settings';
 
 export default function Home() {
+  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const { items } = useCollection();
   const perTcg = useMemo(() => groupBy(items, (i) => i.tcg), [items]);
   const { cardLang } = useCardLang();

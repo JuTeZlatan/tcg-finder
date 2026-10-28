@@ -52,9 +52,42 @@ export function averagePrice(prices, usdToEur, { recent = false, finish = null, 
   return { value: avg, sources: refs.map((r) => r.source), divergent: refs.length > 1 && spread > (recent ? 6 : 2.5) && Math.max(...values) >= 1, recent };
 }
 
+// Devise d'affichage choisie dans les réglages (euro, dollar ou livre) : tous les prix sont convertis au taux du jour.
+// Les valeurs restent enregistrées en euros (collection, prix d'achat) ; seul l'affichage et la saisie changent.
+export const CURRENCIES = { EUR: 'Euro (€)', USD: 'Dollar ($)', GBP: 'Livre (£)' };
+export const CURRENCY_SYMBOLS = { EUR: '€', USD: '$', GBP: '£' };
+let displayCurrency = 'EUR';
+let eurRates = { EUR: 1, USD: 1.1, GBP: 0.85 }; // 1 € = …, remplacé par le taux BCE du jour
+export const setDisplayCurrency = (currency) => {
+  displayCurrency = CURRENCIES[currency] ? currency : 'EUR';
+};
+export const getDisplayCurrency = () => displayCurrency;
+export const loadRates = memo(async () => {
+  try {
+    const res = await getJSON('https://api.frankfurter.dev/v1/latest?from=EUR&to=USD,GBP');
+    if (res?.rates?.USD && res?.rates?.GBP) eurRates = { EUR: 1, ...res.rates };
+  } catch {
+    // taux approximatifs gardés
+  }
+  return eurRates;
+});
+
+// Convertit d'une devise à une autre (via l'euro) ; null pour ce qui n'est pas une monnaie (tickets MTGO).
+export function convert(value, from, to = displayCurrency) {
+  if (from === to) return value;
+  if (!eurRates[from] || !eurRates[to]) return null;
+  return (value / eurRates[from]) * eurRates[to];
+}
+// Saisie d'un prix (achat, carte « Autres ») : tapée dans la devise affichée, enregistrée en euros.
+export const toStoredEur = (value) => (value == null ? null : Math.round(convert(value, displayCurrency, 'EUR') * 100) / 100);
+export const fromStoredEur = (value) => (value == null ? null : Math.round(convert(value, 'EUR', displayCurrency) * 100) / 100);
+
 const formatters = {};
+// `currency` : devise du prix fourni ; il est affiché converti dans la devise choisie.
 export function formatPrice(value, currency) {
   if (currency === 'TIX') return `${value.toFixed(2)} tix`;
-  formatters[currency] ??= new Intl.NumberFormat('fr-FR', { style: 'currency', currency });
-  return formatters[currency].format(value);
+  const converted = convert(value, currency);
+  const shown = converted == null ? currency : displayCurrency;
+  formatters[shown] ??= new Intl.NumberFormat('fr-FR', { style: 'currency', currency: shown, currencyDisplay: 'narrowSymbol' });
+  return formatters[shown].format(converted ?? value);
 }

@@ -18,6 +18,7 @@ import { useSettings } from '../../lib/settings';
 import { finishLabel, storedFinish } from '../../lib/finishes';
 
 export default function ScanScreen() {
+  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const [permission, requestPermission] = useCameraPermissions();
   const focused = useIsFocused();
   const camera = useRef(null);

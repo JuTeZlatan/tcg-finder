@@ -4,10 +4,11 @@ import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View 
 import { Ionicons } from '@expo/vector-icons';
 import { getTcg, dataLang } from '../api';
 import { useCollection, itemKey, ownedQty } from '../lib/collection';
-import { averagePrice, formatPrice, getUsdToEur } from '../lib/prices';
+import { CURRENCY_SYMBOLS, averagePrice, formatPrice, fromStoredEur, getDisplayCurrency, getUsdToEur, toStoredEur } from '../lib/prices';
 import { defaultFinish, finishLabel, finishesOf, isThinPrice, storedFinish } from '../lib/finishes';
 import { useAsync } from '../lib/useAsync';
 import { colors, radius } from '../lib/theme';
+import { useSettings } from '../lib/settings';
 
 // Badge de langue posé sur l'image d'une carte de la collection (chaque langue est un exemplaire distinct).
 export function LangBadge({ lang }) {
@@ -35,6 +36,7 @@ export function ProgressBar({ value, color = colors.accent, height = 6 }) {
 
 // Évolution de la valeur totale (un point par jour, 30 derniers jours affichés).
 export function ValueChart({ history }) {
+  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const points = history.slice(-30);
   if (points.length < 2) {
     return <Text style={styles.chartEmpty}>L’évolution de la valeur s’affichera ici au fil des jours.</Text>;
@@ -72,6 +74,7 @@ export function ValueChart({ history }) {
 // Fenêtre « Quelle version ? » à l'ajout d'une carte qui existe en plusieurs versions (normale, foil, reverse,
 // 1re édition…) : une ligne par version avec son prix moyen, la valeur en collection en dépend.
 function FinishChooser({ request, onClose }) {
+  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const fx = useAsync(() => getUsdToEur(), []);
   if (!request) return null;
   return (
@@ -185,6 +188,7 @@ export function FinishPicker({ prices, value, onChange, ownedFinishes = [] }) {
 // Bloc « Ma collection » de la fiche d'une carte (`finish` : version choisie, null = version de référence).
 // À l'ajout, la version est demandée ; `onFinishChosen` reporte le choix sur la fiche.
 export function CollectionEditor({ tcgId, lang, setId, card, unitPrice, finish = null, onFinishChosen }) {
+  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const { items, add, setQty, setPurchase } = useCollection();
   const { ask, chooser } = useFinishChoice();
   const item =
@@ -192,7 +196,8 @@ export function CollectionEditor({ tcgId, lang, setId, card, unitPrice, finish =
     items.find((i) => i.tcg === tcgId && i.lang === lang && i.cardId === card.id && (i.finish ?? null) === finish && (!setId || !i.setId || i.setId === setId));
   const key = item?.key ?? itemKey(tcgId, lang, setId ?? card.setId ?? null, card.id, finish);
   const otherLangs = items.filter((i) => i.tcg === tcgId && i.cardId === card.id && i.lang !== lang);
-  const fmtPurchase = (v) => (v != null ? String(v).replace('.', ',') : '');
+  // Prix d'achat enregistré en euros, saisi et affiché dans la devise choisie.
+  const fmtPurchase = (v) => (v != null ? String(fromStoredEur(v)).replace('.', ',') : '');
   const [purchase, setPurchaseText] = useState(fmtPurchase(item?.purchase));
   // Prix d'achat modifié ailleurs (autre écran) : on resynchronise le champ.
   const [syncedPurchase, setSyncedPurchase] = useState(item?.purchase);
@@ -204,7 +209,7 @@ export function CollectionEditor({ tcgId, lang, setId, card, unitPrice, finish =
   const summary = { id: card.id, name: card.name, number: card.number, image: card.image, setName: card.setName, price: unitPrice, finish };
   const savePurchase = () => {
     const v = parseFloat(purchase.replace(',', '.'));
-    setPurchase(key, Number.isFinite(v) && v >= 0 ? Math.round(v * 100) / 100 : null);
+    setPurchase(key, Number.isFinite(v) && v >= 0 ? toStoredEur(v) : null);
   };
 
   return (
@@ -258,7 +263,7 @@ export function CollectionEditor({ tcgId, lang, setId, card, unitPrice, finish =
                 placeholder="—"
                 placeholderTextColor={colors.muted}
               />
-              <Text style={styles.editorLabel}>€</Text>
+              <Text style={styles.editorLabel}>{CURRENCY_SYMBOLS[getDisplayCurrency()]}</Text>
             </View>
           </View>
           {item.purchase != null && unitPrice != null ? (

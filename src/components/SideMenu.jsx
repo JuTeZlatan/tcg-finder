@@ -11,7 +11,7 @@ import { useSettings } from '../lib/settings';
 import { useCollection, summarize } from '../lib/collection';
 import { CARD_LANGS, LANG_NAMES, useCardLang } from '../lib/cardLang';
 import { GAME_ICONS } from '../lib/gameIcons';
-import { PRICE_SOURCES, formatPrice } from '../lib/prices';
+import { CURRENCIES, PRICE_SOURCES, formatPrice } from '../lib/prices';
 import { colors, radius } from '../lib/theme';
 import AccountSection from './AccountSection';
 
@@ -47,6 +47,9 @@ export default function SideMenu({ open, onClose }) {
   // Ouverture : la fenêtre apparaît tout de suite (l'animation d'entrée suit) ; elle ne disparaît qu'après la sortie.
   if (open && !visible) setVisible(true);
   const [choosingAvatar, setChoosingAvatar] = useState(false);
+  // 'main' (profil, compte) ou 'settings' (page Réglages) ; le menu se rouvre toujours sur la page principale.
+  const [page, setPage] = useState('main');
+  if (!open && !visible && page !== 'main') setPage('main');
   const { settings, update } = useSettings();
   const { cardLang, setCardLang } = useCardLang();
   const { items, refresh, refreshPrices } = useCollection();
@@ -78,6 +81,8 @@ export default function SideMenu({ open, onClose }) {
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Fermer le menu" />
       <Animated.View style={[styles.panel, { width: panelWidth, paddingTop: insets.top + 16, paddingBottom: insets.bottom + 8, transform: [{ translateX: x }] }]}>
         <ScrollView contentContainerStyle={{ gap: 18, paddingHorizontal: 18, paddingBottom: 16 }} keyboardShouldPersistTaps="handled">
+          {page === 'main' ? (
+          <>
           {/* Profil : avatar rond (touche pour le changer) et pseudo */}
           <View style={styles.profile}>
             <Pressable onPress={() => setChoosingAvatar((v) => !v)} accessibilityLabel="Changer d'avatar">
@@ -119,6 +124,20 @@ export default function SideMenu({ open, onClose }) {
             <AccountSection />
           </Section>
 
+          <Pressable style={styles.navRow} onPress={() => setPage('settings')}>
+            <Ionicons name="settings-outline" size={20} color={colors.accent} />
+            <Text style={styles.navText}>Réglages</Text>
+            <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+          </Pressable>
+          </>
+          ) : (
+          <>
+          {/* Page « Réglages » : prix, devise, langue des cartes, affichage des extensions */}
+          <Pressable style={styles.back} onPress={() => setPage('main')} hitSlop={8}>
+            <Ionicons name="chevron-back" size={22} color={colors.text} />
+            <Text style={styles.pageTitle}>Réglages</Text>
+          </Pressable>
+
           <Section title="Prix">
             {/* Site(s) de prix : toute l'appli suit ce choix (fiches, moyennes, valeur de la collection). */}
             <Text style={styles.label}>Prix pris en compte</Text>
@@ -136,9 +155,16 @@ export default function SideMenu({ open, onClose }) {
                 />
               ))}
             </View>
+            <Text style={styles.label}>Devise</Text>
+            <View style={styles.row}>
+              {Object.entries(CURRENCIES).map(([k, label]) => (
+                <Chip key={k} label={label} active={(settings.currency || 'EUR') === k} onPress={() => update({ currency: k })} />
+              ))}
+            </View>
+            <Text style={styles.muted}>Tous les prix sont convertis au taux de change du jour.</Text>
           </Section>
 
-          <Section title="Réglages">
+          <Section title="Cartes">
             <Text style={styles.label}>Langue des cartes</Text>
             <View style={styles.row}>
               {CARD_LANGS.map((l) => <Chip key={l} label={LANG_NAMES[l]} active={cardLang === l} onPress={() => setCardLang(l)} />)}
@@ -149,6 +175,8 @@ export default function SideMenu({ open, onClose }) {
               <Chip label="Master set" active={settings.setView === 'master'} onPress={() => update({ setView: 'master' })} />
             </View>
           </Section>
+          </>
+          )}
         </ScrollView>
       </Animated.View>
       </View>
@@ -207,5 +235,9 @@ const styles = StyleSheet.create({
   chipActive: { backgroundColor: colors.accent },
   chipText: { color: colors.muted, fontWeight: '600' },
   chipTextActive: { color: '#1A1A1A' },
+  navRow: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: ITEM_BG, borderRadius: radius, padding: 14 },
+  navText: { color: colors.text, fontWeight: '700', fontSize: 16, flex: 1 },
+  back: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  pageTitle: { color: colors.text, fontSize: 22, fontWeight: '800' },
   option: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
 });

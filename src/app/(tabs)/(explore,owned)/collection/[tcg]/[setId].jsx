@@ -28,6 +28,7 @@ const MODES = [
 ];
 
 export default function CollectionSetScreen() {
+  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const { tcg: tcgId, setId, name } = useLocalSearchParams();
   const tcg = getTcg(tcgId);
   const { items } = useCollection();

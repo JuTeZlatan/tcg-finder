@@ -8,12 +8,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { Directory, File, Paths } from 'expo-file-system';
 import { useCollection } from '../../../../lib/collection';
 import { colors, radius } from '../../../../lib/theme';
+import { CURRENCY_SYMBOLS, fromStoredEur, getDisplayCurrency, toStoredEur } from '../../../../lib/prices';
 
+// Prix saisis dans la devise choisie, enregistrés en euros.
 const toNumber = (s) => {
   const v = parseFloat(String(s ?? '').replace(',', '.'));
-  return Number.isFinite(v) && v >= 0 ? Math.round(v * 100) / 100 : null;
+  return Number.isFinite(v) && v >= 0 ? toStoredEur(v) : null;
 };
-const toText = (v) => (v == null ? '' : String(v).replace('.', ','));
+const toText = (v) => (v == null ? '' : String(fromStoredEur(v)).replace('.', ','));
 
 // Recherches eBay (annonces, ventes réussies) et Vinted pour estimer le prix.
 const marketSearches = (text) => {
@@ -123,8 +125,8 @@ export default function CustomCardScreen() {
         </View>
 
         <View style={styles.row2}>
-          <Field label="Prix estimé (€, à l'unité)" value={form.price} onChangeText={set('price')} keyboardType="decimal-pad" placeholder="—" style={{ flex: 1 }} />
-          <Field label="Prix d'achat (€)" value={form.purchase} onChangeText={set('purchase')} keyboardType="decimal-pad" placeholder="—" style={{ flex: 1 }} />
+          <Field label={`Prix estimé (${CURRENCY_SYMBOLS[getDisplayCurrency()]}, à l'unité)`} value={form.price} onChangeText={set('price')} keyboardType="decimal-pad" placeholder="—" style={{ flex: 1 }} />
+          <Field label={`Prix d'achat (${CURRENCY_SYMBOLS[getDisplayCurrency()]})`} value={form.purchase} onChangeText={set('purchase')} keyboardType="decimal-pad" placeholder="—" style={{ flex: 1 }} />
         </View>
 
         <View style={styles.qtyRow}>

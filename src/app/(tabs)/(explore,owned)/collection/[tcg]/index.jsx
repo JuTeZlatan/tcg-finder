@@ -7,6 +7,7 @@ import { useCollection, summarize, setsSummary } from '../../../../../lib/collec
 import { formatPrice } from '../../../../../lib/prices';
 import { colors, radius, percent } from '../../../../../lib/theme';
 import { StatTile, ProgressBar } from '../../../../../components/collection';
+import { useSettings } from '../../../../../lib/settings';
 
 const SORTS = [
   ['value', 'Valeur'],
@@ -16,6 +17,7 @@ const SORTS = [
 ];
 
 export default function CollectionTcgScreen() {
+  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const { tcg: tcgId } = useLocalSearchParams();
   const tcg = getTcg(tcgId);
   const { items } = useCollection();

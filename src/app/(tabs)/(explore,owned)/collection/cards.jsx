@@ -8,6 +8,7 @@ import { finishName } from '../../../../lib/finishes';
 import { openItem } from '../../../../lib/openItem';
 import { formatPrice } from '../../../../lib/prices';
 import { colors, radius } from '../../../../lib/theme';
+import { useSettings } from '../../../../lib/settings';
 
 const SORTS = [
   ['value', 'Valeur totale'],
@@ -26,6 +27,7 @@ const SORT_FNS = {
 };
 
 export default function AllCardsScreen() {
+  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const params = useLocalSearchParams();
   const { items } = useCollection();
   const [tcgFilter, setTcgFilter] = useState(params.tcg || null);

@@ -91,9 +91,7 @@ export default function ReleasesScreen() {
           <Text style={styles.section}>Mes sorties suivies</Text>
           {mine.map(row)}
         </View>
-      ) : (
-        <Text style={styles.hint}>Touche l’étoile d’une sortie pour la suivre : elle restera en haut de cette page.</Text>
-      )}
+      ) : null}
 
       {months.map(({ month, list }) => (
         <View key={month} style={{ gap: 8 }}>

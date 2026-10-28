@@ -1,7 +1,7 @@
 // Profil et réglages simples, mémorisés sur le téléphone : pseudo, avatar, vue des extensions par défaut, site(s) de prix.
 import { createContext, createElement, useCallback, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { setPreferredSource } from './prices';
+import { loadRates, setDisplayCurrency, setPreferredSource } from './prices';
 
 const STORAGE_KEY = 'settings.v1';
 const DEFAULTS = {
@@ -12,6 +12,8 @@ const DEFAULTS = {
   setView: 'simple',
   // Site(s) de prix : 'both', 'cardmarket' ou 'tcgplayer' (voir src/lib/prices.js)
   priceSource: 'both',
+  // Devise d'affichage des prix : 'EUR', 'USD' ou 'GBP' (voir src/lib/prices.js)
+  currency: 'EUR',
   // Sorties suivies (onglet « Sorties ») : clés de src/lib/releases.js
   followed: [],
   // Date du dernier changement (sauvegarde en ligne : le plus récent l'emporte)
@@ -23,6 +25,11 @@ const SettingsContext = createContext(null);
 export function SettingsProvider({ children }) {
   const [settings, setSettings] = useState(DEFAULTS);
   const [loaded, setLoaded] = useState(false);
+  // Taux de change du jour : une fois chargés, les écrans qui lisent les réglages réaffichent leurs prix.
+  const [ratesAt, setRatesAt] = useState(0);
+  useEffect(() => {
+    loadRates().then(() => setRatesAt(Date.now()));
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
@@ -30,6 +37,7 @@ export function SettingsProvider({ children }) {
         if (!raw) return;
         const saved = { ...DEFAULTS, ...JSON.parse(raw) };
         setPreferredSource(saved.priceSource);
+        setDisplayCurrency(saved.currency);
         setSettings(saved);
       })
       .catch(() => {})
@@ -40,6 +48,7 @@ export function SettingsProvider({ children }) {
   const update = useCallback((patch, { fromSync } = {}) => {
     // Source des prix appliquée tout de suite : les calculs lancés juste après (mise à jour de la collection) l'utilisent.
     if (patch.priceSource) setPreferredSource(patch.priceSource);
+    if (patch.currency) setDisplayCurrency(patch.currency);
     setSettings((prev) => {
       const next = { ...prev, ...patch, updatedAt: fromSync ? patch.updatedAt ?? prev.updatedAt : Date.now() };
       AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(next)).catch(() => {});
@@ -47,7 +56,7 @@ export function SettingsProvider({ children }) {
     });
   }, []);
 
-  return createElement(SettingsContext.Provider, { value: { settings, loaded, update } }, children);
+  return createElement(SettingsContext.Provider, { value: { settings, loaded, update, ratesAt } }, children);
 }
 
 export const useSettings = () => useContext(SettingsContext);
