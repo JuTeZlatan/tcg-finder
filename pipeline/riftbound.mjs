@@ -1,15 +1,15 @@
-// Riftbound : catalogue depuis la galerie officielle Riot (fr-fr / en-us),
+// Riftbound : catalogue depuis la galerie officielle Riot (en-us, zh-cn ; fr-fr dès que Riot y publie les noms français),
 // prix TCGplayer via Riftcodex (identifiants) + TCGCSV, prix Cardmarket via ses fichiers publics.
-import { readFileSync } from 'node:fs';
 import {
   getJSON, getText, sleep, htmlToText, normName, loadCardmarket, cardmarketBlock, cardmarketRef, matchByPrice,
   getUsdToEur, tcgcsvPrices, tcgcsvGroups, tcgcsvGroupProducts, tcgplayerBlock, tcgplayerRef, isFoilOnly, writeTcg,
   isRecent, addTcgplayerVariants, productTag, addSetImages,
 } from './lib.mjs';
 
+// L'anglais d'abord : la version française n'est publiée que si ses noms diffèrent vraiment des noms anglais.
 const GALLERY = {
-  fr: 'https://riftbound.leagueoflegends.com/fr-fr/card-gallery/',
   en: 'https://riftbound.leagueoflegends.com/en-us/card-gallery/',
+  fr: 'https://riftbound.leagueoflegends.com/fr-fr/card-gallery/',
   zh: 'https://riftbound.leagueoflegends.com/zh-cn/card-gallery/',
 };
 const RIFTCODEX = 'https://api.riftcodex.com';
@@ -65,34 +65,11 @@ function fromRiftcodex(c) {
   };
 }
 
-// ---------- Traduction française (en attendant les noms officiels : l'API Riot n'a que l'anglais pendant sa bêta) ----------
-// Noms de cartes traduits (pipeline/i18n/riftbound-fr.json), sauf les noms des champions. Le nom anglais officiel
-// est conservé (`nameEn`) : la politique Riot impose de l'afficher à côté d'une traduction non officielle.
-const FR = JSON.parse(readFileSync(new URL('./i18n/riftbound-fr.json', import.meta.url), 'utf8'));
-const FR_DOMAINS = { Fury: 'Fureur', Calm: 'Calme', Mind: 'Esprit', Body: 'Corps', Chaos: 'Chaos', Order: 'Ordre' };
-
-function frenchName(name) {
-  // Mentions de version (« (Signature) », « (Alternate Art) », « (Metal) »…) gardées en anglais.
-  const tags = [...name.matchAll(/\s*\(([^)]*)\)/g)].map((m) => ` (${m[1]})`).join('');
-  const base = name.replace(/\s*\(.*$/, '').trim();
-  const [champion, ...rest] = base.split(' - ');
-  const subtitle = rest.join(' - ');
-  const translated = subtitle ? `${champion} - ${FR[subtitle] || subtitle}` : FR[base] || base;
-  return translated + tags;
-}
-
-function translateFrench(sets) {
-  for (const s of sets) {
-    for (const c of s.cards) {
-      const fr = frenchName(c.name);
-      if (fr !== c.name) c.nameEn = c.name;
-      c.name = fr;
-      c.details = c.details.map(([k, v]) => (/^(domain|domaine)$/i.test(k)
-        ? [k, String(v).split(', ').map((d) => FR_DOMAINS[d] || d).join(', ')]
-        : [k, v]));
-    }
-  }
-}
+// ---------- Français : seulement les noms officiels de Riot ----------
+// Pendant la bêta, la galerie fr-fr reprend les noms anglais : pas de version française tant que moins de 30 %
+// des noms diffèrent de l'anglais (aucune traduction maison : l'appli affiche alors les cartes anglaises).
+const OFFICIAL_FRENCH_SHARE = 0.3;
+const englishNames = new Map();
 
 const SKIP = new Set(['id', 'collectorNumber', 'name', 'set', 'publicCode', 'cardImage', 'orientation', 'text', 'effect']);
 
@@ -254,7 +231,16 @@ export async function build(outDir) {
     }
     addVariants(sets, { allProducts: await allProducts(), groups: tcgGroupsById, cm, cmUsed, fx, lang });
     sets.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    if (lang === 'fr') translateFrench(sets);
+    const cardsOf = sets.flatMap((s) => s.cards);
+    if (lang === 'en') for (const c of cardsOf) englishNames.set(c.id, c.name);
+    if (lang === 'fr') {
+      const translated = cardsOf.filter((c) => englishNames.has(c.id) && englishNames.get(c.id) !== c.name).length;
+      if (translated < cardsOf.length * OFFICIAL_FRENCH_SHARE) {
+        console.log(`  riftbound/fr : pas encore de noms français officiels (${translated}/${cardsOf.length} traduits) : version française non publiée`);
+        continue;
+      }
+      console.log(`  riftbound/fr : noms français officiels détectés (${translated}/${cardsOf.length}) : à activer dans l'appli (languages de Riftbound)`);
+    }
     await addSetImages(sets, TCGCSV_CATEGORY);
     await writeTcg(outDir, 'riftbound', lang, sets);
   }

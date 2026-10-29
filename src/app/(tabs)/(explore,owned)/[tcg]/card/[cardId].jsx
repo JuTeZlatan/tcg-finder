@@ -56,8 +56,6 @@ export default function CardScreen() {
               <Image source={c.image} style={[styles.image, { width: Math.min(width - 64, 360) }]} contentFit="contain" transition={150} />
             ) : null}
             <Text style={styles.name}>{c.name}</Text>
-            {/* Nom traduit par nos soins (Riftbound en français) : le nom anglais officiel reste affiché. */}
-            {c.nameEn ? <Text style={styles.muted}>{t('Nom officiel : {name} · traduction non officielle', { name: c.nameEn })}</Text> : null}
             {c.subtitle ? <Text style={styles.muted}>{c.subtitle}</Text> : null}
 
             <FinishPicker prices={c.prices} value={finish} onChange={setFinish} ownedFinishes={ownedFinishes} />

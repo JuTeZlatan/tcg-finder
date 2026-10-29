@@ -12,7 +12,7 @@ au taux du jour. Le sélecteur « Cartes en » choisit la version des cartes : *
 | Yu-Gi-Oh! | FR EN | YGOPRODeck en direct (texte FR, images EN) | Cardmarket par édition (collecté) + TCGplayer par édition |
 | One Piece | FR EN JA | Sites officiels Bandai (FR à partir d'OP-09) | Cardmarket (fichiers publics) + TCGplayer (TCGCSV) |
 | Lorcana | FR EN | LorcanaJSON (images officielles) | Cardmarket (fichiers publics) + TCGplayer (TCGCSV) |
-| Riftbound | FR EN ZH | Galerie officielle Riot | Cardmarket (fichiers publics) + TCGplayer (Riftcodex + TCGCSV) |
+| Riftbound | EN ZH (FR : cartes anglaises, en attendant les noms officiels) | Galerie officielle Riot | Cardmarket (fichiers publics) + TCGplayer (Riftcodex + TCGCSV) |
 | Dragon Ball Fusion World | EN | Catalogue TCGplayer (TCGCSV) | TCGplayer + Cardmarket (par code) |
 | Dragon Ball Masters | EN | Catalogue TCGplayer (TCGCSV) | TCGplayer + Cardmarket (par nom) |
 | Autres (cartes hors catalogue) | — | saisies à la main, photo prise avec le téléphone | prix saisi à la main |

@@ -37,12 +37,13 @@ const riftbound = createStaticTcg({
   name: 'Riftbound',
   tagline: 'League of Legends TCG',
   color: '#0AC8B9',
-  languages: ['fr', 'en', 'zh'],
+  // Pas de français officiel pour l'instant (galerie Riot en bêta) : cartes anglaises, sans traduction maison.
+  languages: ['en', 'zh'],
+  englishFallback: true,
   source: { name: 'Riot Games, Riftcodex, Cardmarket, TCGplayer' },
   // Champions : cartes « Nom - Titre » (noms anglais, aussi pour regrouper les cartes chinoises).
   characters: { label: 'Champions', keyLang: 'en', of: (c) => (c.name.includes(' - ') ? c.name.split(' - ')[0].trim() : null) },
   note: {
-    fr: 'Noms traduits par TCG Finder (non officiels, sauf les champions) en attendant la version française de Riot ; images en anglais.',
     zh: 'Galerie officielle en chinois simplifié. Prix : ceux des cartes internationales de même numéro.',
   },
 });

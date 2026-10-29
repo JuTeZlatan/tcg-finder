@@ -180,7 +180,9 @@ export function CollectionProvider({ children }) {
         const it = queue.shift();
         try {
           const info = await fetchCardInfo(it.tcg, it.cardId, it.setId, it.lang, it.finish);
-          patchItem(it.key, { ...(it.grading ? { rawPrice: info.price } : { price: info.price, divergent: info.divergent }), priceAt: Date.now(), setCount: info.setCount ?? it.setCount, setName: it.setName || info.setName, rarity: it.rarity || info.rarity });
+          // Langue sans version officielle (cartes affichées en anglais) : nom officiel anglais repris.
+          const fallback = dataLang(getTcg(it.tcg), it.lang) !== it.lang ? { name: info.name, officialName: true } : {};
+          patchItem(it.key, { ...fallback, ...(it.grading ? { rawPrice: info.price } : { price: info.price, divergent: info.divergent }), priceAt: Date.now(), setCount: info.setCount ?? it.setCount, setName: it.setName || info.setName, rarity: it.rarity || info.rarity });
         } catch {
           // carte momentanément indisponible : on garde l'ancien prix
         }
@@ -200,7 +202,9 @@ export function CollectionProvider({ children }) {
     if (!loaded || autoRefreshed.current) return;
     autoRefreshed.current = true;
     const stale = !state.pricesUpdatedAt || Date.now() - state.pricesUpdatedAt > 24 * 3600 * 1000;
-    if (Object.keys(state.items).length && stale) refreshPrices();
+    // Cartes dont la langue n'a plus de version (traduction maison retirée) : nom officiel à reprendre tout de suite.
+    const renamed = Object.values(state.items).some((i) => i.tcg !== 'custom' && getTcg(i.tcg) && dataLang(getTcg(i.tcg), i.lang) !== i.lang && !i.officialName);
+    if (Object.keys(state.items).length && (stale || renamed)) refreshPrices();
   }, [loaded, state.items, state.pricesUpdatedAt, refreshPrices]);
 
   const items = useMemo(() => Object.values(state.items), [state.items]);

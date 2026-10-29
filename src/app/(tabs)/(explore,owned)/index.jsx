@@ -49,8 +49,9 @@ export default function Home() {
         {TCGS.map((g) => {
           const owned = perTcg.get(g.id);
           const s = owned && summarize(owned);
-          // Jeu sans cartes dans la langue choisie : grisé et non sélectionnable.
-          const available = g.languages.includes(cardLang);
+          // Jeu sans cartes dans la langue choisie : grisé et non sélectionnable
+          // (sauf les jeux affichés en anglais en attendant une version officielle, ex. Riftbound en français).
+          const available = g.languages.includes(cardLang) || !!g.englishFallback;
           return (
             <Pressable
               key={g.id}
