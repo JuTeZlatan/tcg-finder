@@ -53,7 +53,14 @@
           }
         }
       ],
-      "@react-native-google-signin/google-signin"
+      "@react-native-google-signin/google-signin",
+      "expo-background-task",
+      [
+        "expo-notifications",
+        {
+          "color": "#F5B82E"
+        }
+      ]
     ],
     "scheme": "tcgfinder",
     "backgroundColor": "#0F1115"

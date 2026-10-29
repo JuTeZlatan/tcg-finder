@@ -9,6 +9,7 @@ import { formatPrice } from '../../../lib/prices';
 import { colors, radius, percent } from '../../../lib/theme';
 import { LangBadge, StatTile, ProgressBar, ValueChart } from '../../../components/collection';
 import { openItem } from '../../../lib/openItem';
+import Movers from '../../../components/Movers';
 import { useSettings } from '../../../lib/settings';
 import { locale, plural, t } from '../../../lib/i18n';
 
@@ -20,6 +21,7 @@ export default function CollectionScreen() {
   const scrollRef = useRef(null);
   useScrollToTop(scrollRef);
   const total = useMemo(() => summarize(items), [items]);
+  const wishCount = Object.keys(useSettings().settings.wishlist || {}).length;
   const byTcg = useMemo(
     () => [...groupBy(items, (i) => i.tcg)]
       .map(([id, list]) => ({ tcg: getTcg(id), sets: setsSummary(list).length, ...summarize(list) }))
@@ -42,6 +44,10 @@ export default function CollectionScreen() {
         <Pressable style={styles.cta} onPress={() => router.navigate('/(tabs)/(explore)')}>
           <Ionicons name="search" size={18} color="#1A1A1A" />
           <Text style={styles.ctaText}>{t('Explorer les cartes')}</Text>
+        </Pressable>
+        <Pressable style={styles.ctaSecondary} onPress={() => router.push('/collection/wishlist')}>
+          <Ionicons name="heart-outline" size={18} color={colors.accent} />
+          <Text style={styles.ctaSecondaryText}>{t('Mes cartes recherchées ({n})', { n: wishCount })}</Text>
         </Pressable>
         <Pressable style={styles.ctaSecondary} onPress={() => router.push('/collection/custom')}>
           <Ionicons name="add-circle-outline" size={18} color={colors.accent} />
@@ -85,6 +91,8 @@ export default function CollectionScreen() {
       <View style={styles.card}>
         <ValueChart history={history} />
       </View>
+
+      <Movers items={items} />
 
       <Text style={styles.section}>{t('Par jeu')}</Text>
       <View style={styles.card}>
@@ -137,6 +145,11 @@ export default function CollectionScreen() {
       <Pressable style={styles.allButton} onPress={() => router.push('/collection/cards')}>
         <Ionicons name="list" size={18} color={colors.text} />
         <Text style={styles.allButtonText}>{t('Toutes mes cartes ({n})', { n: total.unique })}</Text>
+        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+      </Pressable>
+      <Pressable style={styles.allButton} onPress={() => router.push('/collection/wishlist')}>
+        <Ionicons name="heart-outline" size={18} color={colors.accent} />
+        <Text style={styles.allButtonText}>{t('Mes cartes recherchées ({n})', { n: wishCount })}</Text>
         <Ionicons name="chevron-forward" size={18} color={colors.muted} />
       </Pressable>
       <Pressable style={styles.allButton} onPress={() => router.push('/collection/custom')}>

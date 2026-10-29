@@ -39,6 +39,13 @@ export function takeReopenMenu() {
   return v;
 }
 
+// Hors interface (tâche de fond) : langue enregistrée, sans passer par I18nProvider.
+export async function loadAppLang() {
+  const saved = await AsyncStorage.getItem(STORAGE_KEY).catch(() => null);
+  lang = APP_LANGS[saved] ? saved : deviceLang();
+  return lang;
+}
+
 function deviceLang() {
   const code = getLocales()[0]?.languageCode;
   return APP_LANGS[code] ? code : 'en';

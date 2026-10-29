@@ -194,7 +194,7 @@ export function CollectionEditor({ tcgId, lang, setId, card, unitPrice, finish =
   const { ask, chooser } = useFinishChoice();
   const item =
     items.find((i) => i.key === itemKey(tcgId, lang, setId ?? card.setId ?? null, card.id, finish)) ||
-    items.find((i) => i.tcg === tcgId && i.lang === lang && i.cardId === card.id && (i.finish ?? null) === finish && (!setId || !i.setId || i.setId === setId));
+    items.find((i) => i.tcg === tcgId && i.lang === lang && i.cardId === card.id && !i.grading && (i.finish ?? null) === finish && (!setId || !i.setId || i.setId === setId));
   const key = item?.key ?? itemKey(tcgId, lang, setId ?? card.setId ?? null, card.id, finish);
   const otherLangs = items.filter((i) => i.tcg === tcgId && i.cardId === card.id && i.lang !== lang);
   // Prix d'achat enregistré en euros, saisi et affiché dans la devise choisie.

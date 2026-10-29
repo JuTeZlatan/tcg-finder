@@ -48,3 +48,13 @@ export function marketLinks(tcgId, card, lang) {
     { key: 'vinted', label: t('Annonces Vinted'), icon: 'storefront-outline', url: `https://www.vinted.fr/catalog?search_text=${q}` },
   ];
 }
+
+// Exemplaire gradé (« PSA 9 », « PCA 8.5 ») : ventes réussies eBay et annonces Vinted pour estimer sa cote
+// (aucune base de prix gradés ouverte : PriceCharting et PSA sont réservés aux abonnés).
+export function gradedLinks(tcgId, card, lang, company, grade) {
+  const q = encodeURIComponent(`${marketQuery(tcgId, card, lang)} ${company} ${grade}`);
+  return [
+    { key: 'ebay-sold', label: t('Ventes eBay {grade}', { grade: `${company} ${grade}` }), icon: 'checkmark-done-outline', url: `https://www.ebay.fr/sch/i.html?_nkw=${q}&LH_Sold=1&LH_Complete=1` },
+    { key: 'vinted', label: t('Vinted {grade}', { grade: `${company} ${grade}` }), icon: 'storefront-outline', url: `https://www.vinted.fr/catalog?search_text=${q}` },
+  ];
+}

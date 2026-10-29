@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useIsFocused } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -16,7 +16,7 @@ import { colors, radius } from '../../lib/theme';
 import { useFinishChoice } from '../../components/collection';
 import { useSettings } from '../../lib/settings';
 import { finishLabel, storedFinish } from '../../lib/finishes';
-import { t } from '../../lib/i18n';
+import { plural, t } from '../../lib/i18n';
 
 export default function ScanScreen() {
   useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
@@ -25,8 +25,12 @@ export default function ScanScreen() {
   const camera = useRef(null);
   const [ready, setReady] = useState(false);
   const [torch, setTorch] = useState(false);
-  const [state, setState] = useState({ step: 'camera' }); // camera | analyzing | result
+  const [state, setState] = useState({ step: 'camera' }); // camera | analyzing | result | batch
   const { cardLang } = useCardLang();
+  // Scan en rafale : chaque carte lue rejoint une liste, vérifiée puis ajoutée d'un coup.
+  const [mode, setMode] = useState('single'); // single | batch
+  const [batch, setBatch] = useState([]);
+  const [lastRead, setLastRead] = useState(null); // dernier résultat affiché brièvement sur l'appareil photo
 
   // Lecture du texte (OCR sur le téléphone) puis identification de la carte.
   const analyze = async (getUri) => {
@@ -36,8 +40,18 @@ export default function ScanScreen() {
       if (!uri) return setState({ step: 'camera' });
       const ocr = await recognizeText(uri);
       const result = await identify(ocr?.text || '', cardLang);
+      if (mode === 'batch') {
+        const best = result.candidates?.[0];
+        if (best) setBatch((b) => [...b, { key: `${Date.now()}`, candidates: result.candidates, selected: 0, finish: null, finishName: null, price: null }]);
+        setLastRead(best ? { ok: true, text: `${best.name} · ${best.number || ''}` } : { ok: false, text: t('Carte non reconnue') });
+        return setState({ step: 'camera' });
+      }
       setState({ step: 'result', photo: uri, text: ocr?.text || '', ...result, selected: 0 });
     } catch (e) {
+      if (mode === 'batch') {
+        setLastRead({ ok: false, text: t('Carte non reconnue') });
+        return setState({ step: 'camera' });
+      }
       setState({ step: 'result', error: e?.message || String(e), candidates: [], detections: [] });
     }
   };
@@ -60,6 +74,9 @@ export default function ScanScreen() {
   }
 
   if (state.step === 'result') return <Result state={state} setState={setState} onRetry={() => setState({ step: 'camera' })} />;
+  if (state.step === 'batch') {
+    return <BatchReview batch={batch} setBatch={setBatch} onBack={() => setState({ step: 'camera' })} onDone={() => { setBatch([]); setLastRead(null); setState({ step: 'camera' }); }} />;
+  }
 
   return (
     <View style={styles.page}>
@@ -73,6 +90,13 @@ export default function ScanScreen() {
         />
       ) : null}
       <View style={styles.overlay} pointerEvents="box-none">
+        <View style={styles.modeRow}>
+          {[['single', t('Une carte')], ['batch', t('En rafale')]].map(([k, label]) => (
+            <Pressable key={k} style={[styles.modeChip, mode === k && styles.modeChipActive]} onPress={() => setMode(k)}>
+              <Text style={[styles.modeText, mode === k && styles.modeTextActive]}>{label}</Text>
+            </Pressable>
+          ))}
+        </View>
         <Text style={styles.hint}>{t('Cadre la carte entière, bien éclairée.')}{'\n'}{t('Le code en bas (ex. OP09-119, 004/084) doit être net.')}{'\n'}{t('Langue des cartes')} : {t(LANG_NAMES[cardLang])}.</Text>
         <View style={styles.frame} pointerEvents="none">
           <View style={[styles.corner, { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4 }]} />
@@ -87,10 +111,22 @@ export default function ScanScreen() {
           <Pressable style={[styles.shutter, (!ready || state.step === 'analyzing') && { opacity: 0.5 }]} onPress={scan} disabled={!ready || state.step === 'analyzing'}>
             {state.step === 'analyzing' ? <ActivityIndicator color="#1A1A1A" /> : <Ionicons name="scan" size={34} color="#1A1A1A" />}
           </Pressable>
-          {/* Reconnaissance uniquement avec l'appareil photo : espace vide pour centrer le déclencheur. */}
-          <View style={[styles.sideBtn, { backgroundColor: 'transparent' }]} />
+          {mode === 'batch' ? (
+            <Pressable style={[styles.sideBtn, styles.listBtn]} onPress={() => setState({ step: 'batch' })} accessibilityLabel={t('Liste des cartes scannées')}>
+              <Ionicons name="list" size={22} color="#1A1A1A" />
+              <Text style={styles.listCount}>{batch.length}</Text>
+            </Pressable>
+          ) : (
+            // Mode une carte : espace vide pour centrer le déclencheur.
+            <View style={[styles.sideBtn, { backgroundColor: 'transparent' }]} />
+          )}
         </View>
         {state.step === 'analyzing' ? <Text style={styles.analyzing}>{t('Lecture de la carte…')}</Text> : null}
+        {mode === 'batch' && state.step !== 'analyzing' && lastRead ? (
+          <Text style={[styles.analyzing, { color: lastRead.ok ? colors.success : colors.danger }]} numberOfLines={1}>
+            {lastRead.ok ? '✓ ' : '✗ '}{lastRead.text}
+          </Text>
+        ) : null}
       </View>
     </View>
   );
@@ -235,6 +271,99 @@ function ScannedCard({ c }) {
   );
 }
 
+// Rafale : vérification des cartes scannées (bonne carte, version) puis ajout de toutes d'un coup.
+function BatchReview({ batch, setBatch, onBack, onDone }) {
+  const { add } = useCollection();
+  const [done, setDone] = useState(0);
+  const patch = useCallback((key, p) => setBatch((b) => b.map((r) => (r.key === key ? { ...r, ...p } : r))), [setBatch]);
+  const addAll = () => {
+    for (const r of batch) {
+      const c = r.candidates[r.selected];
+      add(c.tcgId, c.lang, c.setId, { id: c.id, name: r.name || c.name, number: c.number, image: r.image || c.image, setName: c.setName, price: r.price, finish: r.finish, finishName: r.finishName }, 1);
+    }
+    setDone(batch.length);
+  };
+  if (done) {
+    return (
+      <View style={styles.center}>
+        <Ionicons name="checkmark-circle" size={64} color={colors.success} />
+        <Text style={styles.title}>{plural(done, '{n} carte ajoutée à ta collection', '{n} cartes ajoutées à ta collection')}</Text>
+        <Pressable style={styles.primary} onPress={onDone}>
+          <Ionicons name="scan" size={18} color="#1A1A1A" />
+          <Text style={styles.primaryText}>{t('Nouvelle rafale')}</Text>
+        </Pressable>
+        <Pressable style={styles.secondary} onPress={() => router.navigate('/(tabs)/(owned)')}>
+          <Text style={[styles.secondaryText, { paddingHorizontal: 18 }]}>{t('Voir ma collection')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+  return (
+    <ScrollView contentContainerStyle={styles.resultPage}>
+      <Pressable style={styles.newScan} onPress={onBack} hitSlop={8}>
+        <Ionicons name="scan" size={18} color={colors.accent} />
+        <Text style={styles.newScanText}>{t('Continuer à scanner')}</Text>
+      </Pressable>
+      <Text style={styles.title}>{plural(batch.length, '{n} carte scannée', '{n} cartes scannées')}</Text>
+      {!batch.length ? <Text style={styles.muted}>{t('Scanne des cartes : elles s’ajoutent ici, tu les vérifies puis tu les ajoutes toutes d’un coup.')}</Text> : null}
+      {batch.map((r) => <BatchRow key={r.key} row={r} onChange={patch} onRemove={() => setBatch((b) => b.filter((x) => x.key !== r.key))} />)}
+      {batch.length ? (
+        <Pressable style={styles.primary} onPress={addAll}>
+          <Ionicons name="albums" size={20} color="#1A1A1A" />
+          <Text style={styles.primaryText}>{plural(batch.length, 'Ajouter {n} carte à ma collection', 'Ajouter les {n} cartes à ma collection')}</Text>
+        </Pressable>
+      ) : null}
+    </ScrollView>
+  );
+}
+
+function BatchRow({ row, onChange, onRemove }) {
+  const c = row.candidates[row.selected];
+  const tcg = getTcg(c.tcgId);
+  const info = useAsync(async () => {
+    const [card, fx] = await Promise.all([tcg.getCard(c.id, c.setId, c.lang), getUsdToEur()]);
+    return { card, fx };
+  }, [c.tcgId, c.id, c.setId, c.lang]);
+  const { priceSource } = useSettings().settings;
+  const { ask, chooser } = useFinishChoice();
+  const card = info.data?.card;
+  const avg = card ? averagePrice(card.prices, info.data.fx, { finish: row.finish, source: priceSource }) : null;
+  // Prix, nom et image de la carte choisie, gardés pour l'ajout final.
+  const price = avg?.value ?? null;
+  const needsSync = !!card && (row.price !== price || row.name !== card.name);
+  useEffect(() => {
+    if (needsSync) onChange(row.key, { price, name: card.name, image: card.image || c.image });
+  }, [needsSync, price, card, c.image, onChange, row.key]);
+  const chooseVersion = () => card && ask(card.name, card.prices || [], (picked, p, label) => onChange(row.key, { finish: picked, finishName: label, price: p ?? price }));
+  const other = (step) => onChange(row.key, { selected: (row.selected + step + row.candidates.length) % row.candidates.length, finish: null, finishName: null, price: null, name: null, image: null });
+  return (
+    <View style={styles.batchRow}>
+      {chooser}
+      {card?.image || c.image ? <Image source={card?.image || c.image} style={styles.batchImg} contentFit="cover" /> : <View style={styles.batchImg} />}
+      <View style={{ flex: 1, gap: 3 }}>
+        <Text style={styles.batchName} numberOfLines={2}>{card?.name || c.name}</Text>
+        <Text style={styles.altMeta} numberOfLines={1}>{tcg?.name} · {c.number} · {c.lang.toUpperCase()}</Text>
+        <Pressable onPress={chooseVersion} hitSlop={6}>
+          <Text style={styles.batchLink}>{row.finishName || (card ? finishLabel(card.prices, storedFinish(card.prices, null)) || t('Version') : t('Version'))} ▾</Text>
+        </Pressable>
+        {row.candidates.length > 1 ? (
+          <View style={styles.badgeRow}>
+            <Pressable onPress={() => other(-1)} hitSlop={6}><Ionicons name="chevron-back" size={18} color={colors.accent} /></Pressable>
+            <Text style={styles.altMeta}>{t('Possibilité {i}/{n}', { i: row.selected + 1, n: row.candidates.length })}</Text>
+            <Pressable onPress={() => other(1)} hitSlop={6}><Ionicons name="chevron-forward" size={18} color={colors.accent} /></Pressable>
+          </View>
+        ) : null}
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 8 }}>
+        <Text style={styles.batchPrice}>{info.loading ? '…' : price != null ? formatPrice(price, 'EUR') : '—'}</Text>
+        <Pressable onPress={onRemove} hitSlop={8} accessibilityLabel={t('Retirer')}>
+          <Ionicons name="close-circle" size={22} color={colors.muted} />
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 const FRAME_W = 260;
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: '#000' },
@@ -275,4 +404,16 @@ const styles = StyleSheet.create({
   altImg: { width: '100%', aspectRatio: 63 / 88, borderRadius: 6, backgroundColor: colors.surfaceAlt },
   altName: { color: colors.text, fontSize: 11, fontWeight: '600' },
   altMeta: { color: colors.muted, fontSize: 10 },
+  modeRow: { flexDirection: 'row', backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 999, padding: 3, marginBottom: 8 },
+  modeChip: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999 },
+  modeChipActive: { backgroundColor: colors.accent },
+  modeText: { color: '#fff', fontWeight: '700' },
+  modeTextActive: { color: '#1A1A1A' },
+  listBtn: { backgroundColor: colors.accent },
+  listCount: { position: 'absolute', top: -4, right: -4, minWidth: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', color: '#1A1A1A', fontWeight: '800', fontSize: 12, textAlign: 'center', lineHeight: 22, overflow: 'hidden' },
+  batchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: radius, padding: 10 },
+  batchImg: { width: 56, aspectRatio: 63 / 88, borderRadius: 6, backgroundColor: colors.surfaceAlt },
+  batchName: { color: colors.text, fontWeight: '700' },
+  batchLink: { color: colors.accent, fontWeight: '700', fontSize: 13 },
+  batchPrice: { color: colors.accent, fontWeight: '800' },
 });

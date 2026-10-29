@@ -91,7 +91,7 @@ export default function AllCardsScreen() {
               {i.image ? <Image source={i.image} style={{ width: '100%', height: '100%' }} contentFit="cover" /> : null}
             </View>
             <View style={{ flex: 1, gap: 2 }}>
-              <Text style={styles.name} numberOfLines={1}>{i.name}{i.finish ? ` · ${i.finishName || finishName(i.finish)}` : ''}</Text>
+              <Text style={styles.name} numberOfLines={1}>{i.name}{i.finish || i.grading ? ` · ${i.finishName || finishName(i.finish)}` : ''}</Text>
               <Text style={styles.meta} numberOfLines={1}>
                 {getTcg(i.tcg)?.name} · {i.setName || i.setId}{i.number ? ` · #${i.number}` : ''}
               </Text>

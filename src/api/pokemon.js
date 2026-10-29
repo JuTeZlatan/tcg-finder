@@ -7,6 +7,7 @@ import { loadData } from './dataSource';
 import { cardmarketRef } from '../lib/priceRef';
 import { versionsOfCard } from '../lib/masterSet';
 import { parseNumber, sortByNumber } from '../lib/cardOrder';
+import { historyFile } from '../lib/priceHistory';
 
 // Chinois : édition traditionnelle (la plus complète chez TCGdex, avec images).
 const TCGDEX_LANG = { zh: 'zh-tw' };
@@ -225,7 +226,15 @@ function promoDate(set, localId, sets) {
   return new Date(at).toISOString().slice(0, 10);
 }
 
+// Historique des prix : fichiers par extension, internationaux (fr/en) ou japonais (ja/zh, mêmes codes).
+const loadHistory = memo((key, setId) => loadData(historyFile(`pokemon/${key}`, setId), async () => null).catch(() => null));
+
 const adapter = {
+  getPriceHistory: async (cardId, setId, lang) => {
+    const key = lang === 'ja' || lang === 'zh' ? 'ja' : 'intl';
+    const h = await loadHistory(key, cardId.slice(0, cardId.lastIndexOf('-')));
+    return h?.cards?.[cardId] ? { days: h.days, points: h.cards[cardId] } : null;
+  },
   id: 'pokemon',
   name: 'Pokémon',
   tagline: 'Pokémon Trading Card Game',

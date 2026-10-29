@@ -12,6 +12,7 @@ import { useAsync } from '../../lib/useAsync';
 import { useCollection } from '../../lib/collection';
 import { useSettings } from '../../lib/settings';
 import { useCardLang } from '../../lib/cardLang';
+import { askNotificationPermission } from '../../lib/notifications';
 import { SOON_DAYS, countdown, daysUntil, findSetForRelease, loadReleases, localizedReleaseNames, releaseLinks } from '../../lib/releases';
 import { colors, radius } from '../../lib/theme';
 import { locale, t } from '../../lib/i18n';
@@ -57,7 +58,10 @@ export default function ReleasesScreen() {
   const toggleFollow = (key) => {
     const next = new Set(followed);
     if (next.has(key)) next.delete(key);
-    else next.add(key);
+    else {
+      next.add(key);
+      askNotificationPermission(); // pour le rappel du jour de sortie
+    }
     // Ne garde que les sorties encore listées (les anciennes disparaissent d'elles-mêmes).
     update({ followed: [...next].filter((k) => all.some((r) => r.key === k)) });
   };

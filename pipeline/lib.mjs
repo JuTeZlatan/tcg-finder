@@ -440,6 +440,47 @@ function dedupeTcgplayer(sets) {
   return removed;
 }
 
+// ---------- Historique des prix ----------
+// Un fichier par extension (history/<chemin>.json) : { days: ['2026-10-29', …], cards: { id: [[cardmarket €, tcgplayer $], …] } },
+// valeurs alignées sur `days`. Chaque jour, le prix du jour est ajouté à l'historique publié la veille ;
+// on garde un point par jour sur 90 jours, puis un par semaine jusqu'à un an.
+const HISTORY_DAILY = 90;
+const HISTORY_MAX_DAYS = 366;
+const today = () => new Date().toISOString().slice(0, 10);
+const round = (v) => (v == null || !Number.isFinite(v) ? null : Math.round(v * 100) / 100);
+
+// Prix de référence d'une carte (version de base) : [Cardmarket en €, TCGplayer en $].
+export function referencePrices(prices) {
+  const ref = (source) => (prices || []).find((p) => p.source === source && !p.versions && p.ref?.value)?.ref.value;
+  return [round(ref('Cardmarket')), round(ref('TCGplayer'))];
+}
+
+// Jours gardés : les 90 derniers, puis le premier jour de chaque semaine (lundi) jusqu'à un an.
+function keptDays(days) {
+  const now = Date.parse(today());
+  return days.filter((d) => {
+    const age = (now - Date.parse(d)) / 86400000;
+    if (age < HISTORY_DAILY) return true;
+    return age <= HISTORY_MAX_DAYS && new Date(d).getUTCDay() === 1;
+  });
+}
+
+// values : { idCarte: [cardmarket, tcgplayer] } pour aujourd'hui.
+export async function updateHistory(outDir, path, values) {
+  const previous = (await previousJSON(`history/${path}.json`)) || { days: [], cards: {} };
+  const day = today();
+  const oldDays = previous.days.filter((d) => d !== day); // relance le même jour : on remplace le point du jour
+  const days = keptDays([...oldDays, day]);
+  const index = new Map(oldDays.map((d, i) => [d, i]));
+  const cards = {};
+  for (const id of new Set([...Object.keys(previous.cards), ...Object.keys(values)])) {
+    const old = previous.cards[id] || [];
+    const series = days.map((d) => (d === day ? values[id] || [null, null] : old[index.get(d)] || [null, null]));
+    if (series.some(([a, b]) => a != null || b != null)) cards[id] = series;
+  }
+  await writeJSON(`${outDir}/history/${path}.json`, { days, cards });
+}
+
 // ---------- Images manquantes (contrôle quotidien) ----------
 // Une photo TCGplayer peut ne pas exister (produit pas encore photographié : réponse 403). Chaque jour, les photos
 // TCGplayer des cartes sont vérifiées (celles déjà validées les jours précédents sont gardées sans nouvel essai) ;
@@ -533,6 +574,7 @@ export async function writeTcg(outDir, tcgId, lang, sets) {
   const search = [];
   for (const set of sets) {
     await writeJSON(`${base}/sets/${fileId(set.id)}.json`, set.cards);
+    await updateHistory(outDir, `${tcgId}/${lang}/${fileId(set.id)}`, Object.fromEntries(set.cards.map((c) => [c.id, referencePrices(c.prices)])));
     for (const c of set.cards) search.push([c.id, c.name, set.id, c.number ?? '', c.image ?? '', c.nameEn ?? '']);
   }
   await writeJSON(

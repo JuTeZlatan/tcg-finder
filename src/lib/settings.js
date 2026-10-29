@@ -3,7 +3,7 @@ import { createContext, createElement, useCallback, useContext, useEffect, useSt
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadRates, setDisplayCurrency, setPreferredSource } from './prices';
 
-const STORAGE_KEY = 'settings.v1';
+export const STORAGE_KEY = 'settings.v1';
 const DEFAULTS = {
   pseudo: '',
   // avatar : { type: 'photo', uri } ou { type: 'game', id } (icône d'un jeu), null = initiale du pseudo
@@ -16,6 +16,8 @@ const DEFAULTS = {
   currency: 'EUR',
   // Sorties suivies (onglet « Sorties ») : clés de src/lib/releases.js
   followed: [],
+  // Cartes recherchées (liste de souhaits) : clé → { tcg, lang, cardId, setId, name, image, number, target, price… }
+  wishlist: {},
   // Date du dernier changement (sauvegarde en ligne : le plus récent l'emporte)
   updatedAt: 0,
 };

@@ -6,7 +6,7 @@
 // Format : { [id]: [productId, [[finition, marché, plus bas], …]] }
 import {
   getJSON, getText, sleep, writeJSON, similarity, normName, tcgcsvGroups, tcgcsvGroupProducts, productTag, groupImage,
-  loadCardmarket, cardmarketRef, buildProductIndex, matchByPrice, getUsdToEur, previousJSON,
+  loadCardmarket, cardmarketRef, buildProductIndex, matchByPrice, getUsdToEur, previousJSON, updateHistory, fileId,
 } from './lib.mjs';
 import { officialImages } from './pokemonOfficial.mjs';
 
@@ -253,6 +253,25 @@ async function imageFallbacks({ intlSets, jaSets, zhCards, intl, ja }) {
   return { images: out, missing };
 }
 
+// Historique des prix (history/pokemon/<intl|ja>/<extension>.json) : TCGplayer « marché » de la version de base
+// (normale, sinon holo, sinon la première) et Cardmarket « tendance » (sinon moyenne).
+const BASE_FINISHES = ['Normal', 'Holofoil', 'Unlimited', '1st Edition'];
+function tcgplayerMarket(entry) {
+  const rows = entry?.[1] || [];
+  const row = BASE_FINISHES.map((f) => rows.find((r) => r[0] === f && r[1] != null)).find(Boolean) || rows.find((r) => r[1] != null);
+  return row ? row[1] : null;
+}
+async function writeHistory(outDir, key, tcgplayer, cardmarket = {}) {
+  const bySet = new Map();
+  for (const id of new Set([...Object.keys(tcgplayer), ...Object.keys(cardmarket)])) {
+    const set = id.slice(0, id.lastIndexOf('-'));
+    const g = cardmarket[id]?.[1];
+    if (!bySet.has(set)) bySet.set(set, {});
+    bySet.get(set)[id] = [g ? g.trend ?? g.avg ?? null : null, tcgplayerMarket(tcgplayer[id])];
+  }
+  for (const [set, values] of bySet) await updateHistory(outDir, `pokemon/${key}/${fileId(set)}`, values);
+}
+
 export async function build(outDir) {
   console.log('Pokémon (prix TCGplayer international)…');
   const [intlSets, intlCatalog] = [await internationalSets(), await catalog(3)];
@@ -263,6 +282,7 @@ export async function build(outDir) {
   const cmOut = matchCardmarket(intlSets, intl.out, cm, fx);
   await writeJSON(`${outDir}/pokemon/cardmarket.json`, cmOut);
   console.log(`  pokemon : ${Object.keys(cmOut).length} cartes reliées à leur produit Cardmarket`);
+  await writeHistory(outDir, 'intl', intl.out, cmOut);
   const versions = matchVersions(intlSets, intlCatalog, new Set(Object.values(intl.out).map((v) => v[0])));
   await writeJSON(`${outDir}/pokemon/tcgplayer-versions.json`, versions.out);
   console.log(`  pokemon : ${versions.n} autres versions (tampons, motifs, Shadowless…) sur ${Object.keys(versions.out).length} cartes`);
@@ -271,6 +291,7 @@ export async function build(outDir) {
   const jaSets = await japaneseSets();
   const ja = matchSets(jaSets, await catalog(85), { compareNames: false });
   await writeJSON(`${outDir}/pokemon/tcgplayer-ja.json`, ja.out);
+  await writeHistory(outDir, 'ja', ja.out);
   console.log(`  pokemon ja : ${ja.matchedSets}/${jaSets.length} extensions reliées, ${ja.matchedCards}/${ja.totalCards} cartes avec prix TCGplayer`);
 
   // Dates de sortie des extensions japonaises et chinoises (pour les trier de la plus récente à la plus ancienne).

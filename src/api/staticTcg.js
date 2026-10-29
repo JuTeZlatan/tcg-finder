@@ -6,6 +6,7 @@ import { loadBundled } from './bundledData';
 import { loadData } from './dataSource';
 import { versionsOfCard } from '../lib/masterSet';
 import { mainPrefix, parseNumber, sortByNumber } from '../lib/cardOrder';
+import { historyFile } from '../lib/priceHistory';
 
 const fileId = (id) => String(id).replace(/[^A-Za-z0-9._-]/g, '_');
 
@@ -21,6 +22,8 @@ export function createStaticTcg(meta) {
     setId,
   ));
 
+  const loadHistory = memo((setId, lang) => loadData(historyFile(`${meta.id}/${lang}`, setId), async () => null).catch(() => null));
+
   // Lignes [id, nom, extension, numéro, image, nom anglais officiel si le nom est traduit]
   const loadSearch = memo(async (lang) => {
     return loadData(path(lang, 'search.json'), async () => {
@@ -34,6 +37,12 @@ export function createStaticTcg(meta) {
     languages: meta.languages || ['fr', 'en'],
 
     getSets: loadSets,
+
+    // Historique des prix d'une carte (null tant qu'il n'y en a pas).
+    getPriceHistory: async (cardId, setId, lang) => {
+      const h = await loadHistory(setId, lang);
+      return h?.cards?.[cardId] ? { days: h.days, points: h.cards[cardId] } : null;
+    },
 
     // Master set : chaque version de chaque carte de l'extension.
     getVersions: memo(async (setId, lang) =>

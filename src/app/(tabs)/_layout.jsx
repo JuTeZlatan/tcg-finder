@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../../lib/theme';
@@ -7,6 +7,8 @@ import { useSettings } from '../../lib/settings';
 import { useAsync } from '../../lib/useAsync';
 import { daysUntil, loadReleases } from '../../lib/releases';
 import { t, takeReopenMenu } from '../../lib/i18n';
+import { scheduleReleaseReminders } from '../../lib/notifications';
+import { getTcg } from '../../api';
 
 // L'appli s'ouvre sur l'Explorer, même si le bouton « Menu » est le premier de la barre.
 export const unstable_settings = { initialRouteName: '(explore)' };
@@ -18,6 +20,12 @@ export default function TabsLayout() {
   // Badge de l'onglet « Sorties » : sorties suivies qui arrivent dans les 7 jours.
   const releases = useAsync(() => loadReleases(), []);
   const followed = new Set(useSettings().settings.followed || []);
+  // Rappel à 9 h le jour de sortie de chaque extension suivie (reprogrammé quand la liste change).
+  const followedKey = [...followed].sort().join(',');
+  useEffect(() => {
+    const list = (releases.data || []).filter((r) => followedKey.split(',').includes(r.key) && daysUntil(r.date) >= 0);
+    scheduleReleaseReminders(list.map((r) => ({ key: r.key, date: r.date, name: r.name, tcgName: getTcg(r.tcg)?.name || '' }))).catch(() => {});
+  }, [releases.data, followedKey]);
   const dueSoon = (releases.data || []).filter((r) => followed.has(r.key) && daysUntil(r.date) >= 0 && daysUntil(r.date) <= 7).length;
   return (
     <>

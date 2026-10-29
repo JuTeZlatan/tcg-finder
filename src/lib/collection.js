@@ -13,9 +13,12 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 // `finish` : version de la carte (foil, reverse…) quand ce n'est pas la version de référence.
 export const itemKey = (tcgId, lang, setId, cardId, finish) => `${tcgId}|${lang}|${setId ?? ''}|${cardId}${finish ? `|${finish}` : ''}`;
+// Exemplaire gradé (« PSA 9 », « PCA 8.5 ») : rangé à part de la carte brute, avec sa propre valeur.
+export const gradingLabel = (g) => (g ? `${g.company} ${g.grade}` : null);
+const gradingSuffix = (g) => (g ? `|g:${g.company}-${g.grade}` : '');
 
 // Prix moyen (EUR) + infos d'extension d'une carte, depuis le même connecteur que la recherche.
-async function fetchCardInfo(tcgId, cardId, setId, lang, finish) {
+export async function fetchCardInfo(tcgId, cardId, setId, lang, finish) {
   const tcg = getTcg(tcgId);
   const l = dataLang(tcg, lang);
   const [card, fx] = await Promise.all([tcg.getCard(cardId, setId || null, l), getUsdToEur()]);
@@ -85,9 +88,9 @@ export function CollectionProvider({ children }) {
   const add = useCallback((tcgId, lang, setId, summary, delta = 1) => {
     // Depuis la recherche, l'extension n'est pas toujours connue : on reprend alors l'exemplaire déjà possédé.
     const existingKey = !setId
-      ? Object.values(stateRef.current.items).find((i) => i.tcg === tcgId && i.lang === lang && i.cardId === summary.id && (i.finish ?? null) === (summary.finish ?? null))?.key
+      ? Object.values(stateRef.current.items).find((i) => i.tcg === tcgId && i.lang === lang && i.cardId === summary.id && (i.finish ?? null) === (summary.finish ?? null) && gradingLabel(i.grading) === gradingLabel(summary.grading))?.key
       : null;
-    const key = existingKey || itemKey(tcgId, lang, setId, summary.id, summary.finish);
+    const key = existingKey || itemKey(tcgId, lang, setId, summary.id, summary.finish) + gradingSuffix(summary.grading);
     const isNew = !stateRef.current.items[key];
     update((prev) => {
       const existing = prev.items[key];
@@ -97,6 +100,7 @@ export function CollectionProvider({ children }) {
           key, tcg: tcgId, lang, cardId: summary.id, setId: setId ?? summary.setId ?? null, setName: summary.setName ?? null,
           setCount: null, name: summary.name, number: summary.number ?? null, image: summary.image ?? null,
           rarity: null, qty: delta, price: summary.price ?? null, priceAt: null, purchase: null, finish: summary.finish ?? null, finishName: summary.finishName ?? null,
+          grading: summary.grading ?? null,
           addedAt: Date.now(), updatedAt: Date.now(),
         };
       return { ...prev, items: { ...prev.items, [key]: item } };
@@ -104,7 +108,10 @@ export function CollectionProvider({ children }) {
     // Complète en arrière-plan : prix moyen, extension, nombre de cartes de l'extension.
     if (isNew) {
       fetchCardInfo(tcgId, summary.id, setId ?? summary.setId, lang, summary.finish)
-        .then((info) => patchItem(key, { ...info, image: summary.image || info.image, priceAt: Date.now() }))
+        // Exemplaire gradé : sa valeur est celle saisie ; le prix de la carte brute est gardé à côté (rawPrice).
+        .then((info) => patchItem(key, summary.grading
+          ? { ...info, price: summary.price ?? null, rawPrice: info.price, image: summary.image || info.image, priceAt: Date.now() }
+          : { ...info, image: summary.image || info.image, priceAt: Date.now() }))
         .catch(() => {});
     }
     return key;
@@ -124,6 +131,8 @@ export function CollectionProvider({ children }) {
   }, [update]);
 
   const setPurchase = useCallback((key, purchase) => patchItem(key, { purchase, updatedAt: Date.now() }), [patchItem]);
+  // Valeur saisie à la main (exemplaire gradé).
+  const setPrice = useCallback((key, price) => patchItem(key, { price, updatedAt: Date.now() }), [patchItem]);
 
   // Sauvegarde en ligne (src/lib/sync.js) : lecture de l'état complet et fusion avec celui du compte.
   const getState = useCallback(() => stateRef.current, []);
@@ -171,7 +180,7 @@ export function CollectionProvider({ children }) {
         const it = queue.shift();
         try {
           const info = await fetchCardInfo(it.tcg, it.cardId, it.setId, it.lang, it.finish);
-          patchItem(it.key, { price: info.price, divergent: info.divergent, priceAt: Date.now(), setCount: info.setCount ?? it.setCount, setName: it.setName || info.setName, rarity: it.rarity || info.rarity });
+          patchItem(it.key, { ...(it.grading ? { rawPrice: info.price } : { price: info.price, divergent: info.divergent }), priceAt: Date.now(), setCount: info.setCount ?? it.setCount, setName: it.setName || info.setName, rarity: it.rarity || info.rarity });
         } catch {
           // carte momentanément indisponible : on garde l'ancien prix
         }
@@ -196,8 +205,8 @@ export function CollectionProvider({ children }) {
 
   const items = useMemo(() => Object.values(state.items), [state.items]);
   const value = useMemo(
-    () => ({ loaded, items, state, history: state.history, pricesUpdatedAt: state.pricesUpdatedAt, refresh, add, setQty, setPurchase, saveCustom, remove, refreshPrices, getState, applySync }),
-    [loaded, items, state, refresh, add, setQty, setPurchase, saveCustom, remove, refreshPrices, getState, applySync],
+    () => ({ loaded, items, state, history: state.history, pricesUpdatedAt: state.pricesUpdatedAt, refresh, add, setQty, setPurchase, setPrice, saveCustom, remove, refreshPrices, getState, applySync }),
+    [loaded, items, state, refresh, add, setQty, setPurchase, setPrice, saveCustom, remove, refreshPrices, getState, applySync],
   );
   // stateRef n’est lu que dans les actions (add, refreshPrices), jamais pendant le rendu.
   // eslint-disable-next-line react-hooks/refs

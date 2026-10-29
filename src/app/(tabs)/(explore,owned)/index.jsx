@@ -1,6 +1,6 @@
 import { router, useScrollToTop } from 'expo-router';
-import { useMemo, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { TCGS } from '../../../api';
@@ -21,10 +21,28 @@ export default function Home() {
   // Toucher l'onglet « Explorer » déjà ouvert ramène en haut de la page.
   const scrollRef = useRef(null);
   useScrollToTop(scrollRef);
+  // Recherche dans tous les jeux à la fois.
+  const [query, setQuery] = useState('');
+  const search = () => query.trim() && router.push({ pathname: '/search', params: { q: query.trim() } });
 
   return (
     <ScrollView ref={scrollRef} contentContainerStyle={styles.page}>
       <Text style={styles.title}>{t('Choisis ton TCG')}</Text>
+
+      <View style={styles.searchRow}>
+        <TextInput
+          style={styles.searchInput}
+          value={query}
+          onChangeText={setQuery}
+          onSubmitEditing={search}
+          returnKeyType="search"
+          placeholder={t('Chercher une carte dans tous les jeux…')}
+          placeholderTextColor={colors.muted}
+        />
+        <Pressable style={styles.searchButton} onPress={search} accessibilityLabel={t('Recherche')}>
+          <Ionicons name="search" size={20} color="#1A1A1A" />
+        </Pressable>
+      </View>
 
       <LangToggle />
       <View style={styles.grid}>
@@ -66,6 +84,9 @@ const styles = StyleSheet.create({
   page: { padding: 16, gap: 12 },
   title: { color: colors.text, fontSize: 26, fontWeight: '800' },
   grid: { gap: 10, marginTop: 8 },
+  searchRow: { flexDirection: 'row', gap: 8 },
+  searchInput: { flex: 1, backgroundColor: colors.surface, color: colors.text, borderRadius: radius, paddingHorizontal: 14, paddingVertical: 12, borderWidth: 1, borderColor: colors.border, fontSize: 16 },
+  searchButton: { backgroundColor: colors.accent, borderRadius: radius, paddingHorizontal: 16, justifyContent: 'center' },
   tile: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: colors.surface, borderRadius: radius, borderLeftWidth: 5, paddingVertical: 18, paddingHorizontal: 16,

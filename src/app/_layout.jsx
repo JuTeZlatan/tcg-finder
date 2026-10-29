@@ -7,6 +7,9 @@ import { I18nProvider } from '../lib/i18n';
 import { SettingsProvider } from '../lib/settings';
 import { SyncProvider } from '../lib/sync';
 import { colors } from '../lib/theme';
+import Watchers from '../components/Watchers';
+// Déclare la tâche de fond des alertes de prix (doit être chargée au démarrage, hors composant).
+import '../lib/backgroundTasks';
 
 export default function RootLayout() {
   return (
@@ -18,6 +21,7 @@ export default function RootLayout() {
               <SettingsProvider>
                 <SyncProvider>
                   <StatusBar style="light" />
+                  <Watchers />
                   {/* Changement de langue : les écrans sont redessinés (key), les données restent chargées. */}
                   <Stack
                     key={appLang}

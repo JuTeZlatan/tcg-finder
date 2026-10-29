@@ -15,7 +15,7 @@ import { useSettings } from './settings';
 import { t } from './i18n';
 
 const PUSH_DELAY = 3000;
-const SYNCED_SETTINGS = ['pseudo', 'avatar', 'setView', 'priceSource', 'currency', 'followed', 'updatedAt'];
+const SYNCED_SETTINGS = ['pseudo', 'avatar', 'setView', 'priceSource', 'currency', 'followed', 'wishlist', 'updatedAt'];
 const PRICE_FIELDS = ['price', 'priceAt', 'divergent'];
 
 const docId = (key) => encodeURIComponent(key);
@@ -27,7 +27,8 @@ const stable = (v) => JSON.stringify(v, (k, x) => (x && typeof x === 'object' &&
 // Ce qui part en ligne pour une carte : sans les prix du catalogue ni le chemin local de la photo.
 function payloadOf(item) {
   const out = { ...item };
-  if (item.tcg !== 'custom') for (const f of PRICE_FIELDS) delete out[f];
+  // (valeur saisie à la main des cartes « Autres » et des exemplaires gradés : gardée)
+  if (item.tcg !== 'custom' && !item.grading) for (const f of PRICE_FIELDS) delete out[f];
   if (isLocalFile(item.image)) {
     out.photo = fileName(item.image);
     delete out.image;
