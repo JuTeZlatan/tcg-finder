@@ -18,6 +18,12 @@ export default function GlobalSearchScreen() {
   const { q } = useLocalSearchParams();
   const { cardLang } = useCardLang();
   const [query, setQuery] = useState(String(q || ''));
+  // Nouvelle recherche ouverte sur le même écran (lien, autre recherche) : le champ suit.
+  const [shownQ, setShownQ] = useState(q);
+  if (q !== shownQ) {
+    setShownQ(q);
+    setQuery(String(q || ''));
+  }
   // Résultats de la recherche en cours : clé (texte + langue) et, par jeu, { cards } ou { error } dès qu'ils arrivent.
   const key = `${String(q || '').trim()}|${cardLang}`;
   const [state, setState] = useState({ key: null, byGame: {} });

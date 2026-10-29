@@ -49,7 +49,7 @@
         "expo-build-properties",
         {
           "android": {
-            "extraProguardRules": "# ML Kit (reconnaissance de texte du scanner) : R8 casse ses classes internes sans ces règles.\n-keep class com.google.mlkit.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_text_common.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_common.** { *; }\n-keep class com.google.android.gms.internal.mlkit_common.** { *; }\n-keep class red.infinite.reactnativemlkit.** { *; }"
+            "extraProguardRules": "# ML Kit (reconnaissance de texte du scanner) : R8 casse ses classes internes sans ces règles.\n-keep class com.google.mlkit.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_text_common.** { *; }\n-keep class com.google.android.gms.internal.mlkit_vision_common.** { *; }\n-keep class com.google.android.gms.internal.mlkit_common.** { *; }\n-keep class red.infinite.reactnativemlkit.** { *; }\n# WorkManager (tâche de fond des alertes de prix) : R8 retire sa base Room sans ces règles.\n-keep class * extends androidx.room.RoomDatabase { <init>(); }\n-keep class androidx.work.impl.WorkDatabase_Impl { *; }\n-keep class androidx.work.** { *; }"
           }
         }
       ],
