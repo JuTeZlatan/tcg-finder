@@ -6,6 +6,7 @@ import { loadBundledFile } from './bundledData';
 import { loadData } from './dataSource';
 import { cardmarketRef } from '../lib/priceRef';
 import { versionsOfCard } from '../lib/masterSet';
+import { parseNumber, sortByNumber } from '../lib/cardOrder';
 
 // Chinois : édition traditionnelle (la plus complète chez TCGdex, avec images).
 const TCGDEX_LANG = { zh: 'zh-tw' };
@@ -197,6 +198,20 @@ const speciesList = memo(async () => {
 });
 const SPECIES_LANG = { fr: 1, en: 2, ja: 3, zh: 4 };
 
+// Promos « Black Star » (SVP, SWSH…) : une seule extension datée de son début, numérotée au fil des sorties sur
+// plusieurs années. Date estimée d'une carte : sa place dans la numérotation, entre le début de cette série
+// et celui de la suivante (ou aujourd'hui pour la série en cours).
+function promoDate(set, localId, sets) {
+  if (!/promo/i.test(set.name || '') || !set.date) return null;
+  const n = parseNumber(localId)?.num;
+  if (!Number.isFinite(n) || !set.count) return null;
+  const next = sets.filter((s) => /promo/i.test(s.name || '') && s.date > set.date).map((s) => s.date).sort()[0];
+  const start = Date.parse(set.date);
+  const end = next ? Date.parse(next) : Date.now();
+  const at = start + Math.min(1, n / set.count) * (end - start);
+  return new Date(at).toISOString().slice(0, 10);
+}
+
 const adapter = {
   id: 'pokemon',
   name: 'Pokémon',
@@ -230,7 +245,7 @@ const adapter = {
   getCards: memo(async (setId, lang) => {
     const set = await getJSON(`${base(lang)}/sets/${encodeURIComponent(setId)}`);
     const collected = await tcgplayerPrices(lang);
-    return (set.cards || []).map((c) => ({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected) }));
+    return sortByNumber(set.cards || [], (c) => c.localId, setId).map((c) => ({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected) }));
   }),
 
   // Master set : versions de chaque carte d'après les prix collectés (TCGplayer, Cardmarket, versions vendues à part),
@@ -243,7 +258,7 @@ const adapter = {
       intl ? tcgplayerVersions() : {},
       intl ? cardmarketProducts() : {},
     ]);
-    return (set.cards || []).flatMap((c) => {
+    return sortByNumber(set.cards || [], (c) => c.localId, setId).flatMap((c) => {
       const pricing = ownCm[c.id] ? { cardmarket: { unit: 'EUR', ...ownCm[c.id][1] } } : null;
       const cardPrices = [...prices(pricing, collected[c.id]), ...versionsBlock(versions[c.id])];
       return versionsOfCard({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected) }, cardPrices);
@@ -333,10 +348,11 @@ const adapter = {
     return (cards || [])
       .map((c) => ({ c, set: setById.get(c.id.slice(0, c.id.lastIndexOf('-'))) }))
       .filter(({ set }) => set) // extensions TCG Pocket et inconnues écartées
-      .sort((a, b) => (b.set.date || '').localeCompare(a.set.date || ''))
-      .map(({ c, set }) => ({
+      .map((x) => ({ ...x, date: promoDate(x.set, x.c.localId, sets) || x.set.date || '' }))
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map(({ c, set, date }) => ({
         id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected), setId: set.id,
-        subtitle: [set.name, set.date].filter(Boolean).join(' · '),
+        subtitle: [set.name, date].filter(Boolean).join(' · '),
       }));
   }),
 };

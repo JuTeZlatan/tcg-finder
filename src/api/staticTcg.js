@@ -5,6 +5,7 @@ import { memo } from './http';
 import { loadBundled } from './bundledData';
 import { loadData } from './dataSource';
 import { versionsOfCard } from '../lib/masterSet';
+import { mainPrefix, parseNumber, sortByNumber } from '../lib/cardOrder';
 
 const fileId = (id) => String(id).replace(/[^A-Za-z0-9._-]/g, '_');
 
@@ -13,9 +14,12 @@ export function createStaticTcg(meta) {
   const path = (lang, p) => `${meta.id}/${lang}/${p}`;
   const loadSets = memo((lang) => loadData(path(lang, 'sets.json'), () => loadBundled(meta.id, lang).then((d) => d.sets)));
 
-  const loadSet = memo((setId, lang) =>
-    loadData(path(lang, `sets/${fileId(setId)}.json`), () => loadBundled(meta.id, lang).then((d) => d.cards[setId] || [])),
-  );
+  // Cartes d'une extension, rangées par numéro (les fichiers suivent l'ordre des sources, pas toujours celui-là).
+  const loadSet = memo(async (setId, lang) => sortByNumber(
+    await loadData(path(lang, `sets/${fileId(setId)}.json`), () => loadBundled(meta.id, lang).then((d) => d.cards[setId] || [])),
+    (c) => c.number,
+    setId,
+  ));
 
   // Lignes [id, nom, extension, numéro, image, nom anglais officiel si le nom est traduit]
   const loadSearch = memo(async (lang) => {
@@ -76,6 +80,15 @@ export function createStaticTcg(meta) {
 const groupKey = (name) => String(name).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
   .replace(/[^a-z0-9぀-ヿ一-鿿]+/g, '');
 
+// Extensions qui regroupent des cartes sorties sur des années (promos, tournois, juges, jeu organisé).
+const UMBRELLA = /promo|judge|organized play|tournament cards/i;
+const isUmbrella = (s) => UMBRELLA.test(s.name || '') && !/release event/i.test(s.name || '');
+// N° de produit TCGplayer d'une carte (« tcg723038 » ou « 191783 »), sinon null.
+const productId = (c) => {
+  const m = String(c.id).match(/^(?:tcg)?(\d{5,})$/);
+  return m ? Number(m[1]) : null;
+};
+
 function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadSet) {
   // Toutes les cartes de toutes les extensions, avec leur personnage, de la plus récente à la plus ancienne.
   const allCards = memo(async (lang) => {
@@ -84,12 +97,41 @@ function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadS
     const keyById = new Map();
     if (keySets) for (const s of keySets) for (const c of await loadSet(s.id, keyLang)) keyById.set(c.id, of(c));
     const out = [];
+    // Repères de dates pour les cartes des extensions « fourre-tout » (promos, tournois…), datées de leur première
+    // sortie (ou d'une mise à jour TCGplayer) alors que leurs cartes s'étalent sur des années :
+    // date de l'extension dont la carte porte le code (« OP06-022 » → OP06), sinon n° de produit TCGplayer
+    // (attribué dans l'ordre de création) comparé au premier n° de chaque extension.
+    const prefixDate = new Map();
+    const productStarts = [];
+    const totalDates = new Map(); // nombre de cartes → dates des extensions de cette taille
     for (const s of sets) {
-      for (const c of await loadSet(s.id, lang)) {
+      const cards = await loadSet(s.id, lang);
+      for (const c of cards) {
         const key = keySets ? keyById.get(c.id) : of(c);
-        if (key) out.push({ key, card: c, set: s });
+        if (key) out.push({ key, card: c, set: s, date: s.date || '' });
       }
+      if (isUmbrella(s) || !s.date) continue;
+      if (s.count) totalDates.set(s.count, [...(totalDates.get(s.count) || []), s.date]);
+      const prefix = mainPrefix(cards.map((c) => c.number), s.id);
+      if (prefix && !(prefixDate.get(prefix) <= s.date)) prefixDate.set(prefix, s.date);
+      // repère fiable seulement si l'extension vient surtout de TCGplayer (sinon n° ajoutés après coup, dans le désordre)
+      const ids = cards.map(productId).filter(Boolean);
+      if (ids.length >= 10 && ids.length >= cards.length / 2) productStarts.push([Math.min(...ids), s.date]);
     }
+    productStarts.sort((a, b) => a[0] - b[0]);
+    let latest = '';
+    for (const p of productStarts) p[1] = latest = p[1] > latest ? p[1] : latest; // date atteinte à ce n° de produit
+    for (const x of out) {
+      if (!isUmbrella(x.set)) continue;
+      const byCode = prefixDate.get(parseNumber(x.card.number)?.prefix);
+      const id = productId(x.card);
+      const byProduct = id ? productStarts.filter(([start]) => start <= id).pop()?.[1] : null;
+      // total imprimé (« PR-066/298 ») d'une seule extension de cette taille : sortie avec elle
+      const total = Number(String(x.card.number || '').match(/\/\s*(\d+)\s*$/)?.[1]);
+      const byTotal = totalDates.get(total)?.length === 1 ? totalDates.get(total)[0] : null;
+      x.date = byCode || byProduct || byTotal || x.date;
+    }
+    out.sort((a, b) => b.date.localeCompare(a.date)); // tri stable : à date égale, ordre des extensions et des numéros
     // Noms « Titre + Nom » sans séparateur (vieilles cartes Dragon Ball : « Abrupt Breakthrough Son Goku ») :
     // rattachés au nom connu le plus long qui les termine (« Son Goku »), s'il existe.
     // Noms de référence : ceux portés par au moins 3 cartes (« Son Goku », « Vegeta »…), du plus long au plus court.
@@ -130,9 +172,9 @@ function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadS
     getCharacterCards: memo(async (id, lang) =>
       (await allCards(lang))
         .filter((x) => groupKey(x.key) === id)
-        .map(({ card: c, set: s }) => ({
+        .map(({ card: c, set: s, date }) => ({
           id: c.id, name: c.name, number: c.number, image: c.thumb || c.image, setId: s.id,
-          subtitle: [s.name, s.date].filter(Boolean).join(' · '),
+          subtitle: [s.name, date].filter(Boolean).join(' · '),
         }))),
   };
 }
