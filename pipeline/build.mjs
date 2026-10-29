@@ -9,6 +9,7 @@ import * as yugioh from './yugioh.mjs';
 import * as dragonball from './dragonball.mjs';
 import * as magic from './magic.mjs';
 import * as upcoming from './upcoming.mjs';
+import { audit } from './audit.mjs';
 
 const BUILDERS = { onepiece, riftbound, lorcana, pokemon, yugioh, dragonball, magic, upcoming };
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
@@ -24,6 +25,12 @@ for (const id of only) {
     console.error(`✗ ${id} : ${e.stack || e.message}`);
     failures.push(id);
   }
+}
+// Contrôle de complétude : comble les manques avec les autres langues et publie le rapport du jour.
+try {
+  await audit(outDir);
+} catch (e) {
+  console.error(`✗ contrôle de complétude : ${e.stack || e.message}`);
 }
 await writeJSON(`${outDir}/meta.json`, { generatedAt: new Date().toISOString(), tcgs: only.filter((id) => !failures.includes(id)) });
 if (failures.length) process.exit(1);

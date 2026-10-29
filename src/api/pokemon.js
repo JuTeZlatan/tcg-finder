@@ -14,7 +14,13 @@ const base = (lang) => `https://api.tcgdex.net/v2/${TCGDEX_LANG[lang] || lang}`;
 const img = (url, quality = 'low') => (url ? `${url}/${quality}.webp` : null);
 // Image TCGdex, sinon photo TCGplayer de la même carte (beaucoup d'extensions récentes, japonaises et chinoises n'ont pas d'image TCGdex).
 const tcgplayerImage = (entry, size) => (entry ? `https://tcgplayer-cdn.tcgplayer.com/product/${entry[0]}_${size}.jpg` : null);
-const imageOf = (c, collected, quality = 'low') => img(c.image, quality) || tcgplayerImage(collected?.[c.id], quality === 'high' ? 'in_1000x1000' : '400w');
+// En dernier recours : la même carte dans une autre langue (pokemon/images.json, collecté chaque jour).
+let imageFallback = {};
+const imageOf = (c, collected, quality = 'low', lang = null) => img(c.image, quality)
+  || tcgplayerImage(collected?.[c.id], quality === 'high' ? 'in_1000x1000' : '400w')
+  || fallbackImage(imageFallback[lang]?.[c.id], quality);
+// Adresse TCGdex (sans extension : on ajoute la qualité) ou image complète d'un site officiel.
+const fallbackImage = (url, quality) => (url && /\.(png|jpe?g|webp)$/i.test(url) ? url : img(url, quality));
 
 // Clés Cardmarket de TCGdex → [clé de prix, variante]
 const CM_KEYS = {
@@ -68,7 +74,14 @@ const asianSetDates = memo(async () => {
 // Cartes japonaises : catalogue TCGplayer « Pokemon Japan » ; cartes chinoises : pas de prix TCGplayer.
 // Cartes chinoises : même numérotation que les japonaises → prix et photo de la carte japonaise équivalente.
 const TCGPLAYER_FILE = { fr: 'tcgplayer', en: 'tcgplayer', ja: 'tcgplayer-ja', zh: 'tcgplayer-ja' };
+const loadImageFallback = memo(async () => {
+  imageFallback = await loadData('pokemon/images.json', async () => ({})).catch(() => ({}));
+  return imageFallback;
+});
+
+// (charge aussi les images de remplacement, lues par imageOf)
 const tcgplayerPrices = memo(async (lang) => {
+  await loadImageFallback();
   const file = TCGPLAYER_FILE[lang];
   if (!file) return {};
   try {
@@ -245,7 +258,7 @@ const adapter = {
   getCards: memo(async (setId, lang) => {
     const set = await getJSON(`${base(lang)}/sets/${encodeURIComponent(setId)}`);
     const collected = await tcgplayerPrices(lang);
-    return sortByNumber(set.cards || [], (c) => c.localId, setId).map((c) => ({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected) }));
+    return sortByNumber(set.cards || [], (c) => c.localId, setId).map((c) => ({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected, 'low', lang) }));
   }),
 
   // Master set : versions de chaque carte d'après les prix collectés (TCGplayer, Cardmarket, versions vendues à part),
@@ -261,7 +274,7 @@ const adapter = {
     return sortByNumber(set.cards || [], (c) => c.localId, setId).flatMap((c) => {
       const pricing = ownCm[c.id] ? { cardmarket: { unit: 'EUR', ...ownCm[c.id][1] } } : null;
       const cardPrices = [...prices(pricing, collected[c.id]), ...versionsBlock(versions[c.id])];
-      return versionsOfCard({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected) }, cardPrices);
+      return versionsOfCard({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected, 'low', lang) }, cardPrices);
     });
   }),
 
@@ -273,7 +286,7 @@ const adapter = {
     const [{ pocket }, collected] = await Promise.all([setsMeta(), tcgplayerPrices(lang)]);
     return (cards || [])
       .filter((c) => !pocket.has(setIdOf(c.id)))
-      .map((c) => ({ id: c.id, name: c.name, number: c.localId, subtitle: c.id, image: imageOf(c, collected) }));
+      .map((c) => ({ id: c.id, name: c.name, number: c.localId, subtitle: c.id, image: imageOf(c, collected, 'low', lang) }));
   }),
 
   getCard: memo(async (id, _setId, lang) => {
@@ -301,7 +314,7 @@ const adapter = {
       name: c.name,
       setId: c.set?.id,
       setName: c.set?.name,
-      image: imageOf(c, collected, 'high'),
+      image: imageOf(c, collected, 'high', lang),
       details: clean([
         ['set', c.set?.name],
         ['number', total ? `${c.localId} / ${total}` : c.localId],
@@ -351,7 +364,7 @@ const adapter = {
       .map((x) => ({ ...x, date: promoDate(x.set, x.c.localId, sets) || x.set.date || '' }))
       .sort((a, b) => b.date.localeCompare(a.date))
       .map(({ c, set, date }) => ({
-        id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected), setId: set.id,
+        id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected, 'low', lang), setId: set.id,
         subtitle: [set.name, date].filter(Boolean).join(' · '),
       }));
   }),

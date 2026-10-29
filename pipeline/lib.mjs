@@ -29,6 +29,10 @@ export async function getText(url, opts) {
   return res ? res.text() : null;
 }
 
+// Données publiées la veille (GitHub Pages) : permet de ne refaire chaque jour que ce qui manque encore.
+export const PUBLISHED_URL = process.env.PUBLISHED_URL || 'https://jutezlatan.github.io/tcg-finder';
+export const previousJSON = (path) => getJSON(`${PUBLISHED_URL}/${path}`).catch(() => null);
+
 export async function writeJSON(path, data) {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(data));
@@ -436,9 +440,95 @@ function dedupeTcgplayer(sets) {
   return removed;
 }
 
+// ---------- Images manquantes (contrôle quotidien) ----------
+// Une photo TCGplayer peut ne pas exister (produit pas encore photographié : réponse 403). Chaque jour, les photos
+// TCGplayer des cartes sont vérifiées (celles déjà validées les jours précédents sont gardées sans nouvel essai) ;
+// une photo absente est remplacée par l'image officielle du même numéro, sinon par celle de la même carte dans
+// une autre extension, sinon retirée (l'appli affiche alors « pas d'image » au lieu d'une image cassée).
+const OFFICIAL_IMAGE = {
+  onepiece: (num, lang) => `https://${{ en: 'en', fr: 'fr' }[lang] || 'www'}.onepiece-cardgame.com/images/cardlist/card/${num}.png`,
+  dbsmasters: (num) => `https://www.dbs-cardgame.com/images/cardlist/cardimg/${num}.png`,
+  dbsfw: (num) => `https://www.dbs-cardgame.com/fw/images/cards/card/en/${num}.webp`,
+};
+const tcgplayerProduct = (url) => Number(String(url || '').match(/tcgplayer-cdn\.tcgplayer\.com\/product\/(\d+)_/)?.[1]) || null;
+const urlChecks = new Map(); // url → Promise<true | false | null> (null : erreur réseau, on ne conclut rien)
+function imageExists(url) {
+  if (!urlChecks.has(url)) {
+    urlChecks.set(url, (async () => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const res = await fetch(url, { method: 'HEAD', headers: { 'User-Agent': 'Mozilla/5.0 (TCG Finder data collector)' } });
+          if (res.status === 429 || res.status >= 500) { await sleep(1000); continue; }
+          return res.ok && /^image\//.test(res.headers.get('content-type') || 'image/');
+        } catch {
+          await sleep(500);
+        }
+      }
+      return null;
+    })());
+  }
+  return urlChecks.get(url);
+}
+async function pool(items, size, fn) {
+  let i = 0;
+  await Promise.all(Array.from({ length: size }, async () => {
+    while (i < items.length) await fn(items[i++]);
+  }));
+}
+const goodProducts = new Map(); // tcgId → Set des produits TCGplayer dont la photo existe (publié chaque jour)
+
+export async function repairImages(tcgId, lang, sets) {
+  if (!goodProducts.has(tcgId)) goodProducts.set(tcgId, new Set((await previousJSON(`${tcgId}/imagecheck.json`))?.good || []));
+  const good = goodProducts.get(tcgId);
+  const cards = sets.flatMap((s) => s.cards);
+  const toCheck = [...new Set(cards.map((c) => tcgplayerProduct(c.thumb || c.image)).filter((id) => id && !good.has(id)))];
+  const bad = new Set();
+  await pool(toCheck, 24, async (id) => {
+    const ok = await imageExists(`https://tcgplayer-cdn.tcgplayer.com/product/${id}_400w.jpg`);
+    if (ok) good.add(id);
+    else if (ok === false) bad.add(id);
+  });
+  const broken = cards.filter((c) => bad.has(tcgplayerProduct(c.thumb || c.image)));
+  if (!broken.length) return { checked: toCheck.length, fixed: 0, removed: 0 };
+  // Même numéro ailleurs (réédition, version de base) avec une image valable : numéro exact, puis sans préfixe
+  // d'extension ni astérisque (« 051/221 » = « SFD-051/221 », « 168* » = « RAD-168 »), puis sans lettre de variante,
+  // enfin même nom exact (runes, jetons réimprimés).
+  const numberKeys = (n) => {
+    const exact = String(n || '').trim();
+    const loose = exact.replace(/^[A-Z]{2,4}-(?=\d)/i, '').replace(/\*/g, '').toUpperCase();
+    return [exact, `~${loose}`, `~~${loose.replace(/^(\d+)[A-Z]+/, '$1')}`];
+  };
+  const byNumber = new Map();
+  for (const c of cards) {
+    if (!c.number || bad.has(tcgplayerProduct(c.thumb || c.image)) || !(c.image || c.thumb)) continue;
+    for (const k of [...numberKeys(c.number), `name:${c.name}`]) if (!byNumber.has(k)) byNumber.set(k, c);
+  }
+  let fixed = 0;
+  let removed = 0;
+  await pool(broken, 8, async (c) => {
+    const num = String(c.number || '').split('/')[0].trim();
+    const official = OFFICIAL_IMAGE[tcgId] && /^[A-Z0-9]+-[A-Z0-9]+$/i.test(num) ? OFFICIAL_IMAGE[tcgId](num, lang) : null;
+    const other = [...numberKeys(c.number), `name:${c.name}`].map((k) => byNumber.get(k)).find(Boolean);
+    const url = (official && (await imageExists(official)) && official) || (other && (other.image || other.thumb));
+    if (url) {
+      c.image = url;
+      c.thumb = other && url === (other.image || other.thumb) ? other.thumb || url : url;
+      fixed++;
+    } else {
+      delete c.image;
+      delete c.thumb;
+      removed++;
+    }
+  });
+  return { checked: toCheck.length, fixed, removed };
+}
+
 export async function writeTcg(outDir, tcgId, lang, sets) {
   const dup = dedupeTcgplayer(sets);
   if (dup) console.log(`  ${tcgId}/${lang} : ${dup} prix TCGplayer en double retirés (produit relié à plusieurs cartes)`);
+  const img = await repairImages(tcgId, lang, sets);
+  if (img.fixed || img.removed) console.log(`  ${tcgId}/${lang} : ${img.checked} photos TCGplayer vérifiées, ${img.fixed} images remplacées, ${img.removed} sans image`);
+  await writeJSON(`${outDir}/${tcgId}/imagecheck.json`, { good: [...goodProducts.get(tcgId)].sort((a, b) => a - b) });
   const base = `${outDir}/${tcgId}/${lang}`;
   const search = [];
   for (const set of sets) {

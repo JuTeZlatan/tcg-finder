@@ -6,8 +6,9 @@
 // Format : { [id]: [productId, [[finition, marché, plus bas], …]] }
 import {
   getJSON, getText, sleep, writeJSON, similarity, normName, tcgcsvGroups, tcgcsvGroupProducts, productTag, groupImage,
-  loadCardmarket, cardmarketRef, buildProductIndex, matchByPrice, getUsdToEur,
+  loadCardmarket, cardmarketRef, buildProductIndex, matchByPrice, getUsdToEur, previousJSON,
 } from './lib.mjs';
+import { officialImages } from './pokemonOfficial.mjs';
 
 const TCGDEX = 'https://api.tcgdex.net/v2';
 
@@ -19,7 +20,7 @@ async function internationalSets() {
   const res = await fetch(`${TCGDEX}/graphql`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: '{ sets { id name serie { id } cardCount { official } cards { id localId name } } }' }),
+    body: JSON.stringify({ query: '{ sets { id name serie { id } cardCount { official } cards { id localId name image } } }' }),
   });
   // Sans les extensions de Pokémon TCG Pocket (jeu mobile, cartes numériques sans prix).
   return (await res.json()).data.sets.filter((s) => s.serie?.id !== 'tcgp');
@@ -214,6 +215,44 @@ function matchVersions(sets, byGroup, linked) {
   return { out, n };
 }
 
+// Images de remplacement des cartes sans image TCGdex ni photo TCGplayer : la même carte dans une autre langue
+// (même identifiant TCGdex ; le chinois reprend les codes japonais). Ordre de préférence par langue de cartes.
+// Sortie : { fr: { 'sv08-001': 'https://assets.tcgdex.net/en/sv/sv08/001' }, … } (l'appli ajoute la qualité).
+const FALLBACK_LANGS = { en: ['fr'], fr: ['en'], ja: ['zh'], zh: ['ja', 'en'] };
+async function imageFallbacks({ intlSets, jaSets, zhCards, intl, ja }) {
+  const frCards = [];
+  const shown = new Set(intlSets.map((s) => s.id)); // sans les extensions TCG Pocket, absentes de l'appli
+  for (const s of ((await getJSON(`${TCGDEX}/fr/sets`)) || []).filter((x) => shown.has(x.id))) {
+    const full = await getJSON(`${TCGDEX}/fr/sets/${encodeURIComponent(s.id)}`).catch(() => null);
+    frCards.push(...(full?.cards || []));
+    await sleep(40);
+  }
+  const cardsOf = { en: intlSets.flatMap((s) => s.cards), fr: frCards, ja: jaSets.flatMap((s) => s.cards), zh: zhCards };
+  const imageOf = Object.fromEntries(Object.entries(cardsOf).map(([l, cards]) => [l, new Map(cards.filter((c) => c.image).map((c) => [c.id, c.image]))]));
+  const tcgplayer = { en: intl, fr: intl, ja, zh: ja }; // photos TCGplayer déjà utilisées par l'appli
+  const out = {};
+  const missing = {};
+  for (const [lang, cards] of Object.entries(cardsOf)) {
+    out[lang] = {};
+    missing[lang] = new Set();
+    for (const c of cards) {
+      if (c.image || tcgplayer[lang][c.id]) continue;
+      const other = FALLBACK_LANGS[lang].map((l) => imageOf[l].get(c.id)).find(Boolean);
+      if (other) out[lang][c.id] = other;
+      else missing[lang].add(c.id);
+    }
+  }
+  // Japonais et chinois : images des sites officiels (correspondances de la veille réutilisées).
+  const previous = (await previousJSON('pokemon/images.json')) || {};
+  const zhSets = [...Map.groupBy(zhCards, (c) => c.id.slice(0, c.id.lastIndexOf('-')))].map(([id, cards]) => ({ id, cards }));
+  for (const [lang, sets] of [['ja', jaSets], ['zh', zhSets]]) {
+    const found = await officialImages(lang, sets, missing[lang], previous[lang] || {});
+    Object.assign(out[lang], found);
+    for (const id of Object.keys(found)) missing[lang].delete(id);
+  }
+  return { images: out, missing };
+}
+
 export async function build(outDir) {
   console.log('Pokémon (prix TCGplayer international)…');
   const [intlSets, intlCatalog] = [await internationalSets(), await catalog(3)];
@@ -236,13 +275,21 @@ export async function build(outDir) {
 
   // Dates de sortie des extensions japonaises et chinoises (pour les trier de la plus récente à la plus ancienne).
   const zhDates = {};
+  const zhCards = [];
   for (const s of (await getJSON(`${TCGDEX}/zh-tw/sets`)) || []) {
     const full = await getJSON(`${TCGDEX}/zh-tw/sets/${encodeURIComponent(s.id)}`).catch(() => null);
     if (full?.releaseDate) zhDates[s.id] = full.releaseDate;
+    zhCards.push(...(full?.cards || []));
     await sleep(40);
   }
   const jaDates = Object.fromEntries(jaSets.filter((s) => s.releaseDate).map((s) => [s.id, s.releaseDate]));
   await writeJSON(`${outDir}/pokemon/setdates.json`, { ja: jaDates, zh: zhDates });
+
+  const { images: fallbacks, missing } = await imageFallbacks({ intlSets, jaSets, zhCards, intl: intl.out, ja: ja.out });
+  await writeJSON(`${outDir}/pokemon/images.json`, fallbacks);
+  console.log(`  pokemon : images de remplacement ${Object.entries(fallbacks).map(([l, m]) => `${l} ${Object.keys(m).length}`).join(', ')}`);
+  console.log(`  pokemon : encore sans image ${Object.entries(missing).map(([l, m]) => `${l} ${m.size}`).join(', ')}`);
+  await writeJSON(`${outDir}/pokemon/images-missing.json`, Object.fromEntries(Object.entries(missing).map(([l, m]) => [l, m.size])));
 
   // Visuel des extensions sans logo TCGdex (toutes les japonaises et chinoises, quelques internationales) :
   // image du booster du groupe TCGplayer relié. Le chinois reprend les codes japonais (S9a, SV1a…).
