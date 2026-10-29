@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useIsFocused } from 'expo-router';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { recognizeText } from '@infinitered/react-native-mlkit-text-recognition';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { getTcg } from '../../api';
 import { identify } from '../../lib/scan';
+import { discard, readCard } from '../../lib/scanImage';
 import { nameCandidates } from '../../lib/scanDetect';
 import { useCardLang, LANG_NAMES } from '../../lib/cardLang';
 import { useCollection, ownedQty } from '../../lib/collection';
@@ -17,6 +17,13 @@ import { useFinishChoice } from '../../components/collection';
 import { useSettings } from '../../lib/settings';
 import { finishLabel, storedFinish } from '../../lib/finishes';
 import { plural, t } from '../../lib/i18n';
+
+// Rafale automatique : une image toutes les ~0,7 s ; une carte est ajoutée quand son code est lu nettement (score
+// ≥ 0,95) ou quand deux images de suite donnent la même carte. Elle n'est pas ajoutée deux fois tant qu'elle reste
+// devant l'appareil photo (retirer la carte puis la représenter permet d'en compter un 2e exemplaire).
+const SURE_SCORE = 0.95;
+const AUTO_PAUSE = 700;
+const candKey = (c) => `${c.tcgId}|${c.lang}|${c.id}`;
 
 export default function ScanScreen() {
   useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
@@ -30,32 +37,69 @@ export default function ScanScreen() {
   // Scan en rafale : chaque carte lue rejoint une liste, vérifiée puis ajoutée d'un coup.
   const [mode, setMode] = useState('single'); // single | batch
   const [batch, setBatch] = useState([]);
-  const [lastRead, setLastRead] = useState(null); // dernier résultat affiché brièvement sur l'appareil photo
+  const [auto, setAuto] = useState(true); // rafale : lecture automatique en continu (pause possible)
+  const [lastAdded, setLastAdded] = useState(null); // bande du bas : dernière carte ajoutée
+  // Position de l'aperçu et du cadre à l'écran : la photo est recadrée sur la carte avant la lecture.
+  const layout = useRef({ view: null, frame: null });
+  const photoText = async (quality) => {
+    const photo = await camera.current.takePictureAsync({ quality, shutterSound: false });
+    return { photo, text: await readCard(photo, layout.current.view, layout.current.frame) };
+  };
 
-  // Lecture du texte (OCR sur le téléphone) puis identification de la carte.
-  const analyze = async (getUri) => {
+  // Mode une carte : photo au toucher du déclencheur, puis résultat détaillé.
+  const scan = async () => {
+    if (!ready || !camera.current) return;
     setState({ step: 'analyzing' });
     try {
-      const uri = await getUri();
-      if (!uri) return setState({ step: 'camera' });
-      const ocr = await recognizeText(uri);
-      const result = await identify(ocr?.text || '', cardLang);
-      if (mode === 'batch') {
-        const best = result.candidates?.[0];
-        if (best) setBatch((b) => [...b, { key: `${Date.now()}`, candidates: result.candidates, selected: 0, finish: null, finishName: null, price: null }]);
-        setLastRead(best ? { ok: true, text: `${best.name} · ${best.number || ''}` } : { ok: false, text: t('Carte non reconnue') });
-        return setState({ step: 'camera' });
-      }
-      setState({ step: 'result', photo: uri, text: ocr?.text || '', ...result, selected: 0 });
+      const { photo, text } = await photoText(0.9);
+      const result = await identify(text, cardLang);
+      setState({ step: 'result', photo: photo.uri, text, ...result, selected: 0 });
     } catch (e) {
-      if (mode === 'batch') {
-        setLastRead({ ok: false, text: t('Carte non reconnue') });
-        return setState({ step: 'camera' });
-      }
       setState({ step: 'result', error: e?.message || String(e), candidates: [], detections: [] });
     }
   };
-  const scan = () => ready && camera.current && analyze(async () => (await camera.current.takePictureAsync({ quality: 0.9, shutterSound: false })).uri);
+
+  // Rafale : boucle de lecture tant que l'écran est affiché.
+  const memory = useRef({ pending: null, present: null, empty: 0 });
+  const running = mode === 'batch' && auto && focused && ready && state.step === 'camera';
+  useEffect(() => {
+    if (!running) return undefined;
+    let stop = false;
+    (async () => {
+      while (!stop) {
+        try {
+          const { photo, text } = await photoText(0.7);
+          discard(photo.uri);
+          if (stop) break;
+          const { candidates = [] } = await identify(text, cardLang);
+          const best = candidates[0];
+          const m = memory.current;
+          if (!best) {
+            // carte retirée (deux images vides) : la même carte pourra être ajoutée à nouveau
+            m.empty += 1;
+            if (m.empty >= 2) Object.assign(m, { pending: null, present: null });
+          } else {
+            m.empty = 0;
+            const key = candKey(best);
+            const sure = best.score >= SURE_SCORE || m.pending === key;
+            m.pending = key;
+            if (sure && m.present !== key) {
+              m.present = key;
+              const row = { key: `${Date.now()}`, candidates, selected: 0, finish: null, finishName: null, price: null };
+              setBatch((b) => [...b, row]);
+              setLastAdded({ ...best, rowKey: row.key, at: Date.now() });
+            }
+          }
+        } catch {
+          // image illisible : on continue
+        }
+        await new Promise((r) => setTimeout(r, AUTO_PAUSE));
+      }
+    })();
+    return () => {
+      stop = true;
+    };
+  }, [running, cardLang]);
 
   if (!permission) return <View style={styles.page} />;
   if (!permission.granted) {
@@ -75,11 +119,12 @@ export default function ScanScreen() {
 
   if (state.step === 'result') return <Result state={state} setState={setState} onRetry={() => setState({ step: 'camera' })} />;
   if (state.step === 'batch') {
-    return <BatchReview batch={batch} setBatch={setBatch} onBack={() => setState({ step: 'camera' })} onDone={() => { setBatch([]); setLastRead(null); setState({ step: 'camera' }); }} />;
+    return <BatchReview batch={batch} setBatch={setBatch} onBack={() => setState({ step: 'camera' })} onDone={() => { setBatch([]); setLastAdded(null); setState({ step: 'camera' }); }} />;
   }
 
+  const batchMode = mode === 'batch';
   return (
-    <View style={styles.page}>
+    <View style={styles.page} onLayout={(e) => { layout.current.view = e.nativeEvent.layout; }}>
       {focused ? (
         <CameraView
           ref={camera}
@@ -97,38 +142,71 @@ export default function ScanScreen() {
             </Pressable>
           ))}
         </View>
-        <Text style={styles.hint}>{t('Cadre la carte entière, bien éclairée.')}{'\n'}{t('Le code en bas (ex. OP09-119, 004/084) doit être net.')}{'\n'}{t('Langue des cartes')} : {t(LANG_NAMES[cardLang])}.</Text>
-        <View style={styles.frame} pointerEvents="none">
+        <Text style={styles.hint}>
+          {batchMode ? t('Présente les cartes une par une dans le cadre : elles sont lues et ajoutées toutes seules.') : t('Cadre la carte entière, bien éclairée.')}
+          {'\n'}{t('Le code en bas (ex. OP09-119, 004/084) doit être net.')}{'\n'}{t('Langue des cartes')} : {t(LANG_NAMES[cardLang])}.
+        </Text>
+        <View style={styles.frame} pointerEvents="none" onLayout={(e) => { layout.current.frame = e.nativeEvent.layout; }}>
           <View style={[styles.corner, { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4 }]} />
           <View style={[styles.corner, { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4 }]} />
           <View style={[styles.corner, { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4 }]} />
           <View style={[styles.corner, { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4 }]} />
         </View>
-        <View style={styles.controls}>
-          <Pressable style={styles.sideBtn} onPress={() => setTorch((tg) => !tg)}>
-            <Ionicons name={torch ? 'flash' : 'flash-off'} size={24} color={colors.text} />
-          </Pressable>
-          <Pressable style={[styles.shutter, (!ready || state.step === 'analyzing') && { opacity: 0.5 }]} onPress={scan} disabled={!ready || state.step === 'analyzing'}>
-            {state.step === 'analyzing' ? <ActivityIndicator color="#1A1A1A" /> : <Ionicons name="scan" size={34} color="#1A1A1A" />}
-          </Pressable>
-          {mode === 'batch' ? (
-            <Pressable style={[styles.sideBtn, styles.listBtn]} onPress={() => setState({ step: 'batch' })} accessibilityLabel={t('Liste des cartes scannées')}>
-              <Ionicons name="list" size={22} color="#1A1A1A" />
-              <Text style={styles.listCount}>{batch.length}</Text>
+        <View style={{ width: '100%', gap: 10 }}>
+          {batchMode && lastAdded ? <LastScanned card={lastAdded} count={batch.length} onPress={() => setState({ step: 'batch' })} /> : null}
+          <View style={styles.controls}>
+            <Pressable style={styles.sideBtn} onPress={() => setTorch((tg) => !tg)}>
+              <Ionicons name={torch ? 'flash' : 'flash-off'} size={24} color={colors.text} />
             </Pressable>
-          ) : (
-            // Mode une carte : espace vide pour centrer le déclencheur.
-            <View style={[styles.sideBtn, { backgroundColor: 'transparent' }]} />
-          )}
+            {batchMode ? (
+              // Rafale : le bouton met en pause / relance la lecture automatique.
+              <Pressable style={[styles.shutter, !ready && { opacity: 0.5 }]} onPress={() => setAuto((a) => !a)} disabled={!ready} accessibilityLabel={auto ? t('Pause') : t('Reprendre')}>
+                <Ionicons name={auto ? 'pause' : 'play'} size={34} color="#1A1A1A" />
+              </Pressable>
+            ) : (
+              <Pressable style={[styles.shutter, (!ready || state.step === 'analyzing') && { opacity: 0.5 }]} onPress={scan} disabled={!ready || state.step === 'analyzing'}>
+                {state.step === 'analyzing' ? <ActivityIndicator color="#1A1A1A" /> : <Ionicons name="scan" size={34} color="#1A1A1A" />}
+              </Pressable>
+            )}
+            {batchMode ? (
+              <Pressable style={[styles.sideBtn, styles.listBtn]} onPress={() => setState({ step: 'batch' })} accessibilityLabel={t('Liste des cartes scannées')}>
+                <Ionicons name="list" size={22} color="#1A1A1A" />
+                <Text style={styles.listCount}>{batch.length}</Text>
+              </Pressable>
+            ) : (
+              // Mode une carte : espace vide pour centrer le déclencheur.
+              <View style={[styles.sideBtn, { backgroundColor: 'transparent' }]} />
+            )}
+          </View>
+          {state.step === 'analyzing' ? <Text style={styles.analyzing}>{t('Lecture de la carte…')}</Text> : null}
+          {batchMode ? <Text style={styles.analyzing}>{auto ? t('Lecture automatique en cours…') : t('Lecture en pause')}</Text> : null}
         </View>
-        {state.step === 'analyzing' ? <Text style={styles.analyzing}>{t('Lecture de la carte…')}</Text> : null}
-        {mode === 'batch' && state.step !== 'analyzing' && lastRead ? (
-          <Text style={[styles.analyzing, { color: lastRead.ok ? colors.success : colors.danger }]} numberOfLines={1}>
-            {lastRead.ok ? '✓ ' : '✗ '}{lastRead.text}
-          </Text>
-        ) : null}
       </View>
     </View>
+  );
+}
+
+// Rafale : bande en bas de l'écran avec la dernière carte ajoutée (image, nom, prix, langue).
+function LastScanned({ card, count, onPress }) {
+  const tcg = getTcg(card.tcgId);
+  const { priceSource } = useSettings().settings;
+  const info = useAsync(async () => {
+    const [full, fx] = await Promise.all([tcg.getCard(card.id, card.setId, card.lang), getUsdToEur()]);
+    return averagePrice(full.prices, fx, { source: priceSource });
+  }, [card.tcgId, card.id, card.setId, card.lang, priceSource]);
+  return (
+    <Pressable style={styles.strip} onPress={onPress}>
+      {card.image ? <Image source={card.image} style={styles.stripImg} contentFit="cover" /> : <View style={styles.stripImg} />}
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={styles.stripName} numberOfLines={1}>✓ {card.name}</Text>
+        <Text style={styles.stripMeta} numberOfLines={1}>{tcg?.name} · {card.number}</Text>
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+        <Text style={styles.stripPrice}>{info.loading ? '…' : info.data ? formatPrice(info.data.value, 'EUR') : '—'}</Text>
+        <Text style={styles.stripLang}>{card.lang.toUpperCase()}</Text>
+      </View>
+      <Text style={styles.stripCount}>{count}</Text>
+    </Pressable>
   );
 }
 
@@ -416,4 +494,11 @@ const styles = StyleSheet.create({
   batchName: { color: colors.text, fontWeight: '700' },
   batchLink: { color: colors.accent, fontWeight: '700', fontSize: 13 },
   batchPrice: { color: colors.accent, fontWeight: '800' },
+  strip: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, padding: 8, borderRadius: radius, backgroundColor: 'rgba(15,17,21,0.92)', borderWidth: 1, borderColor: colors.success },
+  stripImg: { width: 40, aspectRatio: 63 / 88, borderRadius: 4, backgroundColor: colors.surfaceAlt },
+  stripName: { color: colors.text, fontWeight: '700' },
+  stripMeta: { color: colors.muted, fontSize: 12 },
+  stripPrice: { color: colors.accent, fontWeight: '800' },
+  stripLang: { color: colors.muted, fontWeight: '700', fontSize: 11, borderWidth: 1, borderColor: colors.border, borderRadius: 6, paddingHorizontal: 5 },
+  stripCount: { color: '#1A1A1A', backgroundColor: colors.success, fontWeight: '800', minWidth: 24, height: 24, lineHeight: 24, textAlign: 'center', borderRadius: 12, overflow: 'hidden' },
 });

@@ -11,12 +11,13 @@ const cand = (tcgId, lang, c, score, why) => ({
   tcgId, lang, setId: c.setId ?? null, id: c.id, name: c.name, number: c.number, image: c.image, setName: c.setName, score, why,
 });
 
-// Langue à essayer en premier : celle imprimée sur la carte si connue, sinon le réglage « Cartes en ».
-const langOrder = (preferred) => (preferred === 'en' ? ['en', 'fr'] : ['fr', 'en']);
+// Langue à essayer en premier : celle imprimée sur la carte si connue, sinon le réglage « Cartes en » ;
+// seulement les langues publiées pour ce jeu (ex. Riftbound : pas de français officiel).
+const langOrder = (preferred, tcgId) => [...new Set([preferred, 'en', 'fr'])].filter((l) => getTcg(tcgId).languages.includes(l));
 
 async function onePiece(d, text, preferred) {
   const tcg = getTcg('onepiece');
-  for (const lang of langOrder(preferred)) {
+  for (const lang of langOrder(preferred, 'onepiece')) {
     const rows = await tcg.findCards((r) => r.number === d.code, lang);
     if (rows.length) return rows.map((r) => cand('onepiece', lang, r, 0.9 + 0.1 * (r.id.includes('_') ? 0 : 1), d.code));
   }
@@ -25,7 +26,7 @@ async function onePiece(d, text, preferred) {
 
 async function riftbound(d, text, preferred) {
   const tcg = getTcg('riftbound');
-  for (const lang of langOrder(preferred)) {
+  for (const lang of langOrder(preferred, 'riftbound')) {
     const rows = await tcg.findCards((r) => r.number.toUpperCase().startsWith(d.code.toUpperCase()), lang);
     if (rows.length) return rows.map((r) => cand('riftbound', lang, r, 0.9 + 0.1 * nameScore(r.name, text), d.code));
   }
@@ -110,7 +111,7 @@ async function byName(text, preferred) {
     // On compare au nom complet et à sa première partie (« Ariel » pour « Ariel - Chanteuse exceptionnelle »).
     for (const id of ['onepiece', 'lorcana', 'riftbound']) {
       const tcg = getTcg(id);
-      for (const lang of langOrder(preferred)) {
+      for (const lang of langOrder(preferred, id)) {
         // Un nom très court ressemble à beaucoup d'autres : on exige alors une correspondance quasi exacte.
         const minSim = name.replace(/[^A-Za-zÀ-ÿ]/g, '').length < 6 ? 0.95 : 0.72;
         const scored = (await tcg.findCards(() => true, lang))
