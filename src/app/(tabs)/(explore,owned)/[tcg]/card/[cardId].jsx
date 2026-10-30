@@ -11,7 +11,6 @@ import { fieldLabel, fieldValue, priceLabel, sourceLabel } from '../../../../../
 import { colors, radius } from '../../../../../lib/theme';
 import { Loading, ErrorView } from '../../../../../components/Status';
 import { CollectionEditor, FinishPicker } from '../../../../../components/collection';
-import PriceHistory from '../../../../../components/PriceHistory';
 import WishButton from '../../../../../components/WishButton';
 import GradedSection from '../../../../../components/GradedSection';
 import { useCollection } from '../../../../../lib/collection';
@@ -81,8 +80,6 @@ export default function CardScreen() {
                 <Text style={styles.muted}>{fx.loading ? t('Calcul…') : (priceSource === 'both' ? t('Aucun prix disponible pour cette carte.') : t('Pas de prix {0} pour cette carte.', { 0: PRICE_SOURCES[priceSource] }))}</Text>
               )}
             </View>
-
-            <PriceHistory tcg={tcg} cardId={cardId} setId={setId || c.setId} lang={lang} usdToEur={fx.data} finish={chosen} />
 
             <CollectionEditor tcgId={tcg.id} lang={lang} setId={setId || c.setId || null} card={{ ...c, id: cardId }} unitPrice={avg?.value ?? null} finish={chosen} onFinishChosen={setFinish} />
 
