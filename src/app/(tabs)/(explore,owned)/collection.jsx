@@ -15,8 +15,11 @@ import { locale, plural, t } from '../../../lib/i18n';
 
 
 // Avancement d'un jeu : cartes différentes possédées sur le total des extensions commencées (taille connue).
+// Les mini-extensions (moins de 10 cartes : commandant mis en avant, lots promo…) n'y comptent pas : une seule carte
+// suffirait à les compléter.
+const MIN_SET_SIZE = 10;
 function completionOf(sets) {
-  const known = sets.filter((s) => s.setCount);
+  const known = sets.filter((s) => s.setCount >= MIN_SET_SIZE);
   const total = known.reduce((n, s) => n + s.setCount, 0);
   const owned = known.reduce((n, s) => n + Math.min(s.distinct, s.setCount), 0);
   return { sets: sets.length, owned, total, completion: total ? owned / total : null };
