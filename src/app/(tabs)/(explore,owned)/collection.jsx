@@ -3,10 +3,12 @@ import { router, useScrollToTop } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
-import { getTcg } from '../../../api';
+import { getTcg, dataLang } from '../../../api';
+import { useCardLang } from '../../../lib/cardLang';
+import { useAsync } from '../../../lib/useAsync';
 import { useCollection, summarize, groupBy, setsSummary } from '../../../lib/collection';
 import { formatPrice } from '../../../lib/prices';
-import { colors, radius, percent } from '../../../lib/theme';
+import { colors, radius } from '../../../lib/theme';
 import { LangBadge, StatTile, ProgressBar, ValueChart } from '../../../components/collection';
 import { openItem } from '../../../lib/openItem';
 import Movers from '../../../components/Movers';
@@ -14,16 +16,21 @@ import { useSettings } from '../../../lib/settings';
 import { locale, plural, t } from '../../../lib/i18n';
 
 
-// Avancement d'un jeu : cartes différentes possédées sur le total des extensions commencées (taille connue).
-// Les mini-extensions (moins de 10 cartes : commandant mis en avant, lots promo…) n'y comptent pas : une seule carte
-// suffirait à les compléter.
-const MIN_SET_SIZE = 10;
-function completionOf(sets) {
-  const known = sets.filter((s) => s.setCount >= MIN_SET_SIZE);
-  const total = known.reduce((n, s) => n + s.setCount, 0);
-  const owned = known.reduce((n, s) => n + Math.min(s.distinct, s.setCount), 0);
-  return { sets: sets.length, owned, total, completion: total ? owned / total : null };
+// Avancement d'un jeu : cartes différentes possédées (toutes langues et versions confondues) sur le nombre total de
+// cartes du jeu (catalogue complet, dans la langue de cartes choisie).
+async function catalogSizes(tcgIds, cardLang) {
+  const sizes = await Promise.all(tcgIds.map(async (id) => {
+    const tcg = getTcg(id);
+    if (!tcg) return [id, null];
+    const sets = await tcg.getSets(dataLang(tcg, cardLang)).catch(() => []);
+    return [id, sets.reduce((n, set) => n + (set.count || 0), 0) || null];
+  }));
+  return Object.fromEntries(sizes);
 }
+// Pourcentage lisible même pour un petit avancement (« 0,3 % ») : une décimale sous 10 %.
+const pctText = (v) => (v > 0 && v < 0.0005
+  ? `< ${(0.1).toLocaleString(locale())} %` // au moins une carte possédée : jamais « 0 % »
+  : `${(v * 100).toLocaleString(locale(), { maximumFractionDigits: v < 0.1 ? 1 : 0 })} %`);
 
 export default function CollectionScreen() {
   useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
@@ -35,13 +42,16 @@ export default function CollectionScreen() {
   const wishCount = Object.keys(useSettings().settings.wishlist || {}).length;
   const byTcg = useMemo(
     () => [...groupBy(items, (i) => i.tcg)]
-      .map(([id, list]) => ({ tcg: getTcg(id), ...completionOf(setsSummary(list)), ...summarize(list) }))
+      .map(([id, list]) => ({ tcg: getTcg(id), sets: setsSummary(list).length, owned: new Set(list.map((i) => i.cardId)).size, ...summarize(list) }))
       .filter((g) => g.tcg)
       .sort((a, b) => b.value - a.value),
     [items],
   );
   const top = useMemo(() => items.filter((i) => i.price != null).sort((a, b) => b.price - a.price).slice(0, 10), [items]);
   const setCount = useMemo(() => byTcg.reduce((s, g) => s + g.sets, 0), [byTcg]);
+  const { cardLang } = useCardLang();
+  const gameIds = byTcg.map((g) => g.tcg.id).filter((id) => id !== 'custom').join(',');
+  const catalog = useAsync(() => catalogSizes(gameIds ? gameIds.split(',') : [], cardLang), [gameIds, cardLang]);
 
 
   if (loaded && !items.length) {
@@ -117,10 +127,10 @@ export default function CollectionScreen() {
                 <Text style={styles.tcgName}>{t(g.tcg.name)}</Text>
                 <Text style={styles.tcgValue}>{formatPrice(g.value, 'EUR')}</Text>
               </View>
-              {/* Avancement du jeu, comme pour les extensions : cartes différentes possédées / cartes des extensions commencées. */}
-              <ProgressBar value={g.completion ?? 0} color={g.completion === 1 ? colors.success : g.tcg.color} height={5} />
+              {/* Avancement du jeu : cartes différentes possédées / toutes les cartes du jeu. */}
+              <ProgressBar value={catalog.data?.[g.tcg.id] ? g.owned / catalog.data[g.tcg.id] : 0} color={g.tcg.color} height={5} />
               <Text style={styles.muted}>
-                {[plural(g.cards, '{n} carte', '{n} cartes'), plural(g.unique, '{n} différente', '{n} différentes'), plural(g.sets, '{n} extension', '{n} extensions'), g.completion != null ? t('{owned}/{total} cartes · {pct}', { owned: g.owned, total: g.total, pct: percent(g.completion) }) : null].filter(Boolean).join(' · ')}
+                {[plural(g.cards, '{n} carte', '{n} cartes'), plural(g.unique, '{n} différente', '{n} différentes'), plural(g.sets, '{n} extension', '{n} extensions'), catalog.data?.[g.tcg.id] ? t('{owned}/{total} cartes · {pct}', { owned: g.owned, total: catalog.data[g.tcg.id].toLocaleString(locale()), pct: pctText(Math.min(1, g.owned / catalog.data[g.tcg.id])) }) : null].filter(Boolean).join(' · ')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.muted} />
