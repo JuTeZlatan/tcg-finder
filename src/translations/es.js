@@ -23,7 +23,6 @@ export default {
   "{n} jeux": "{n} juegos",
   "{owned}/{total} cartes · {pct}": "{owned}/{total} cartas · {pct}",
   "{owned}/{total} cartes · {pct} complétée": "{owned}/{total} cartas · {pct} completada",
-  "{pct} de la valeur": "{pct} del valor",
   "+ {n} cartes secrètes ou spéciales hors numérotation": "+ {n} cartas secretas o especiales fuera de la numeración",
   "⚠ Code de la carte illisible : reconnue par son nom. Vérifie la version (édition, version alternative) dans les choix plus bas, le prix peut beaucoup varier.": "⚠ Código de la carta ilegible: reconocida por su nombre. Comprueba la versión (edición, arte alternativo) en las opciones de abajo, el precio puede variar mucho.",
   "⚠ Les sites donnent des prix très différents : vérifie la version exacte (édition, version alternative) avant d’acheter ou de vendre.": "⚠ Los sitios dan precios muy distintos: comprueba la versión exacta (edición, arte alternativo) antes de comprar o vender.",

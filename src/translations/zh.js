@@ -23,7 +23,6 @@ export default {
   "{n} jeux": "{n} 款游戏",
   "{owned}/{total} cartes · {pct}": "{owned}/{total} 张 · {pct}",
   "{owned}/{total} cartes · {pct} complétée": "{owned}/{total} 张 · 完成 {pct}",
-  "{pct} de la valeur": "占价值 {pct}",
   "+ {n} cartes secrètes ou spéciales hors numérotation": "+ {n} 张编号外的隐藏或特殊卡",
   "⚠ Code de la carte illisible : reconnue par son nom. Vérifie la version (édition, version alternative) dans les choix plus bas, le prix peut beaucoup varier.": "⚠ 无法读取卡牌编号：已通过名称识别。请在下方选项中确认版本（版次、异画），价格可能差别很大。",
   "⚠ Les sites donnent des prix très différents : vérifie la version exacte (édition, version alternative) avant d’acheter ou de vendre.": "⚠ 各网站价格差异很大：买卖前请确认具体版本（版次、异画）。",

@@ -14,6 +14,14 @@ import { useSettings } from '../../../lib/settings';
 import { locale, plural, t } from '../../../lib/i18n';
 
 
+// Avancement d'un jeu : cartes différentes possédées sur le total des extensions commencées (taille connue).
+function completionOf(sets) {
+  const known = sets.filter((s) => s.setCount);
+  const total = known.reduce((n, s) => n + s.setCount, 0);
+  const owned = known.reduce((n, s) => n + Math.min(s.distinct, s.setCount), 0);
+  return { sets: sets.length, owned, total, completion: total ? owned / total : null };
+}
+
 export default function CollectionScreen() {
   useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const { loaded, items, history, pricesUpdatedAt, refresh } = useCollection();
@@ -24,7 +32,7 @@ export default function CollectionScreen() {
   const wishCount = Object.keys(useSettings().settings.wishlist || {}).length;
   const byTcg = useMemo(
     () => [...groupBy(items, (i) => i.tcg)]
-      .map(([id, list]) => ({ tcg: getTcg(id), sets: setsSummary(list).length, ...summarize(list) }))
+      .map(([id, list]) => ({ tcg: getTcg(id), ...completionOf(setsSummary(list)), ...summarize(list) }))
       .filter((g) => g.tcg)
       .sort((a, b) => b.value - a.value),
     [items],
@@ -106,9 +114,10 @@ export default function CollectionScreen() {
                 <Text style={styles.tcgName}>{t(g.tcg.name)}</Text>
                 <Text style={styles.tcgValue}>{formatPrice(g.value, 'EUR')}</Text>
               </View>
-              <ProgressBar value={total.value ? g.value / total.value : 0} color={g.tcg.color} height={5} />
+              {/* Avancement du jeu, comme pour les extensions : cartes différentes possédées / cartes des extensions commencées. */}
+              <ProgressBar value={g.completion ?? 0} color={g.completion === 1 ? colors.success : g.tcg.color} height={5} />
               <Text style={styles.muted}>
-                {[plural(g.cards, '{n} carte', '{n} cartes'), plural(g.unique, '{n} différente', '{n} différentes'), plural(g.sets, '{n} extension', '{n} extensions'), t('{pct} de la valeur', { pct: total.value ? percent(g.value / total.value) : '0 %' })].join(' · ')}
+                {[plural(g.cards, '{n} carte', '{n} cartes'), plural(g.unique, '{n} différente', '{n} différentes'), plural(g.sets, '{n} extension', '{n} extensions'), g.completion != null ? t('{owned}/{total} cartes · {pct}', { owned: g.owned, total: g.total, pct: percent(g.completion) }) : null].filter(Boolean).join(' · ')}
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={colors.muted} />

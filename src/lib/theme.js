@@ -12,4 +12,5 @@ export const colors = {
 
 export const radius = 12;
 
-export const percent = (v) => `${Math.round(v * 100)} %`;
+// Espace insécable : le « % » ne passe jamais seul à la ligne.
+export const percent = (v) => `${Math.round(v * 100)} %`;

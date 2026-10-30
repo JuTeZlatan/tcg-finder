@@ -22,7 +22,6 @@ export default {
   '{n} jeux': '{n} games',
   '{owned}/{total} cartes · {pct}': '{owned}/{total} cards · {pct}',
   '{owned}/{total} cartes · {pct} complétée': '{owned}/{total} cards · {pct} complete',
-  '{pct} de la valeur': '{pct} of the value',
   '+ {n} cartes secrètes ou spéciales hors numérotation': '+ {n} secret or special cards beyond the set number',
   '⚠ Code de la carte illisible : reconnue par son nom. Vérifie la version (édition, version alternative) dans les choix plus bas, le prix peut beaucoup varier.': '⚠ Card code unreadable: recognized by its name. Check the version (edition, alternate art) in the choices below, the price can vary a lot.',
   '⚠ Les sites donnent des prix très différents : vérifie la version exacte (édition, version alternative) avant d’acheter ou de vendre.': '⚠ Sites give very different prices: check the exact version (edition, alternate art) before buying or selling.',
