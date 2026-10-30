@@ -82,7 +82,7 @@ export default function CardScreen() {
               )}
             </View>
 
-            <PriceHistory tcg={tcg} cardId={cardId} setId={setId || c.setId} lang={lang} usdToEur={fx.data} finish={chosen} />
+            <PriceHistory tcg={tcg} cardId={cardId} setId={setId || c.setId} lang={lang} usdToEur={fx.data} finish={chosen} prices={c.prices} />
 
             <CollectionEditor tcgId={tcg.id} lang={lang} setId={setId || c.setId || null} card={{ ...c, id: cardId }} unitPrice={avg?.value ?? null} finish={chosen} onFinishChosen={setFinish} />
 

@@ -443,9 +443,8 @@ function dedupeTcgplayer(sets) {
 // ---------- Historique des prix ----------
 // Un fichier par extension (history/<chemin>.json) : { days: ['2026-10-29', …], cards: { id: [[cardmarket €, tcgplayer $], …] } },
 // valeurs alignées sur `days`. Chaque jour, le prix du jour est ajouté à l'historique publié la veille ;
-// on garde un point par jour sur 90 jours, puis un par semaine jusqu'à un an.
+// on garde un point par jour sur 90 jours, puis un par semaine, sans limite (courbe depuis la sortie de la carte).
 const HISTORY_DAILY = 90;
-const HISTORY_MAX_DAYS = 366;
 const today = () => new Date().toISOString().slice(0, 10);
 const round = (v) => (v == null || !Number.isFinite(v) ? null : Math.round(v * 100) / 100);
 
@@ -455,13 +454,13 @@ export function referencePrices(prices) {
   return [round(ref('Cardmarket')), round(ref('TCGplayer'))];
 }
 
-// Jours gardés : les 90 derniers, puis le premier jour de chaque semaine (lundi) jusqu'à un an.
+// Jours gardés : les 90 derniers, puis le premier jour de chaque semaine (lundi).
 function keptDays(days) {
   const now = Date.parse(today());
   return days.filter((d) => {
     const age = (now - Date.parse(d)) / 86400000;
     if (age < HISTORY_DAILY) return true;
-    return age <= HISTORY_MAX_DAYS && new Date(d).getUTCDay() === 1;
+    return new Date(d).getUTCDay() === 1;
   });
 }
 

@@ -16,7 +16,7 @@ import { locale, plural, t } from '../../../lib/i18n';
 
 export default function CollectionScreen() {
   useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
-  const { loaded, items, history, pricesUpdatedAt, refresh, refreshPrices } = useCollection();
+  const { loaded, items, history, pricesUpdatedAt, refresh } = useCollection();
   // Toucher l'onglet « Ma collection » déjà ouvert ramène en haut de la page.
   const scrollRef = useRef(null);
   useScrollToTop(scrollRef);
@@ -70,16 +70,14 @@ export default function CollectionScreen() {
             {total.gain >= 0 ? '▲' : '▼'} {formatPrice(Math.abs(total.gain), 'EUR')} ({total.gainPct >= 0 ? '+' : ''}{total.gainPct.toLocaleString(locale(), { maximumFractionDigits: 1 })} %) {t('par rapport au prix d’achat')}
           </Text>
         ) : null}
-        <Pressable style={styles.refresh} onPress={refreshPrices} disabled={!!refresh}>
-          <Ionicons name="refresh" size={16} color={colors.accent} />
-          <Text style={styles.refreshText}>
+        {/* Prix mis à jour automatiquement chaque jour : simple date (progression pendant la mise à jour). */}
+        {refresh || pricesUpdatedAt ? (
+          <Text style={styles.updated}>
             {refresh
               ? t('Mise à jour des prix… {done}/{total}', refresh)
-              : pricesUpdatedAt
-                ? t('Prix du {date} · Mettre à jour', { date: new Date(pricesUpdatedAt).toLocaleDateString(locale()) })
-                : t('Mettre à jour les prix')}
+              : t('Prix du {date}', { date: new Date(pricesUpdatedAt).toLocaleDateString(locale()) })}
           </Text>
-        </Pressable>
+        ) : null}
         {refresh ? <ProgressBar value={refresh.done / refresh.total} /> : null}
       </View>
 
@@ -171,8 +169,7 @@ const styles = StyleSheet.create({
   heroValue: { color: colors.accent, fontSize: 38, fontWeight: '800' },
   heroMeta: { color: colors.text, fontSize: 13, textAlign: 'center' },
   heroGain: { fontSize: 13, fontWeight: '700', textAlign: 'center' },
-  refresh: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 6, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: colors.border },
-  refreshText: { color: colors.accent, fontWeight: '600', fontSize: 13 },
+  updated: { color: colors.muted, fontSize: 13, marginTop: 4 },
   statsRow: { flexDirection: 'row', gap: 10 },
   card: { backgroundColor: colors.surface, borderRadius: radius, padding: 14 },
   section: { color: colors.text, fontSize: 18, fontWeight: '700' },
