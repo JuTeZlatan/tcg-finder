@@ -85,7 +85,7 @@ export default function ScanScreen() {
             m.empty += 1;
             m.pending = null;
             if (m.empty >= EMPTY_FRAMES) m.present = null;
-            setLook(m.present ? 'added' : 'none');
+            if (m.empty >= EMPTY_FRAMES) setLook('none'); // une seule image vide ne change pas le cadre (pas de clignotement)
           } else {
             m.empty = 0;
             const { detections, candidates = [] } = hasCode ? await identify(text, cardLang, { codesOnly: true }) : {};
@@ -151,6 +151,8 @@ export default function ScanScreen() {
           style={StyleSheet.absoluteFill}
           facing="back"
           enableTorch={torch}
+          // Pas d'éclair noir à chaque photo : la rafale en prend plusieurs par seconde, l'écran clignotait.
+          animateShutter={false}
           onCameraReady={() => setReady(true)}
         />
       ) : null}
