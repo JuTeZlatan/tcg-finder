@@ -14,7 +14,7 @@ if ($Full -or -not (Test-Path "$dst\android")) {
   Pop-Location
 } else {
   # Rapide : seulement le code et les données, en gardant les caches de compilation.
-  foreach ($d in 'src', 'assets') { robocopy "$src\$d" "$dst\$d" /MIR /NFL /NDL /NJH /NJS /NP | Out-Null }
+  foreach ($d in 'src', 'assets', 'modules') { robocopy "$src\$d" "$dst\$d" /MIR /NFL /NDL /NJH /NJS /NP | Out-Null }
   Copy-Item "$src\app.json", "$src\package.json", "$src\metro.config.js", "$src\.env" $dst -Force
   # Gradle ne surveille pas assets/data : on force la régénération du bundle JS + ressources.
   Remove-Item -Recurse -Force -ErrorAction SilentlyContinue `

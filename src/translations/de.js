@@ -393,4 +393,7 @@ export default {
   "⚠ Carte pas reconnue avec certitude : vérifie-la, ou rescanne-la plus près, bien éclairée et sans reflet.": "⚠ Karte nicht sicher erkannt: prüfe sie oder scanne sie näher, gut beleuchtet und ohne Spiegelung erneut.",
   "À vérifier": "Prüfen",
   "À vérifier : deux cartes possibles": "Prüfen: zwei mögliche Karten",
+  "Montre les cartes une par une : elles sont repérées, lues et ajoutées toutes seules.": "Zeig die Karten einzeln: Sie werden automatisch erkannt, gelesen und hinzugefügt.",
+  "Montre la carte, bien éclairée, puis touche le bouton.": "Zeig die Karte bei guter Beleuchtung und tippe dann auf den Knopf.",
+  "Reconnue par son illustration": "An der Illustration erkannt",
 };

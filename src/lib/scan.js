@@ -1,6 +1,7 @@
 // Identification d'une carte à partir du texte lu par l'OCR : codes imprimés → cartes candidates, classées.
 import { getTcg, dataLang } from '../api';
 import { getJSON } from '../api/http';
+import { imageMatchAvailable, refFingerprint, similarity as imageSimilarity } from './imageMatch';
 import { detectCodes, detectLanguage, nameCandidates, nameScore, similarity, textOverlap } from './scanDetect';
 
 const SCRYFALL = 'https://api.scryfall.com';
@@ -147,6 +148,16 @@ async function byName(text, preferred) {
   return out;
 }
 
+// Numéros à 3 chiffres lus après un tiret ou devant une barre (bout de code : « -0o4 », « 004/ »), lettres
+// confondues avec des chiffres remises en chiffres.
+function partialNumbers(text) {
+  const out = new Set();
+  const digits = (v) => v.toUpperCase().replace(/[OQD]/g, '0').replace(/[IL]/g, '1').replace(/S/g, '5').replace(/B/g, '8');
+  for (const m of String(text).matchAll(/[-–]\s?([0-9OoQDIlL]{3})(?![0-9A-Za-z])/g)) out.add(digits(m[1]));
+  for (const m of String(text).matchAll(/(?<![0-9])([0-9OoQD]{3})\s?\//g)) out.add(digits(m[1]));
+  return out;
+}
+
 // Plusieurs cartes du même nom (ex. une dizaine de Luffy) : on départage avec le texte de la carte
 // (effet, types, caractéristiques) comparé au texte lu. Pour les jeux dont les données sont sur le téléphone.
 async function rerankByText(candidates, text) {
@@ -179,7 +190,15 @@ export async function identify(text, preferredLang, { codesOnly = false } = {}) 
       // source indisponible : on continue avec les autres détections
     }
   }
-  if (!candidates.length && !codesOnly) candidates = await byName(text, preferredLang);
+  if (!candidates.length && !codesOnly) {
+    candidates = await byName(text, preferredLang);
+    // Code lu à moitié (« oe0a-0o4 ») : son numéro final (004) départage les cartes de même nom.
+    const numbers = partialNumbers(text);
+    for (const c of candidates) {
+      const tail = String(c.number || '').match(/(\d{3})[a-z]?$/i)?.[1];
+      if (tail && numbers.has(tail)) c.score += 0.3;
+    }
+  }
   // Plusieurs versions possibles (même code ou même nom) : le texte de la carte aide à choisir.
   if (candidates.length > 1) await rerankByText(candidates, text);
   // Jeux sans code de langue imprimé : l'exemplaire prend la langue lue sur la carte, même sans données dans
@@ -233,3 +252,43 @@ function rate(list, text) {
 export const agreed = (r, agree) => Math.min(r.tie ? 0.94 : 0.995, r.confidence + 0.02 * Math.max(0, agree - 1));
 export const SURE = 0.95; // au-dessus : carte validée seule
 export const TWO_CHOICES = 0.9; // entre 0,90 et 0,95 : deux choix proposés ; en dessous : on continue à chercher
+
+// Comparaison avec les images officielles (empreinte de la carte filmée) : jusqu'à VISUAL_MAX candidates.
+// - la ressemblance s'ajoute au score et peut changer l'ordre (bonne illustration en tête) ;
+// - nette ressemblance avec la 1re et pas avec les suivantes : égalité levée et fiabilité renforcée ;
+// - aucune ressemblance avec la 1re : le code a sans doute été mal lu, fiabilité baissée.
+const VISUAL_MAX = 6; // cartes comparées quand le code est lu
+const VISUAL_MAX_BY_NAME = 24; // … quand seul le nom est lu (beaucoup de cartes du même nom)
+// Réglé sur une carte filmée (émulateur, image dégradée) : bonne illustration 0,59, autres versions ≤ 0,37.
+export const VISUAL_SAME = 0.5; // au-dessus : même illustration
+const VISUAL_LOW = 0.3; // en dessous : illustration différente
+const VISUAL_GAP = 0.12; // écart qui départage deux versions
+
+export async function withVisual(result, fp, text) {
+  const list = result.candidates;
+  if (!fp || !imageMatchAvailable || !list?.length) return result;
+  const max = list[0].why.startsWith('nom') ? VISUAL_MAX_BY_NAME : VISUAL_MAX;
+  const top = list.slice(0, max);
+  const sims = await Promise.all(top.map((c) => refFingerprint(c.image).then((r) => imageSimilarity(fp, r)).catch(() => null)));
+  top.forEach((c, i) => {
+    c.visual = sims[i];
+    if (sims[i] != null) c.score += 0.4 * sims[i];
+  });
+  const sorted = [...top.sort((a, b) => b.score - a.score), ...list.slice(max)];
+  const base = rate(sorted, text);
+  const [a, b] = sorted;
+  let { confidence, tie } = base;
+  if (a.visual != null) {
+    const clear = a.visual >= VISUAL_SAME && (b?.visual == null || a.visual - b.visual >= VISUAL_GAP);
+    if (clear) {
+      tie = false;
+      // Illustration nettement reconnue : preuve forte, même sans code lisible (avec le nom lu, la carte est sûre).
+      const byName = a.why.startsWith('nom');
+      confidence = Math.min(0.995, Math.max(confidence + 0.04, byName ? (nameRead(a.name, text) ? 0.95 : 0.9) : 0));
+      if (byName) a.why = 'image';
+    } else if (a.visual < VISUAL_LOW && !(b?.visual > a.visual + VISUAL_GAP)) {
+      confidence -= 0.1;
+    }
+  }
+  return { ...result, candidates: sorted, confidence, tie };
+}

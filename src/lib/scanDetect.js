@@ -190,8 +190,10 @@ export function detectLanguage(text) {
   const raw = String(text || '');
   const kana = (raw.match(/[\u3040-\u30ff]/g) || []).length;
   const han = (raw.match(/[\u4e00-\u9fff]/g) || []).length;
-  if (kana >= 3) return 'ja';
-  if (han >= 4) return 'zh';
+  // Écriture asiatique seulement si elle domine (quelques signes isolés : erreurs de lecture d'une carte latine).
+  const latin = (raw.match(/[A-Za-z]/g) || []).length;
+  if (kana >= 3 && kana + han >= latin * 0.3) return 'ja';
+  if (han >= 4 && han >= latin * 0.3) return 'zh';
   const words = fold(raw).split(' ');
   const scores = Object.entries(LANG_SETS)
     .map(([l, set]) => [l, words.filter((w) => set.has(w)).length])

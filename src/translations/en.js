@@ -393,4 +393,7 @@ export default {
   "⚠ Carte pas reconnue avec certitude : vérifie-la, ou rescanne-la plus près, bien éclairée et sans reflet.": "⚠ Card not recognised with certainty: check it, or scan it again closer, well lit and without glare.",
   "À vérifier": "To check",
   "À vérifier : deux cartes possibles": "To check: two possible cards",
+  "Montre les cartes une par une : elles sont repérées, lues et ajoutées toutes seules.": "Show the cards one at a time: they are spotted, read and added automatically.",
+  "Montre la carte, bien éclairée, puis touche le bouton.": "Show the card in good light, then tap the button.",
+  "Reconnue par son illustration": "Recognised by its artwork",
 };

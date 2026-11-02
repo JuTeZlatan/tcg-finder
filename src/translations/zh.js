@@ -393,4 +393,7 @@ export default {
   "⚠ Carte pas reconnue avec certitude : vérifie-la, ou rescanne-la plus près, bien éclairée et sans reflet.": "⚠ 无法确定识别结果：请核对，或靠近、在光线充足且无反光的环境下重新扫描。",
   "À vérifier": "待确认",
   "À vérifier : deux cartes possibles": "待确认：可能是两张卡牌",
+  "Montre les cartes une par une : elles sont repérées, lues et ajoutées toutes seules.": "逐张展示卡牌：会自动识别、读取并添加。",
+  "Montre la carte, bien éclairée, puis touche le bouton.": "在光线充足处展示卡牌，然后点按按钮。",
+  "Reconnue par son illustration": "通过插画识别",
 };

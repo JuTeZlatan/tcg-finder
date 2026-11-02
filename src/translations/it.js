@@ -393,4 +393,7 @@ export default {
   "⚠ Carte pas reconnue avec certitude : vérifie-la, ou rescanne-la plus près, bien éclairée et sans reflet.": "⚠ Carta non riconosciuta con certezza: controllala o riscansionala più vicino, ben illuminata e senza riflessi.",
   "À vérifier": "Da verificare",
   "À vérifier : deux cartes possibles": "Da verificare: due carte possibili",
+  "Montre les cartes une par une : elles sont repérées, lues et ajoutées toutes seules.": "Mostra le carte una alla volta: vengono individuate, lette e aggiunte da sole.",
+  "Montre la carte, bien éclairée, puis touche le bouton.": "Mostra la carta ben illuminata, poi tocca il pulsante.",
+  "Reconnue par son illustration": "Riconosciuta dalla sua illustrazione",
 };
