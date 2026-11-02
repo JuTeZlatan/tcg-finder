@@ -40,18 +40,18 @@ export function detectCodes(rawText) {
   const found = [];
   const add = (d) => { if (!found.some((f) => f.game === d.game && f.code === d.code)) found.push(d); };
 
-  // One Piece
-  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(OP_SETS)})\\s?(${D}{2})\\s?-\\s?(${D}{3})\\b`, 'g'))) {
+  // One Piece (tiret, point, puce ou simple espace entre l'extension et le numéro : « OP09 119 »)
+  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(OP_SETS)})\\s?(${D}{2})(?:\\s?[-•.]\\s?|\\s)(${D}{3})\\b`, 'g'))) {
     add({ game: 'onepiece', code: `${canonical(m[1], OP_SETS)}${toDigits(m[2])}-${toDigits(m[3])}` });
   }
   for (const m of t.matchAll(new RegExp(`\\bP\\s?-\\s?(${D}{3})\\b`, 'g'))) add({ game: 'onepiece', code: `P-${toDigits(m[1])}` });
 
   // Dragon Ball Super Fusion World : FB01-001, FS01-01, SB01-001, FP01-001
-  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(FW_SETS)})\\s?(${D}{2})\\s?-\\s?(${D}{2,3})\\b`, 'g'))) {
+  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(FW_SETS)})\\s?(${D}{2})(?:\\s?[-•.]\\s?|\\s)(${D}{2,3})\\b`, 'g'))) {
     add({ game: 'dbsfw', code: `${canonical(m[1], FW_SETS)}${toDigits(m[2])}-${toDigits(m[3])}` });
   }
   // Dragon Ball Super Masters : BT1-001, TB1-001, SD1-01, EX01-01, DB1-001, XD1-01
-  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(DBS_SETS)})\\s?(${D}{1,2})\\s?-\\s?(${D}{2,3})\\b`, 'g'))) {
+  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(DBS_SETS)})\\s?(${D}{1,2})(?:\\s?[-•.]\\s?|\\s)(${D}{2,3})\\b`, 'g'))) {
     add({ game: 'dbsmasters', code: `${canonical(m[1], DBS_SETS)}${toDigits(m[2])}-${toDigits(m[3])}` });
   }
 

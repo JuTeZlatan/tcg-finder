@@ -66,17 +66,13 @@ export default function ScanScreen() {
   const [lastAdded, setLastAdded] = useState(null); // bande du bas : dernière carte ajoutée
   // Position de l'aperçu et du cadre à l'écran : la photo est recadrée sur la carte avant la lecture.
   const layout = useRef({ view: null, frame: null });
-  const [viewSize, setViewSize] = useState(null);
-  const onViewLayout = useCallback((e) => { layout.current.view = e.nativeEvent.layout; setViewSize(e.nativeEvent.layout); }, []);
+  const onViewLayout = useCallback((e) => { layout.current.view = e.nativeEvent.layout; }, []);
   const onFrameLayout = useCallback((e) => { layout.current.frame = e.nativeEvent.layout; }, []);
-  // Caméra en direct : carte repérée dans l'image ([x, y, l, h] en fractions de la vue), entourée à l'écran.
-  const [cardBox, setCardBox] = useState(null);
   // Caméra analysée en direct (Android) : chaque image analysée arrive par onFrame ; nextFrame() attend la suivante.
   const scanner = useRef(null);
   const waiters = useRef([]);
   const onFrame = useCallback((e) => {
     const { codeText, cardText, fingerprint, script, box } = e.nativeEvent;
-    setCardBox(box?.length === 4 ? box : null);
     const text = [codeText, cardText].filter(Boolean).join('\n');
     // Image lue avec le lecteur japonais / chinois sur une carte latine : texte inutilisable (charabia), seule
     // image ignorée (les autres images, lues avec le lecteur latin, suffisent).
@@ -283,18 +279,6 @@ export default function ScanScreen() {
           // Pas d'éclair noir à chaque photo : la rafale en prend plusieurs par seconde, l'écran clignotait.
           animateShutter={false}
           onCameraReady={() => setReady(true)}
-        />
-      ) : null}
-      {LIVE && cardBox && viewSize ? (
-        <View
-          pointerEvents="none"
-          style={[styles.cardBox, {
-            left: cardBox[0] * viewSize.width,
-            top: cardBox[1] * viewSize.height,
-            width: cardBox[2] * viewSize.width,
-            height: cardBox[3] * viewSize.height,
-            borderColor: batchMode && look === 'added' ? colors.success : colors.accent,
-          }]}
         />
       ) : null}
       <View style={styles.overlay} pointerEvents="box-none">
@@ -664,7 +648,6 @@ const styles = StyleSheet.create({
   overlay: { flex: 1, alignItems: 'center', justifyContent: 'space-between', paddingVertical: 24 },
   hint: { color: '#fff', textAlign: 'center', backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 10, fontSize: 13, marginHorizontal: 16 },
   frame: { width: FRAME_W, height: FRAME_W * (88 / 63) },
-  cardBox: { position: 'absolute', borderWidth: 3, borderRadius: 12 },
   corner: { position: 'absolute', width: 34, height: 34, borderColor: colors.accent, borderRadius: 4 },
   controls: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', paddingHorizontal: 40 },
   sideBtn: { width: 52, height: 52, borderRadius: 26, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' },

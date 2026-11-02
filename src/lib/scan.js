@@ -49,15 +49,45 @@ async function riftbound(d, text, preferred) {
   return [];
 }
 
-// « 030/298 », « 300*/298 » (O / D lus pour des 0) → cartes Riftbound de même numéro et même total imprimé.
-async function riftboundByNumber(text, preferred) {
-  const pairs = [...String(text).toUpperCase().matchAll(/(?<![0-9A-Z])([0-9OQD]{3})\*?\s?\/\s?([0-9OQD]{3})(?![0-9])/g)]
-    .map((m) => [m[1], m[2]].map((v) => v.replace(/[OQD]/g, '0')));
+// Jeux dont le numéro imprimé porte le total de l'extension (« 030/298 », « 019/252 », « 133/130 ») : sans code
+// d'extension lisible, le numéro et le total suffisent à retrouver quelques cartes, que l'illustration départage.
+// Star Wars Unlimited imprime aussi « SOR-FR » / « SOR-EN » : extension et langue de la carte.
+const BY_NUMBER_GAMES = ['riftbound', 'swu', 'naruto'];
+const SWU_LANGS = { EN: 'en', FR: 'fr' };
+
+function numberPairs(text) {
+  return [...String(text).toUpperCase().matchAll(/(?<![0-9A-Z])([0-9OQD]{1,3})[*•]?\s?\/\s?([0-9OQD]{2,3})(?![0-9])/g)]
+    .map((m) => [m[1], m[2]].map((v) => parseInt(v.replace(/[OQD]/g, '0'), 10)))
+    .filter(([n, total]) => n > 0 && total >= 10);
+}
+
+// « SFD-001/221 », « SFD-223*/221 », « 019/252 », « 133/130 » → [numéro, total]
+const numberOfRow = (number) => {
+  const m = String(number).match(/(\d{1,3})[a-z]?\*?\s?\/\s?(\d{2,3})\s*$/i);
+  return m ? [parseInt(m[1], 10), parseInt(m[2], 10)] : null;
+};
+
+async function byNumberTotal(tcgId, text, preferred) {
+  const pairs = numberPairs(text);
   if (!pairs.length) return [];
-  const tcg = getTcg('riftbound');
-  for (const lang of langOrder(preferred, 'riftbound')) {
-    const rows = await tcg.findCards((r) => pairs.some(([n, total]) => new RegExp(`-${n}[a-z]?\\*?/${total}$`, 'i').test(r.number)), lang);
-    if (rows.length) return rows.map((r) => cand('riftbound', lang, r, 0.8 + 0.1 * nameScore(r.name, text), r.number.split('/')[0]));
+  const tcg = getTcg(tcgId);
+  let langs = langOrder(preferred, tcgId);
+  let setId = null;
+  if (tcgId === 'swu') {
+    const sets = new Set((await tcg.getSets('en')).map((x) => String(x.id)));
+    const m = [...String(text).toUpperCase().matchAll(/\b([A-Z0-9]{2,5})\s?-\s?(EN|FR|DE|IT|ES)\b/g)].find((x) => sets.has(x[1]));
+    if (m) {
+      setId = m[1];
+      if (SWU_LANGS[m[2]]) langs = [SWU_LANGS[m[2]], ...langs.filter((l) => l !== SWU_LANGS[m[2]])];
+    }
+  }
+  for (const lang of langs) {
+    const rows = await tcg.findCards((r) => {
+      if (setId && String(r.setId) !== setId) return false;
+      const own = numberOfRow(r.number);
+      return !!own && pairs.some(([n, total]) => own[0] === n && own[1] === total);
+    }, lang);
+    if (rows.length) return rows.map((r) => cand(tcgId, lang, r, (setId ? 0.88 : 0.8) + 0.1 * nameScore(r.name, text), String(r.number)));
   }
   return [];
 }
@@ -203,8 +233,10 @@ export async function identify(text, preferredLang, { codesOnly = false } = {}) 
       // source indisponible : on continue avec les autres détections
     }
   }
-  // Riftbound dont le code d'extension n'a pas été lu (seulement « 030/298 ») : recherche par numéro et total.
-  if (!candidates.some((c) => c.tcgId === 'riftbound')) candidates.push(...(await riftboundByNumber(text, preferredLang).catch(() => [])));
+  // Numéro et total lus sans code d'extension reconnu (Riftbound, Star Wars Unlimited, Naruto Mythos).
+  for (const id of BY_NUMBER_GAMES) {
+    if (!candidates.some((c) => c.tcgId === id)) candidates.push(...(await byNumberTotal(id, text, preferredLang).catch(() => [])));
+  }
   if (!candidates.length && !codesOnly) {
     candidates = await byName(text, preferredLang);
     // Code lu à moitié (« oe0a-0o4 ») : son numéro final (004) départage les cartes de même nom.
