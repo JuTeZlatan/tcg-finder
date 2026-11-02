@@ -75,6 +75,43 @@ const dbsmasters = createStaticTcg({
   characters: { label: 'Personnages', resolveSuffix: true, of: (c) => (DBS_CHARACTER.test(typeOf(c)) ? dbsName(c.name) || null : null) },
 });
 
+const swu = createStaticTcg({
+  id: 'swu',
+  name: 'Star Wars Unlimited',
+  tagline: 'Star Wars: Unlimited TCG',
+  color: '#3A5BD9',
+  // Pas de version japonaise ni chinoise publiée.
+  languages: ['fr', 'en'],
+  source: { name: 'Fantasy Flight Games, Cardmarket, TCGplayer' },
+  // Leaders et unités « Nom - Titre » (noms anglais, aussi pour regrouper les cartes françaises : Dark Vador = Darth Vader).
+  characters: { label: 'Personnages', keyLang: 'en', of: (c) => (/leader|unit/i.test(typeOf(c)) ? withoutTags(c.name.split(' - ')[0]) : null) },
+  note: { fr: 'Cartes françaises : noms, textes et images officiels. Prix : ceux des cartes de même numéro.' },
+});
+const cyberpunk = createStaticTcg({
+  id: 'cyberpunk',
+  name: 'Cyberpunk',
+  tagline: 'Cyberpunk TCG',
+  color: '#D6187A',
+  // Les cartes françaises existent, mais sans source publique de leurs noms et images : affichage en anglais.
+  languages: ['en'],
+  englishFallback: true,
+  source: { name: 'Cardmarket, TCGplayer' },
+  characters: { label: 'Légendes', of: (c) => (/legend/i.test(typeOf(c)) ? withoutTags(c.name.split(' - ')[0]) : null) },
+});
+const naruto = createStaticTcg({
+  id: 'naruto',
+  name: 'Naruto Mythos',
+  tagline: 'Naruto Mythos TCG',
+  color: '#E8590C',
+  languages: ['fr', 'en'],
+  source: { name: 'Naruto Mythos TCG' },
+  characters: { label: 'Personnages', keyLang: 'en', of: (c) => (/character/i.test(typeOf(c)) ? withoutTags(c.name.split(' - ')[0]) : null) },
+  note: {
+    fr: 'Cartes françaises publiées à partir du set 1. Pas encore de prix : aucune place de marché ne liste ces cartes.',
+    en: 'Pas encore de prix : aucune place de marché ne liste ces cartes.',
+  },
+});
+
 yugioh.note = { fr: 'Textes en français ; les images restent en anglais (pas de source FR).' };
 magic.note = {
   fr: 'Nom, texte et image en français sur la fiche quand l’impression française existe.',
@@ -82,7 +119,7 @@ magic.note = {
   zh: 'Nom, texte et image en chinois sur la fiche quand l’impression existe. Prix : ceux de la version anglaise.',
 };
 
-export const TCGS = [pokemon, magic, yugioh, onepiece, lorcana, riftbound, dbsfw, dbsmasters];
+export const TCGS = [pokemon, magic, yugioh, onepiece, lorcana, riftbound, dbsfw, dbsmasters, swu, cyberpunk, naruto];
 // « Autres » : cartes hors catalogue saisies à la main, présentes seulement dans la collection.
 export const CUSTOM_TCG = { id: 'custom', name: 'Autres', tagline: 'Cartes saisies à la main', color: '#9B8AFB', languages: ['en'] };
 export const getTcg = (id) => (id === 'custom' ? CUSTOM_TCG : TCGS.find((t) => t.id === id));

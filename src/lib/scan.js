@@ -129,7 +129,7 @@ async function byName(text, preferred) {
     }
     // Jeux dont tout le catalogue est sur le téléphone : recherche tolérante aux fautes de lecture.
     // On compare au nom complet et à sa première partie (« Ariel » pour « Ariel - Chanteuse exceptionnelle »).
-    for (const id of ['onepiece', 'lorcana', 'riftbound']) {
+    for (const id of ['onepiece', 'lorcana', 'riftbound', 'swu', 'cyberpunk', 'naruto', 'dbsfw']) {
       const tcg = getTcg(id);
       for (const lang of langOrder(preferred, id)) {
         // Un nom très court ressemble à beaucoup d'autres : on exige alors une correspondance quasi exacte.
@@ -161,7 +161,7 @@ function partialNumbers(text) {
 // Plusieurs cartes du même nom (ex. une dizaine de Luffy) : on départage avec le texte de la carte
 // (effet, types, caractéristiques) comparé au texte lu. Pour les jeux dont les données sont sur le téléphone.
 async function rerankByText(candidates, text) {
-  const local = new Set(['onepiece', 'lorcana', 'riftbound']);
+  const local = new Set(['onepiece', 'lorcana', 'riftbound', 'swu', 'cyberpunk', 'naruto', 'dbsfw', 'dbsmasters']);
   await Promise.all(candidates.filter((c) => local.has(c.tcgId)).slice(0, 250).map(async (c) => {
     try {
       const card = await getTcg(c.tcgId).getCard(c.id, c.setId, c.dataLang ?? c.lang);

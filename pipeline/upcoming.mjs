@@ -3,7 +3,7 @@
 // Sortie : pipeline/out/upcoming.json = [{ tcg, name, date, code, image }], de la plus ancienne à la plus lointaine.
 import { getJSON, groupImage, tcgcsvGroups, writeJSON } from './lib.mjs';
 
-const CATEGORIES = { pokemon: 3, yugioh: 2, onepiece: 68, lorcana: 71, riftbound: 89, dbsfw: 80, dbsmasters: 27 };
+const CATEGORIES = { pokemon: 3, yugioh: 2, onepiece: 68, lorcana: 71, riftbound: 89, dbsfw: 80, dbsmasters: 27, swu: 79, cyberpunk: 92, naruto: 93 };
 // Magic : vraies extensions seulement (pas les cartes d'art, jetons, promos…).
 const MAGIC_TYPES = new Set(['expansion', 'core', 'masters', 'commander', 'draft_innovation', 'starter', 'duel_deck', 'from_the_vault', 'premium_deck', 'spellbook', 'arsenal', 'box']);
 const PAST_DAYS = 30;

@@ -8,4 +8,7 @@ export const GAME_ICONS = {
   riftbound: require('../../assets/games/riftbound.png'),
   dbsfw: require('../../assets/games/dbsfw.png'),
   dbsmasters: require('../../assets/games/dbsmasters.png'),
+  swu: require('../../assets/games/swu.png'),
+  cyberpunk: require('../../assets/games/cyberpunk.png'),
+  naruto: require('../../assets/games/naruto.png'),
 };

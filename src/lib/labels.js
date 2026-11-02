@@ -13,6 +13,8 @@ const FIELD = {
   cost: 'Coût', power: 'Puissance', counter: 'Contre', life: 'Vie', subTypes: 'Types', domain: 'Domaine',
   energy: 'Énergie', might: 'Force', tags: 'Tags', variants: 'Variantes', block: 'Bloc', ink: 'Encre',
   inkwell: 'Encrier', strength: 'Force', willpower: 'Volonté', lore: 'Éclats de lore',
+  edition: 'Édition', chakra: 'Chakra', points: 'Points', group: 'Groupe', keywords: 'Mots-clés', artwork: 'Illustration',
+  variant: 'Variante', stamp: 'Tampon', obtain: 'Obtention',
 };
 // « low » est l'annonce en vente la moins chère en ce moment, pas une vente : elle peut dépasser le prix
 // des ventes récentes (personne ne vend moins cher aujourd'hui). Les libellés le disent pour éviter la confusion.
@@ -31,7 +33,7 @@ const SOURCE = {
   thisEdition: 'Cette édition (TCGplayer)',
   byEdition: 'Par édition (TCGplayer)',
 };
-const TEXT = { effect: 'Effet', description: 'Description', text: 'Texte', flavor: 'Ambiance' };
+const TEXT = { effect: 'Effet', description: 'Description', text: 'Texte', flavor: 'Ambiance', deploy: 'Leader déployé', epic: 'Action épique', upgrade: 'Amélioration' };
 const RARITY = { common: 'Commune', uncommon: 'Peu commune', rare: 'Rare', mythic: 'Mythique', special: 'Spéciale', bonus: 'Bonus' };
 
 export const fieldLabel = (key) => (FIELD[key] ? t(FIELD[key]) : key);

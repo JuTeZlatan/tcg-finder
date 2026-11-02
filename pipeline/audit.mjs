@@ -8,7 +8,7 @@
 import { readFile, appendFile } from 'node:fs/promises';
 import { fileId, previousJSON, writeJSON } from './lib.mjs';
 
-const GAMES = ['onepiece', 'lorcana', 'riftbound', 'dbsfw', 'dbsmasters'];
+const GAMES = ['onepiece', 'lorcana', 'riftbound', 'dbsfw', 'dbsmasters', 'swu', 'cyberpunk', 'naruto'];
 const LANG_ORDER = ['en', 'fr', 'ja', 'zh'];
 const FIELDS = ['image', 'name', 'number'];
 

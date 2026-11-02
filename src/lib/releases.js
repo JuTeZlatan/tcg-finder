@@ -83,7 +83,7 @@ export async function localizedReleaseNames(releases, cardLang) {
 // Rubrique Cardmarket de chaque jeu.
 const CARDMARKET_GAME = {
   pokemon: 'Pokemon', magic: 'Magic', yugioh: 'YuGiOh', onepiece: 'OnePiece', lorcana: 'Lorcana', riftbound: 'Riftbound',
-  dbsfw: 'DragonBallSuper', dbsmasters: 'DragonBallSuper',
+  dbsfw: 'DragonBallSuper', dbsmasters: 'DragonBallSuper', swu: 'StarWarsUnlimited', cyberpunk: 'Cyberpunk',
 };
 
 // Recherches de précommande / d'achat d'une extension (son nom, sans le préfixe de code « ME06: »).

@@ -1,4 +1,4 @@
-// Script de collecte quotidien : node pipeline/build.mjs [--only=onepiece,lorcana,riftbound,pokemon,yugioh,dragonball,magic,upcoming] [--out=dossier]
+// Script de collecte quotidien : node pipeline/build.mjs [--only=onepiece,lorcana,riftbound,pokemon,yugioh,dragonball,magic,swu,cyberpunk,naruto,upcoming] [--out=dossier]
 // Produit des fichiers JSON statiques lus par l'appli (publiés sur GitHub Pages par .github/workflows/data.yml).
 import { writeJSON } from './lib.mjs';
 import * as onepiece from './onepiece.mjs';
@@ -8,10 +8,13 @@ import * as pokemon from './pokemon.mjs';
 import * as yugioh from './yugioh.mjs';
 import * as dragonball from './dragonball.mjs';
 import * as magic from './magic.mjs';
+import * as swu from './swu.mjs';
+import * as cyberpunk from './cyberpunk.mjs';
+import * as naruto from './naruto.mjs';
 import * as upcoming from './upcoming.mjs';
 import { audit } from './audit.mjs';
 
-const BUILDERS = { onepiece, riftbound, lorcana, pokemon, yugioh, dragonball, magic, upcoming };
+const BUILDERS = { onepiece, riftbound, lorcana, pokemon, yugioh, dragonball, magic, swu, cyberpunk, naruto, upcoming };
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.split('=')[1];
 
 const outDir = arg('out') || 'pipeline/out';

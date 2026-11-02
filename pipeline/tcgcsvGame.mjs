@@ -1,6 +1,7 @@
 // Jeu construit entièrement à partir du catalogue TCGplayer (via TCGCSV) : extensions, cartes, images, caractéristiques,
 // prix TCGplayer, puis prix Cardmarket associés par code ou par nom (et proximité de prix entre versions).
-// Utilisé pour Dragon Ball Super (Fusion World et Masters), en anglais.
+// Utilisé pour Dragon Ball Super (Fusion World et Masters), Star Wars Unlimited et Cyberpunk, en anglais ; renvoie les
+// extensions (pour en dériver une autre langue).
 import {
   sleep, clean, htmlToText, loadCardmarket, cardmarketBlock, cardmarketRef, buildProductIndex, matchByPrice,
   getUsdToEur, tcgcsvGroups, tcgcsvGroupProducts, tcgplayerBlock, tcgplayerRef, isFoilOnly, writeTcg, addSetImages,
@@ -72,4 +73,5 @@ export async function buildTcgcsvGame(outDir, { id, label, categoryId, cardmarke
   sets.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   await addSetImages(sets, categoryId);
   await writeTcg(outDir, id, 'en', sets);
+  return sets;
 }

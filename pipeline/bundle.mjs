@@ -13,6 +13,9 @@ const GAMES = {
   lorcana: ['fr', 'en'],
   dbsfw: ['en'],
   dbsmasters: ['en'],
+  swu: ['fr', 'en'],
+  cyberpunk: ['en'],
+  naruto: ['fr', 'en'],
 };
 // Compléments de prix pour les jeux interrogés en direct : [fichier collecté, nom intégré].
 const EXTRAS = [
