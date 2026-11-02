@@ -140,12 +140,12 @@ function ReleaseRow({ release: r, followed, expanded, onToggle, onFollow }) {
           {r.image && !imageFailed ? (
             <Image source={r.image} style={styles.visualImg} contentFit="contain" tintColor={r.imageTint ? colors.text : undefined} onError={() => setImageFailed(true)} />
           ) : (
-            <Image source={GAME_ICONS[r.tcg]} style={styles.visualIcon} contentFit="contain" />
+            <Image source={GAME_ICONS[r.tcg]} cachePolicy="memory" style={styles.visualIcon} contentFit="contain" />
           )}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <View style={styles.gameLine}>
-            <Image source={GAME_ICONS[r.tcg]} style={styles.gameIcon} contentFit="contain" />
+            <Image source={GAME_ICONS[r.tcg]} cachePolicy="memory" style={styles.gameIcon} contentFit="contain" />
             <Text style={styles.game}>{tcg?.name}{r.code ? ` · ${r.code}` : ''}</Text>
           </View>
           <Text style={styles.name} numberOfLines={2}>{r.name}</Text>
@@ -195,7 +195,7 @@ function Stat({ value, label, accent }) {
 function Chip({ label, active, onPress, image, icon }) {
   return (
     <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
-      {image ? <Image source={image} style={styles.chipIcon} contentFit="contain" /> : null}
+      {image ? <Image source={image} style={styles.chipIcon} contentFit="contain" cachePolicy="memory" /> : null}
       {icon ? <Ionicons name={icon} size={14} color={active ? '#1A1A1A' : colors.muted} /> : null}
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </Pressable>

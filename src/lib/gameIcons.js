@@ -1,4 +1,6 @@
 // Icône de chaque jeu (icônes des sites officiels ; symbole planeswalker pour Magic), intégrées à l'appli.
+// À afficher avec cachePolicy="memory" : une image intégrée est désignée par un numéro de ressource qui change quand on
+// ajoute des images ; le cache disque d'expo-image garderait l'ancienne image sous ce numéro après une mise à jour.
 export const GAME_ICONS = {
   pokemon: require('../../assets/games/pokemon.png'),
   magic: require('../../assets/games/magic.png'),

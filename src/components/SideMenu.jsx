@@ -29,7 +29,7 @@ export function Avatar({ avatar, pseudo, size = 72 }) {
   const style = { width: size, height: size, borderRadius: size / 2 };
   if (avatar?.type === 'photo') return <Image source={avatar.uri} style={[styles.avatar, style]} contentFit="cover" />;
   if (avatar?.type === 'game' && GAME_ICONS[avatar.id]) {
-    return <Image source={GAME_ICONS[avatar.id]} style={[styles.avatar, style]} contentFit="contain" />;
+    return <Image source={GAME_ICONS[avatar.id]} cachePolicy="memory" style={[styles.avatar, style]} contentFit="contain" />;
   }
   return (
     <View style={[styles.avatar, styles.avatarEmpty, style]}>

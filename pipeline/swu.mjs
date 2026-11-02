@@ -43,20 +43,30 @@ export async function build(outDir) {
 
   console.log('Star Wars Unlimited (français)…');
   const fr = await officialCards('fr');
-  const byKey = new Map();
+  // Les promos d'une extension partagent son code et ses numéros (« 3/20 » contre « 003/252 ») : on relie par code,
+  // numéro ET total imprimé ; sans total (variantes Hyperspace 285…), la carte de la série principale (plus grand total).
+  const byExact = new Map();
+  const byNumber = new Map();
   const setNames = new Map();
   for (const c of fr) {
     const code = c.expansion?.data?.attributes?.code;
     if (!code || c.cardNumber == null) continue;
-    byKey.set(`${code}|${Number(c.cardNumber)}`, c);
+    byExact.set(`${code}|${Number(c.cardNumber)}|${Number(c.cardCount)}`, c);
+    const k = `${code}|${Number(c.cardNumber)}`;
+    const prev = byNumber.get(k);
+    if (!prev || Number(c.cardCount) > Number(prev.cardCount)) byNumber.set(k, c);
     const setName = c.expansion?.data?.attributes?.name;
     if (setName) setNames.set(code, setName);
   }
+  const officialOf = (code, number) => {
+    const [n, total] = String(number).split('/').map((v) => parseInt(v, 10));
+    return total ? byExact.get(`${code}|${n}|${total}`) : byNumber.get(`${code}|${n}`);
+  };
   let matched = 0;
   const frSets = sets.map((s) => {
     const code = String(s.id).replace(/-\d+$/, '');
     const cards = s.cards.map((card) => {
-      const f = byKey.get(`${code}|${parseInt(card.number, 10)}`);
+      const f = officialOf(code, card.number);
       if (!f) return { ...card };
       matched++;
       // Mention de version gardée (« (Hyperspace) », « (Showcase) »…).

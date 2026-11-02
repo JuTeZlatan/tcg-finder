@@ -130,7 +130,7 @@ export default function Home() {
             >
               <View style={styles.tileTop}>
                 <View style={styles.iconRing}>
-                  <Image source={GAME_ICONS[g.id]} style={styles.icon} contentFit="contain" />
+                  <Image source={GAME_ICONS[g.id]} cachePolicy="memory" style={styles.icon} contentFit="contain" />
                 </View>
                 {!on ? (
                   <Ionicons name="lock-closed" size={18} color={colors.text} />

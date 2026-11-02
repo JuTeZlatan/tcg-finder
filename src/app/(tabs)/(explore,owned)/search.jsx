@@ -81,7 +81,7 @@ export default function GlobalSearchScreen() {
         return (
           <View key={g.id} style={styles.section}>
             <View style={styles.sectionHead}>
-              <Image source={GAME_ICONS[g.id]} style={styles.gameIcon} contentFit="contain" />
+              <Image source={GAME_ICONS[g.id]} cachePolicy="memory" style={styles.gameIcon} contentFit="contain" />
               <Text style={styles.sectionTitle}>{g.name}</Text>
               <Text style={styles.muted}>{cards.length}</Text>
               <View style={{ flex: 1 }} />
