@@ -415,4 +415,7 @@ export default {
   "Tampon": "Stamp",
   "Variante": "Variant",
   "Légendes": "Legends",
+  "Valeur des cartes scannées": "Value of scanned cards",
+  "{n} carte sans prix (non comptée)": "{n} card without a price (not counted)",
+  "{n} cartes sans prix (non comptées)": "{n} cards without a price (not counted)",
 };

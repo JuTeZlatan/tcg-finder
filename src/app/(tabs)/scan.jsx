@@ -82,7 +82,8 @@ export default function ScanScreen() {
     // image ignorée (les autres images, lues avec le lecteur latin, suffisent).
     const cjk = (text.match(/[぀-ヿ一-鿿]/g) || []).length;
     if ((script === 'ja' || script === 'zh') && cjk < text.replace(/\s/g, '').length * 0.15) return;
-    const hasCode = detectCodes(text).length > 0;
+    // Code reconnu, ou au moins un numéro/total (« 030/298 », « 300*/298 » : Riftbound dont l'extension n'est pas lue).
+    const hasCode = detectCodes(text).length > 0 || /\d{3}\*?\s?\/\s?\d{3}/.test(text);
     const found = box?.length === 4;
     const frame = { text, hasCode, card: found || hasCard(cardText, hasCode), fp: found ? fingerprint : null };
     const list = waiters.current;
@@ -563,6 +564,7 @@ function BatchReview({ batch, setBatch, onBack, onDone }) {
         <Text style={styles.newScanText}>{t('Continuer à scanner')}</Text>
       </Pressable>
       <Text style={styles.title}>{plural(batch.length, '{n} carte scannée', '{n} cartes scannées')}</Text>
+      {batch.length ? <BatchTotal batch={batch} /> : null}
       {!batch.length ? <Text style={styles.muted}>{t('Scanne des cartes : elles s’ajoutent ici, tu les vérifies puis tu les ajoutes toutes d’un coup.')}</Text> : null}
       {batch.map((r) => <BatchRow key={r.key} row={r} onChange={patch} onRemove={() => setBatch((b) => b.filter((x) => x.key !== r.key))} />)}
       {batch.length ? (
@@ -572,6 +574,39 @@ function BatchReview({ batch, setBatch, onBack, onDone }) {
         </Pressable>
       ) : null}
     </ScrollView>
+  );
+}
+
+// Valeur des cartes scannées : total, puis sous-total par jeu (une rafale peut mélanger plusieurs jeux).
+// Les prix sont ceux retenus pour chaque ligne (version choisie) ; une carte sans prix est signalée à part.
+function BatchTotal({ batch }) {
+  const games = new Map();
+  let total = 0;
+  let missing = 0;
+  for (const r of batch) {
+    const c = r.candidates[r.selected];
+    const g = games.get(c.tcgId) || { count: 0, value: 0 };
+    g.count += 1;
+    if (r.price != null) {
+      g.value += r.price;
+      total += r.price;
+    } else missing += 1;
+    games.set(c.tcgId, g);
+  }
+  return (
+    <View style={styles.totalBox}>
+      <Text style={styles.priceLabel}>{t('Valeur des cartes scannées')}</Text>
+      <Text style={styles.priceValue}>{formatPrice(total, 'EUR')}</Text>
+      {games.size > 1
+        ? [...games].map(([id, g]) => (
+          <View key={id} style={styles.totalRow}>
+            <Text style={styles.totalGame} numberOfLines={1}>{getTcg(id)?.name} · {g.count}</Text>
+            <Text style={styles.totalGameValue}>{formatPrice(g.value, 'EUR')}</Text>
+          </View>
+        ))
+        : null}
+      {missing ? <Text style={styles.mutedCenter}>{plural(missing, '{n} carte sans prix (non comptée)', '{n} cartes sans prix (non comptées)')}</Text> : null}
+    </View>
   );
 }
 
@@ -671,6 +706,10 @@ const styles = StyleSheet.create({
   modeTextActive: { color: '#1A1A1A' },
   listBtn: { backgroundColor: colors.accent },
   listCount: { position: 'absolute', top: -4, right: -4, minWidth: 22, height: 22, borderRadius: 11, backgroundColor: '#fff', color: '#1A1A1A', fontWeight: '800', fontSize: 12, textAlign: 'center', lineHeight: 22, overflow: 'hidden' },
+  totalBox: { backgroundColor: colors.surfaceAlt, borderRadius: radius, padding: 14, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.accent },
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignSelf: 'stretch', gap: 10 },
+  totalGame: { color: colors.text, flex: 1 },
+  totalGameValue: { color: colors.accent, fontWeight: '700' },
   batchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: radius, padding: 10 },
   batchImg: { width: 56, aspectRatio: 63 / 88, borderRadius: 6, backgroundColor: colors.surfaceAlt },
   batchName: { color: colors.text, fontWeight: '700' },

@@ -49,6 +49,19 @@ async function riftbound(d, text, preferred) {
   return [];
 }
 
+// « 030/298 », « 300*/298 » (O / D lus pour des 0) → cartes Riftbound de même numéro et même total imprimé.
+async function riftboundByNumber(text, preferred) {
+  const pairs = [...String(text).toUpperCase().matchAll(/(?<![0-9A-Z])([0-9OQD]{3})\*?\s?\/\s?([0-9OQD]{3})(?![0-9])/g)]
+    .map((m) => [m[1], m[2]].map((v) => v.replace(/[OQD]/g, '0')));
+  if (!pairs.length) return [];
+  const tcg = getTcg('riftbound');
+  for (const lang of langOrder(preferred, 'riftbound')) {
+    const rows = await tcg.findCards((r) => pairs.some(([n, total]) => new RegExp(`-${n}[a-z]?\\*?/${total}$`, 'i').test(r.number)), lang);
+    if (rows.length) return rows.map((r) => cand('riftbound', lang, r, 0.8 + 0.1 * nameScore(r.name, text), r.number.split('/')[0]));
+  }
+  return [];
+}
+
 async function lorcana(d, text) {
   const tcg = getTcg('lorcana');
   const lang = dataLang(tcg, d.lang);
@@ -190,6 +203,8 @@ export async function identify(text, preferredLang, { codesOnly = false } = {}) 
       // source indisponible : on continue avec les autres détections
     }
   }
+  // Riftbound dont le code d'extension n'a pas été lu (seulement « 030/298 ») : recherche par numéro et total.
+  if (!candidates.some((c) => c.tcgId === 'riftbound')) candidates.push(...(await riftboundByNumber(text, preferredLang).catch(() => [])));
   if (!candidates.length && !codesOnly) {
     candidates = await byName(text, preferredLang);
     // Code lu à moitié (« oe0a-0o4 ») : son numéro final (004) départage les cartes de même nom.
@@ -282,9 +297,10 @@ export async function withVisual(result, fp, text) {
     const clear = a.visual >= VISUAL_SAME && (b?.visual == null || a.visual - b.visual >= VISUAL_GAP);
     if (clear) {
       tie = false;
-      // Illustration nettement reconnue : preuve forte, même sans code lisible (avec le nom lu, la carte est sûre).
+      // Illustration nettement reconnue : preuve forte. Avec le code (ou le nom) lu, la carte est sûre ; avec le nom
+      // seulement à moitié lu, deux choix.
       const byName = a.why.startsWith('nom');
-      confidence = Math.min(0.995, Math.max(confidence + 0.04, byName ? (nameRead(a.name, text) ? 0.95 : 0.9) : 0));
+      confidence = Math.min(0.995, Math.max(confidence + 0.04, byName ? (nameRead(a.name, text) ? 0.95 : 0.9) : 0.95));
       if (byName) a.why = 'image';
     } else if (a.visual < VISUAL_LOW && !(b?.visual > a.visual + VISUAL_GAP)) {
       confidence -= 0.1;

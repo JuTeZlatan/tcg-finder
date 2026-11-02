@@ -415,4 +415,7 @@ export default {
   "Tampon": "Sello",
   "Variante": "Variante",
   "Légendes": "Leyendas",
+  "Valeur des cartes scannées": "Valor de las cartas escaneadas",
+  "{n} carte sans prix (non comptée)": "{n} carta sin precio (no contada)",
+  "{n} cartes sans prix (non comptées)": "{n} cartas sin precio (no contadas)",
 };

@@ -415,4 +415,7 @@ export default {
   "Tampon": "Timbro",
   "Variante": "Variante",
   "Légendes": "Leggende",
+  "Valeur des cartes scannées": "Valore delle carte scansionate",
+  "{n} carte sans prix (non comptée)": "{n} carta senza prezzo (non conteggiata)",
+  "{n} cartes sans prix (non comptées)": "{n} carte senza prezzo (non conteggiate)",
 };

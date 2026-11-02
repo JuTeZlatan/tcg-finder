@@ -415,4 +415,7 @@ export default {
   "Tampon": "印章",
   "Variante": "变体",
   "Légendes": "传奇",
+  "Valeur des cartes scannées": "已扫描卡牌总价值",
+  "{n} carte sans prix (non comptée)": "{n} 张卡牌无价格（未计入）",
+  "{n} cartes sans prix (non comptées)": "{n} 张卡牌无价格（未计入）",
 };

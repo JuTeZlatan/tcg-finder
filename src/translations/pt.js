@@ -415,4 +415,7 @@ export default {
   "Tampon": "Carimbo",
   "Variante": "Variante",
   "Légendes": "Lendas",
+  "Valeur des cartes scannées": "Valor das cartas digitalizadas",
+  "{n} carte sans prix (non comptée)": "{n} carta sem preço (não contada)",
+  "{n} cartes sans prix (non comptées)": "{n} cartas sem preço (não contadas)",
 };

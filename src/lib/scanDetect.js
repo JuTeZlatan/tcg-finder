@@ -55,8 +55,8 @@ export function detectCodes(rawText) {
     add({ game: 'dbsmasters', code: `${canonical(m[1], DBS_SETS)}${toDigits(m[2])}-${toDigits(m[3])}` });
   }
 
-  // Riftbound
-  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(RIFT_SETS)})\\s?-\\s?(${D}{3}[A-Z]?)\\s?\\/\\s?(${D}{3})\\b`, 'g'))) {
+  // Riftbound : « OGN-030/298 », mais aussi « OGN • 030/298 » ou « OGN 030/298 » ; « 300* » pour les signatures
+  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(RIFT_SETS)})\\s?[-•.]?\\s?(${D}{3}[A-Z]?)[*•]?\\s?\\/\\s?(${D}{3})\\b`, 'g'))) {
     const num = toDigits(m[2].slice(0, 3)) + m[2].slice(3).toLowerCase();
     const set = canonical(m[1], RIFT_SETS);
     add({ game: 'riftbound', set, code: `${set}-${num}`, total: toDigits(m[3]) });
