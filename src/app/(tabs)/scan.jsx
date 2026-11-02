@@ -6,7 +6,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { getTcg } from '../../api';
 import { identify } from '../../lib/scan';
-import { discard, readCard } from '../../lib/scanImage';
+import { discard, readCard, readCardQuick } from '../../lib/scanImage';
 import { nameCandidates } from '../../lib/scanDetect';
 import { useCardLang, LANG_NAMES } from '../../lib/cardLang';
 import { useCollection, ownedQty } from '../../lib/collection';
@@ -18,12 +18,17 @@ import { useSettings } from '../../lib/settings';
 import { finishLabel, storedFinish } from '../../lib/finishes';
 import { plural, t } from '../../lib/i18n';
 
-// Rafale automatique : une image toutes les ~0,7 s ; une carte est ajoutée quand son code est lu nettement (score
-// ≥ 0,95) ou quand deux images de suite donnent la même carte. Elle n'est pas ajoutée deux fois tant qu'elle reste
-// devant l'appareil photo (retirer la carte puis la représenter permet d'en compter un 2e exemplaire).
-const SURE_SCORE = 0.95;
-const AUTO_PAUSE = 700;
-const candKey = (c) => `${c.tcgId}|${c.lang}|${c.id}`;
+// Rafale automatique : lecture en continu, mais une carte n'est ajoutée que si son code imprimé est lu dans le cadre
+// (jamais sur un simple décor). Code net (score ≥ 0,9) : ajout immédiat ; sinon confirmé par l'image suivante.
+// La carte n'est pas ajoutée deux fois tant qu'elle reste dans le cadre : il faut la retirer (cadre vide deux fois)
+// puis la représenter pour compter un 2e exemplaire.
+const SURE_SCORE = 0.9;
+const AUTO_PAUSE = 250;
+const EMPTY_FRAMES = 2;
+// Même carte relue avec un caractère différent (« OP09-119 » / « OP09-118 » sur une carte du même nom).
+const misread = (a, b) => a.length === b.length && [...a].filter((ch, i) => ch !== b[i]).length <= 1;
+const sameCard = (present, code, name) =>
+  present.code === code || (misread(present.code, code) && present.name.toLowerCase() === String(name).toLowerCase());
 
 export default function ScanScreen() {
   useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
@@ -60,7 +65,9 @@ export default function ScanScreen() {
   };
 
   // Rafale : boucle de lecture tant que l'écran est affiché.
+  // present : carte déjà ajoutée et toujours dans le cadre ({ code, name }) ; pending : code vu une fois, à confirmer.
   const memory = useRef({ pending: null, present: null, empty: 0 });
+  const [look, setLook] = useState('none'); // none | card | added : retour visuel sur le cadre
   const running = mode === 'batch' && auto && focused && ready && state.step === 'camera';
   useEffect(() => {
     if (!running) return undefined;
@@ -68,26 +75,37 @@ export default function ScanScreen() {
     (async () => {
       while (!stop) {
         try {
-          const { photo, text } = await photoText(0.7);
+          const photo = await camera.current.takePictureAsync({ quality: 0.6, shutterSound: false });
+          const { text, hasCode, card } = await readCardQuick(photo, layout.current.view, layout.current.frame);
           discard(photo.uri);
           if (stop) break;
-          const { candidates = [] } = await identify(text, cardLang);
-          const best = candidates[0];
           const m = memory.current;
-          if (!best) {
-            // carte retirée (deux images vides) : la même carte pourra être ajoutée à nouveau
+          if (!card) {
+            // cadre vide : après deux images, la même carte pourra être ajoutée à nouveau
             m.empty += 1;
-            if (m.empty >= 2) Object.assign(m, { pending: null, present: null });
+            m.pending = null;
+            if (m.empty >= EMPTY_FRAMES) m.present = null;
+            setLook(m.present ? 'added' : 'none');
           } else {
             m.empty = 0;
-            const key = candKey(best);
-            const sure = best.score >= SURE_SCORE || m.pending === key;
-            m.pending = key;
-            if (sure && m.present !== key) {
-              m.present = key;
+            const { detections, candidates = [] } = hasCode ? await identify(text, cardLang, { codesOnly: true }) : {};
+            const best = candidates[0];
+            const code = detections?.map((d) => d.code).join(' ');
+            if (stop) break;
+            if (!best) {
+              setLook(m.present ? 'added' : 'card'); // carte vue, code pas encore lisible
+            } else if (m.present && sameCard(m.present, code, best.name)) {
+              setLook('added'); // même carte toujours dans le cadre (ou son code relu un peu différemment)
+            } else if (best.score >= SURE_SCORE || m.pending === code) {
+              m.present = { code, name: best.name };
+              m.pending = null;
               const row = { key: `${Date.now()}`, candidates, selected: 0, finish: null, finishName: null, price: null };
               setBatch((b) => [...b, row]);
               setLastAdded({ ...best, rowKey: row.key, at: Date.now() });
+              setLook('added');
+            } else {
+              m.pending = code;
+              setLook('card');
             }
           }
         } catch {
@@ -123,6 +141,8 @@ export default function ScanScreen() {
   }
 
   const batchMode = mode === 'batch';
+  // Rafale : cadre vert dès qu'une carte est ajoutée, blanc quand une carte est vue mais pas encore lue.
+  const cornerTint = batchMode && auto ? { borderColor: look === 'added' ? colors.success : look === 'card' ? colors.text : colors.accent } : null;
   return (
     <View style={styles.page} onLayout={(e) => { layout.current.view = e.nativeEvent.layout; }}>
       {focused ? (
@@ -147,10 +167,10 @@ export default function ScanScreen() {
           {'\n'}{t('Le code en bas (ex. OP09-119, 004/084) doit être net.')}{'\n'}{t('Langue des cartes')} : {t(LANG_NAMES[cardLang])}.
         </Text>
         <View style={styles.frame} pointerEvents="none" onLayout={(e) => { layout.current.frame = e.nativeEvent.layout; }}>
-          <View style={[styles.corner, { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4 }]} />
-          <View style={[styles.corner, { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4 }]} />
-          <View style={[styles.corner, { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4 }]} />
-          <View style={[styles.corner, { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4 }]} />
+          <View style={[styles.corner, cornerTint, { top: 0, left: 0, borderTopWidth: 4, borderLeftWidth: 4 }]} />
+          <View style={[styles.corner, cornerTint, { top: 0, right: 0, borderTopWidth: 4, borderRightWidth: 4 }]} />
+          <View style={[styles.corner, cornerTint, { bottom: 0, left: 0, borderBottomWidth: 4, borderLeftWidth: 4 }]} />
+          <View style={[styles.corner, cornerTint, { bottom: 0, right: 0, borderBottomWidth: 4, borderRightWidth: 4 }]} />
         </View>
         <View style={{ width: '100%', gap: 10 }}>
           {batchMode && lastAdded ? <LastScanned card={lastAdded} count={batch.length} onPress={() => setState({ step: 'batch' })} /> : null}
@@ -179,7 +199,11 @@ export default function ScanScreen() {
             )}
           </View>
           {state.step === 'analyzing' ? <Text style={styles.analyzing}>{t('Lecture de la carte…')}</Text> : null}
-          {batchMode ? <Text style={styles.analyzing}>{auto ? t('Lecture automatique en cours…') : t('Lecture en pause')}</Text> : null}
+          {batchMode ? (
+            <Text style={styles.analyzing}>
+              {!auto ? t('Lecture en pause') : look === 'added' ? t('Carte ajoutée ✓ — présente la suivante') : look === 'card' ? t('Carte détectée, lecture du code…') : t('En attente d’une carte dans le cadre…')}
+            </Text>
+          ) : null}
         </View>
       </View>
     </View>

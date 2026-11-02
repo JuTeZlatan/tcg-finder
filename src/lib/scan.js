@@ -13,6 +13,19 @@ const cand = (tcgId, lang, c, score, why) => ({
 
 // Langue à essayer en premier : celle imprimée sur la carte si connue, sinon le réglage « Cartes en » ;
 // seulement les langues publiées pour ce jeu (ex. Riftbound : pas de français officiel).
+// Variantes d'un code d'extension où l'OCR a pu confondre 0 et O (« L0B » / « LOB », « M2O » / « M20 ») : le code lu
+// d'abord, puis les variantes (au plus quelques-unes).
+export function zeroVariants(code) {
+  const spots = [...code].map((ch, i) => (ch === '0' || ch === 'O' ? i : -1)).filter((i) => i >= 0).slice(0, 3);
+  const out = [code];
+  for (let mask = 1; mask < 1 << spots.length; mask++) {
+    const chars = [...code];
+    spots.forEach((i, b) => { if (mask & (1 << b)) chars[i] = chars[i] === '0' ? 'O' : '0'; });
+    out.push(chars.join(''));
+  }
+  return out;
+}
+
 const langOrder = (preferred, tcgId) => [...new Set([preferred, 'en', 'fr'])].filter((l) => getTcg(tcgId).languages.includes(l));
 
 async function onePiece(d, text, preferred) {
@@ -42,7 +55,11 @@ async function lorcana(d, text) {
 
 async function magic(d, text, preferred) {
   // Les prix sont sur l'impression anglaise : on vise celle-ci, la fiche affichera la version française si elle existe.
-  const c = await getJSON(`${SCRYFALL}/cards/${d.set}/${encodeURIComponent(d.number)}`, { allowMissing: true }).catch(() => null);
+  let c = null;
+  for (const set of zeroVariants(d.set.toUpperCase())) {
+    c = await getJSON(`${SCRYFALL}/cards/${set.toLowerCase()}/${encodeURIComponent(d.number)}`, { allowMissing: true }).catch(() => null);
+    if (c) break;
+  }
   if (!c) return [];
   const lang = d.lang === 'fr' || d.lang === 'en' ? d.lang : preferred;
   const image = c.image_uris?.normal ?? c.card_faces?.[0]?.image_uris?.normal;
@@ -50,7 +67,7 @@ async function magic(d, text, preferred) {
 }
 
 async function yugioh(d) {
-  const tries = [`${d.prefix}-EN${d.num}`, `${d.prefix}-${d.num}`];
+  const tries = zeroVariants(d.prefix).flatMap((p) => [`${p}-EN${d.num}`, `${p}-${d.num}`]);
   for (const code of tries) {
     const r = await getJSON(`${YGO}/cardsetsinfo.php?setcode=${encodeURIComponent(code)}`, { allowMissing: true }).catch(() => null);
     if (r?.id) {
@@ -146,7 +163,8 @@ async function rerankByText(candidates, text) {
   return candidates;
 }
 
-export async function identify(text, preferredLang) {
+// codesOnly : seulement par le code imprimé (rafale : pas de recherche par nom sur un décor sans carte).
+export async function identify(text, preferredLang, { codesOnly = false } = {}) {
   const detections = detectCodes(text);
   let candidates = [];
   for (const d of detections) {
@@ -156,7 +174,7 @@ export async function identify(text, preferredLang) {
       // source indisponible : on continue avec les autres détections
     }
   }
-  if (!candidates.length) candidates = await byName(text, preferredLang);
+  if (!candidates.length && !codesOnly) candidates = await byName(text, preferredLang);
   // Plusieurs versions possibles (même code ou même nom) : le texte de la carte aide à choisir.
   if (candidates.length > 1) await rerankByText(candidates, text);
   const seen = new Set();

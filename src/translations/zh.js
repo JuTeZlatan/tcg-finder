@@ -373,7 +373,6 @@ export default {
   "Présente les cartes une par une dans le cadre : elles sont lues et ajoutées toutes seules.": "将卡牌逐张放入框内：会自动识别并加入。",
   "Pause": "暂停",
   "Reprendre": "继续",
-  "Lecture automatique en cours…": "正在自动识别…",
   "Lecture en pause": "识别已暂停",
   "Tout": "全部",
   "Moy. 30 j": "30天均价",
@@ -386,4 +385,7 @@ export default {
   "Salut {name}": "你好，{name}",
   "Salut !": "你好！",
   "Jeux": "游戏",
+  "Carte ajoutée ✓ — présente la suivante": "已添加卡牌 ✓ — 请放下一张",
+  "Carte détectée, lecture du code…": "已检测到卡牌，正在读取编号…",
+  "En attente d’une carte dans le cadre…": "等待取景框中的卡牌…",
 };

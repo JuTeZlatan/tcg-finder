@@ -373,7 +373,6 @@ export default {
   "Présente les cartes une par une dans le cadre : elles sont lues et ajoutées toutes seules.": "Halte die Karten nacheinander in den Rahmen: Sie werden automatisch gelesen und hinzugefügt.",
   "Pause": "Pause",
   "Reprendre": "Fortsetzen",
-  "Lecture automatique en cours…": "Automatisches Lesen…",
   "Lecture en pause": "Lesen pausiert",
   "Tout": "Alles",
   "Moy. 30 j": "Ø 30 T.",
@@ -386,4 +385,7 @@ export default {
   "Salut {name}": "Hallo {name}",
   "Salut !": "Hallo!",
   "Jeux": "Spiele",
+  "Carte ajoutée ✓ — présente la suivante": "Karte hinzugefügt ✓ — zeig die nächste",
+  "Carte détectée, lecture du code…": "Karte erkannt, Code wird gelesen…",
+  "En attente d’une carte dans le cadre…": "Warte auf eine Karte im Rahmen…",
 };

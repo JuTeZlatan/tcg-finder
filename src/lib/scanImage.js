@@ -69,3 +69,19 @@ export async function readCard(photo, view, frame) {
   if (!detectCodes(texts.join('\n')).length) texts.push((await recognizeText(photo.uri))?.text || '');
   return texts.filter(Boolean).join('\n');
 }
+
+// Rafale : lecture rapide, sans la photo entière (le décor autour du cadre donnerait de faux résultats).
+// Bande du bas (le code) puis carte entière, en plus petit : son texte départage les versions et dit s'il y a bien
+// une carte dans le cadre (une carte porte toujours du texte : nom, effet…).
+// → { text, hasCode, card } ; card : une carte semble être dans le cadre.
+export async function readCardQuick(photo, view, frame) {
+  const rect = frameOnPhoto(photo, view, frame);
+  if (!rect) return { text: '', hasCode: false, card: false };
+  const bottom = { ...rect, originY: Math.round(rect.originY + rect.height * (1 - BOTTOM)), height: Math.round(rect.height * BOTTOM) };
+  const code = await readAndDiscard(await cropTo(photo.uri, bottom, 1400));
+  const whole = await readAndDiscard(await cropTo(photo.uri, rect, 900));
+  const text = [code, whole].filter(Boolean).join('\n');
+  const hasCode = detectCodes(text).length > 0;
+  const letters = whole.replace(/[^A-Za-zÀ-ÿ0-9]/g, '').length;
+  return { text, hasCode, card: hasCode || letters >= 30 };
+}

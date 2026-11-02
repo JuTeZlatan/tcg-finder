@@ -10,6 +10,14 @@
 // L'OCR confond souvent lettres et chiffres dans les numéros.
 const toDigits = (s) => s.replace(/[OQD]/g, '0').replace(/[IL|]/g, '1').replace(/Z/g, '2').replace(/S/g, '5').replace(/B/g, '8');
 const D = '[0-9OQDILZSB]'; // « chiffre » tolérant
+// … et l'inverse dans les codes d'extension (« 0P09 » pour OP09, « 8T1 » pour BT1, « 5FD » pour SFD).
+export const toLetters = (s) => s.replace(/0/g, 'O').replace(/8/g, 'B').replace(/5/g, 'S').replace(/7/g, 'T').replace(/6/g, 'G').replace(/1/g, 'I');
+const LOOKALIKE = { O: '[O0Q]', B: '[B8]', S: '[S5]', T: '[T7]', G: '[G6]', I: '[I1L]', D: '[D0]' };
+// Motif tolérant pour un code de lettres : « OP » → « [O0Q]P ».
+const fuzzy = (word) => [...word].map((ch) => LOOKALIKE[ch] || ch).join('');
+const fuzzyAlt = (words) => words.map(fuzzy).join('|');
+// Retrouve le code exact d'une liste à partir de ce que l'OCR a lu.
+const canonical = (read, words) => words.find((w) => new RegExp(`^(${fuzzy(w)})$`).test(read)) || toLetters(read);
 
 export function normalizeOcr(text) {
   return String(text || '')
@@ -20,7 +28,10 @@ export function normalizeOcr(text) {
 }
 
 const POKEMON_PREFIXES = new Set(['TG', 'GG', 'SV', 'RC', 'SH', 'H', 'SWSH', 'SM', 'XY', 'BW', 'DP']);
-const RIFT_SETS ='OGN|OGS|SFD|UNL|VEN|RAD|ARC|JDG|OPP|PR';
+const RIFT_SETS = ['OGN', 'OGS', 'SFD', 'UNL', 'VEN', 'RAD', 'ARC', 'JDG', 'OPP', 'PR'];
+const OP_SETS = ['OP', 'ST', 'EB', 'PRB'];
+const FW_SETS = ['FB', 'FS', 'SB', 'FP'];
+const DBS_SETS = ['BT', 'TB', 'SD', 'EX', 'DB', 'XD', 'BE'];
 const YGO_LANGS = { EN: 'en', E: 'en', FR: 'fr', F: 'fr' };
 const MAGIC_LANGS = new Set(['EN', 'FR', 'DE', 'IT', 'ES', 'PT', 'JA', 'KO', 'RU', 'ZHS', 'ZHT', 'PH']);
 
@@ -30,24 +41,25 @@ export function detectCodes(rawText) {
   const add = (d) => { if (!found.some((f) => f.game === d.game && f.code === d.code)) found.push(d); };
 
   // One Piece
-  for (const m of t.matchAll(new RegExp(`\\b(OP|ST|EB|PRB)\\s?(${D}{2})\\s?-\\s?(${D}{3})\\b`, 'g'))) {
-    add({ game: 'onepiece', code: `${m[1]}${toDigits(m[2])}-${toDigits(m[3])}` });
+  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(OP_SETS)})\\s?(${D}{2})\\s?-\\s?(${D}{3})\\b`, 'g'))) {
+    add({ game: 'onepiece', code: `${canonical(m[1], OP_SETS)}${toDigits(m[2])}-${toDigits(m[3])}` });
   }
   for (const m of t.matchAll(new RegExp(`\\bP\\s?-\\s?(${D}{3})\\b`, 'g'))) add({ game: 'onepiece', code: `P-${toDigits(m[1])}` });
 
   // Dragon Ball Super Fusion World : FB01-001, FS01-01, SB01-001, FP01-001
-  for (const m of t.matchAll(new RegExp(`\\b(FB|FS|SB|FP)\\s?(${D}{2})\\s?-\\s?(${D}{2,3})\\b`, 'g'))) {
-    add({ game: 'dbsfw', code: `${m[1]}${toDigits(m[2])}-${toDigits(m[3])}` });
+  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(FW_SETS)})\\s?(${D}{2})\\s?-\\s?(${D}{2,3})\\b`, 'g'))) {
+    add({ game: 'dbsfw', code: `${canonical(m[1], FW_SETS)}${toDigits(m[2])}-${toDigits(m[3])}` });
   }
   // Dragon Ball Super Masters : BT1-001, TB1-001, SD1-01, EX01-01, DB1-001, XD1-01
-  for (const m of t.matchAll(new RegExp(`\\b(BT|TB|SD|EX|DB|XD|BE)\\s?(${D}{1,2})\\s?-\\s?(${D}{2,3})\\b`, 'g'))) {
-    add({ game: 'dbsmasters', code: `${m[1]}${toDigits(m[2])}-${toDigits(m[3])}` });
+  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(DBS_SETS)})\\s?(${D}{1,2})\\s?-\\s?(${D}{2,3})\\b`, 'g'))) {
+    add({ game: 'dbsmasters', code: `${canonical(m[1], DBS_SETS)}${toDigits(m[2])}-${toDigits(m[3])}` });
   }
 
   // Riftbound
-  for (const m of t.matchAll(new RegExp(`\\b(${RIFT_SETS})\\s?-\\s?(${D}{3}[A-Z]?)\\s?\\/\\s?(${D}{3})\\b`, 'g'))) {
+  for (const m of t.matchAll(new RegExp(`\\b(${fuzzyAlt(RIFT_SETS)})\\s?-\\s?(${D}{3}[A-Z]?)\\s?\\/\\s?(${D}{3})\\b`, 'g'))) {
     const num = toDigits(m[2].slice(0, 3)) + m[2].slice(3).toLowerCase();
-    add({ game: 'riftbound', set: m[1], code: `${m[1]}-${num}`, total: toDigits(m[3]) });
+    const set = canonical(m[1], RIFT_SETS);
+    add({ game: 'riftbound', set, code: `${set}-${num}`, total: toDigits(m[3]) });
   }
 
   // Lorcana : numéro/total • langue • extension

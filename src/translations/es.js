@@ -373,7 +373,6 @@ export default {
   "Présente les cartes une par une dans le cadre : elles sont lues et ajoutées toutes seules.": "Muestra las cartas una a una en el marco: se leen y se añaden solas.",
   "Pause": "Pausa",
   "Reprendre": "Reanudar",
-  "Lecture automatique en cours…": "Lectura automática en curso…",
   "Lecture en pause": "Lectura en pausa",
   "Tout": "Todo",
   "Moy. 30 j": "Media 30 d",
@@ -386,4 +385,7 @@ export default {
   "Salut {name}": "Hola {name}",
   "Salut !": "¡Hola!",
   "Jeux": "Juegos",
+  "Carte ajoutée ✓ — présente la suivante": "Carta añadida ✓ — muestra la siguiente",
+  "Carte détectée, lecture du code…": "Carta detectada, leyendo el código…",
+  "En attente d’une carte dans le cadre…": "Esperando una carta en el marco…",
 };

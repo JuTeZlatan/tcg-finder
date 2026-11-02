@@ -373,7 +373,6 @@ export default {
   "Présente les cartes une par une dans le cadre : elles sont lues et ajoutées toutes seules.": "Show the cards one by one in the frame: they are read and added automatically.",
   "Pause": "Pause",
   "Reprendre": "Resume",
-  "Lecture automatique en cours…": "Automatic reading…",
   "Lecture en pause": "Reading paused",
   "Tout": "All",
   "Moy. 30 j": "30-d avg",
@@ -386,4 +385,7 @@ export default {
   "Salut {name}": "Hi {name}",
   "Salut !": "Hi!",
   "Jeux": "Games",
+  "Carte ajoutée ✓ — présente la suivante": "Card added ✓ — show the next one",
+  "Carte détectée, lecture du code…": "Card detected, reading the code…",
+  "En attente d’une carte dans le cadre…": "Waiting for a card in the frame…",
 };
