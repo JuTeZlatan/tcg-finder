@@ -5,7 +5,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { getTcg } from '../../api';
-import { identify } from '../../lib/scan';
+import { agreed, identify, SURE, TWO_CHOICES } from '../../lib/scan';
 import { discard, readCard, readCardQuick } from '../../lib/scanImage';
 import { nameCandidates } from '../../lib/scanDetect';
 import { useCardLang, LANG_NAMES } from '../../lib/cardLang';
@@ -18,11 +18,16 @@ import { useSettings } from '../../lib/settings';
 import { finishLabel, storedFinish } from '../../lib/finishes';
 import { plural, t } from '../../lib/i18n';
 
+// Fiabilité (voir lib/scan.js) : ≥ 95 % → carte validée ; 90-95 % → deux choix proposés ; en dessous → on continue
+// à lire (chaque image qui relit le même code renforce la fiabilité).
 // Rafale automatique : lecture en continu, mais une carte n'est ajoutée que si son code imprimé est lu dans le cadre
-// (jamais sur un simple décor). Code net (score ≥ 0,9) : ajout immédiat ; sinon confirmé par l'image suivante.
-// La carte n'est pas ajoutée deux fois tant qu'elle reste dans le cadre : il faut la retirer (cadre vide deux fois)
-// puis la représenter pour compter un 2e exemplaire.
-const SURE_SCORE = 0.9;
+// (jamais sur un simple décor). La carte n'est pas ajoutée deux fois tant qu'elle reste dans le cadre : il faut la
+// retirer (cadre vide deux fois) puis la représenter pour compter un 2e exemplaire.
+// Mode une carte : jusqu'à SINGLE_TRIES photos, arrêt dès que le résultat est sûr.
+const SINGLE_TRIES = 10;
+// Entre 90 et 95 % : deux choix proposés tout de suite si deux versions sont à égalité (relire n'y changera rien),
+// sinon après quelques images (la fiabilité a pu monter à 95 % entre-temps).
+const settle = (conf, tie, agree) => conf >= SURE || (conf >= TWO_CHOICES && (tie || agree >= 3));
 const AUTO_PAUSE = 250;
 const EMPTY_FRAMES = 2;
 // Même carte relue avec un caractère différent (« OP09-119 » / « OP09-118 » sur une carte du même nom).
@@ -51,21 +56,35 @@ export default function ScanScreen() {
     return { photo, text: await readCard(photo, layout.current.view, layout.current.frame) };
   };
 
-  // Mode une carte : photo au toucher du déclencheur, puis résultat détaillé.
+  // Mode une carte : au toucher du déclencheur, photos successives jusqu'à un résultat sûr, puis résultat détaillé.
   const scan = async () => {
     if (!ready || !camera.current) return;
     setState({ step: 'analyzing' });
     try {
-      const { photo, text } = await photoText(0.9);
-      const result = await identify(text, cardLang);
-      setState({ step: 'result', photo: photo.uri, text, ...result, selected: 0 });
+      let best = null;
+      let last = { code: null, agree: 0 };
+      for (let i = 0; i < SINGLE_TRIES; i++) {
+        const { photo, text } = await photoText(0.9);
+        const result = await identify(text, cardLang);
+        const code = result.detections.map((d) => d.code).join(' ') || result.candidates[0]?.id || null;
+        last = { code, agree: code && code === last.code ? last.agree + 1 : 1 };
+        const confidence = result.candidates.length ? agreed(result, last.agree) : 0;
+        if (!best || confidence >= best.confidence) {
+          if (best?.photo) discard(best.photo);
+          best = { photo: photo.uri, text, ...result, confidence };
+        } else discard(photo.uri);
+        if (settle(confidence, result.tie, last.agree)) break;
+        if (i >= 2 && !best.candidates.length) break; // rien de reconnaissable après 3 photos : inutile d'insister
+      }
+      setState({ step: 'result', ...best, selected: 0 });
     } catch (e) {
       setState({ step: 'result', error: e?.message || String(e), candidates: [], detections: [] });
     }
   };
 
   // Rafale : boucle de lecture tant que l'écran est affiché.
-  // present : carte déjà ajoutée et toujours dans le cadre ({ code, name }) ; pending : code vu une fois, à confirmer.
+  // present : carte déjà ajoutée et toujours dans le cadre ({ code, name }) ;
+  // pending : code en cours de lecture, pas encore assez sûr ({ code, agree : images d'accord }).
   const memory = useRef({ pending: null, present: null, empty: 0 });
   const [look, setLook] = useState('none'); // none | card | added : retour visuel sur le cadre
   const running = mode === 'batch' && auto && focused && ready && state.step === 'camera';
@@ -88,7 +107,8 @@ export default function ScanScreen() {
             if (m.empty >= EMPTY_FRAMES) setLook('none'); // une seule image vide ne change pas le cadre (pas de clignotement)
           } else {
             m.empty = 0;
-            const { detections, candidates = [] } = hasCode ? await identify(text, cardLang, { codesOnly: true }) : {};
+            const result = hasCode ? await identify(text, cardLang, { codesOnly: true }) : {};
+            const { detections, candidates = [] } = result;
             const best = candidates[0];
             const code = detections?.map((d) => d.code).join(' ');
             if (stop) break;
@@ -96,16 +116,22 @@ export default function ScanScreen() {
               setLook(m.present ? 'added' : 'card'); // carte vue, code pas encore lisible
             } else if (m.present && sameCard(m.present, code, best.name)) {
               setLook('added'); // même carte toujours dans le cadre (ou son code relu un peu différemment)
-            } else if (best.score >= SURE_SCORE || m.pending === code) {
-              m.present = { code, name: best.name };
-              m.pending = null;
-              const row = { key: `${Date.now()}`, candidates, selected: 0, finish: null, finishName: null, price: null };
-              setBatch((b) => [...b, row]);
-              setLastAdded({ ...best, rowKey: row.key, at: Date.now() });
-              setLook('added');
             } else {
-              m.pending = code;
-              setLook('card');
+              const agree = m.pending?.code === code ? m.pending.agree + 1 : 1;
+              const confidence = agreed(result, agree);
+              if (settle(confidence, result.tie, agree)) {
+                m.present = { code, name: best.name };
+                m.pending = null;
+                // 90-95 % : les deux possibilités restent à choisir dans la liste
+                const twoChoices = confidence < SURE && candidates.length > 1;
+                const row = { key: `${Date.now()}`, candidates: twoChoices ? candidates.slice(0, 2) : candidates, selected: 0, finish: null, finishName: null, price: null, confidence, twoChoices };
+                setBatch((b) => [...b, row]);
+                setLastAdded({ ...best, rowKey: row.key, at: Date.now(), confidence, twoChoices });
+                setLook('added');
+              } else {
+                m.pending = { code, agree };
+                setLook('card'); // pas encore assez sûr : on continue à lire
+              }
             }
           }
         } catch {
@@ -240,6 +266,7 @@ function LastScanned({ card, count, onPress }) {
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
         <Text style={styles.stripPrice}>{info.loading ? '…' : info.data ? formatPrice(info.data.value, 'EUR') : '—'}</Text>
         <Text style={styles.stripLang}>{card.lang.toUpperCase()}</Text>
+        {card.twoChoices ? <Text style={styles.stripCheck}>{t('À vérifier')}</Text> : null}
       </View>
       <Text style={styles.stripCount}>{count}</Text>
     </Pressable>
@@ -257,7 +284,10 @@ function NewScanButton({ onPress }) {
 }
 
 function Result({ state, setState, onRetry }) {
-  const { candidates = [], selected = 0 } = state;
+  const { candidates: all = [], selected = 0 } = state;
+  // 90-95 % : seulement les deux possibilités les plus probables.
+  const twoChoices = state.confidence != null && state.confidence < SURE && state.confidence >= TWO_CHOICES && all.length > 1;
+  const candidates = twoChoices ? all.slice(0, 2) : all;
   const best = candidates[selected];
   if (!best) {
     return (
@@ -299,10 +329,13 @@ function Result({ state, setState, onRetry }) {
   return (
     <ScrollView contentContainerStyle={styles.resultPage}>
       <NewScanButton onPress={onRetry} />
+      {state.confidence != null && state.confidence < TWO_CHOICES ? (
+        <Text style={styles.nameOnly}>{t('⚠ Carte pas reconnue avec certitude : vérifie-la, ou rescanne-la plus près, bien éclairée et sans reflet.')}</Text>
+      ) : null}
       <ScannedCard key={`${best.tcgId}|${best.id}|${best.lang}`} c={best} />
       {candidates.length > 1 ? (
         <>
-          <Text style={styles.section}>{t('Pas la bonne version ? ({n} possibilités)', { n: candidates.length })}</Text>
+          <Text style={styles.section}>{twoChoices ? t('Deux cartes possibles : touche la bonne') : t('Pas la bonne version ? ({n} possibilités)', { n: candidates.length })}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {candidates.map((c, i) => (
               <Pressable key={`${c.tcgId}|${c.id}|${c.lang}`} onPress={() => setState({ ...state, selected: i })} style={[styles.alt, i === selected && styles.altActive]}>
@@ -465,6 +498,7 @@ function BatchRow({ row, onChange, onRemove }) {
         <Pressable onPress={chooseVersion} hitSlop={6}>
           <Text style={styles.batchLink}>{row.finishName || (card ? finishLabel(card.prices, storedFinish(card.prices, null)) || t('Version') : t('Version'))} ▾</Text>
         </Pressable>
+        {row.twoChoices ? <Text style={[styles.altMeta, { color: colors.accent }]}>{t('À vérifier : deux cartes possibles')}</Text> : null}
         {row.candidates.length > 1 ? (
           <View style={styles.badgeRow}>
             <Pressable onPress={() => other(-1)} hitSlop={6}><Ionicons name="chevron-back" size={18} color={colors.accent} /></Pressable>
@@ -533,6 +567,7 @@ const styles = StyleSheet.create({
   batchRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: colors.surface, borderRadius: radius, padding: 10 },
   batchImg: { width: 56, aspectRatio: 63 / 88, borderRadius: 6, backgroundColor: colors.surfaceAlt },
   batchName: { color: colors.text, fontWeight: '700' },
+  stripCheck: { color: colors.accent, fontWeight: '800', fontSize: 11 },
   batchLink: { color: colors.accent, fontWeight: '700', fontSize: 13 },
   batchPrice: { color: colors.accent, fontWeight: '800' },
   strip: { flexDirection: 'row', alignItems: 'center', gap: 10, marginHorizontal: 16, padding: 8, borderRadius: radius, backgroundColor: 'rgba(15,17,21,0.92)', borderWidth: 1, borderColor: colors.success },

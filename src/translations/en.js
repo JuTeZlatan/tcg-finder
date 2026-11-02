@@ -389,4 +389,8 @@ export default {
   "Carte détectée, lecture du code…": "Card detected, reading the code…",
   "En attente d’une carte dans le cadre…": "Waiting for a card in the frame…",
   "Pas encore de données dans la langue de cette carte : nom et image de la version anglaise.": "No data yet in this card's language: name and image from the English version.",
+  "Deux cartes possibles : touche la bonne": "Two possible cards: tap the right one",
+  "⚠ Carte pas reconnue avec certitude : vérifie-la, ou rescanne-la plus près, bien éclairée et sans reflet.": "⚠ Card not recognised with certainty: check it, or scan it again closer, well lit and without glare.",
+  "À vérifier": "To check",
+  "À vérifier : deux cartes possibles": "To check: two possible cards",
 };

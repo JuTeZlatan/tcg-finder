@@ -191,15 +191,45 @@ export async function identify(text, preferredLang, { codesOnly = false } = {}) 
     }
   }
   const seen = new Set();
-  return {
-    printed,
-    detections,
-    candidates: candidates
-      .sort((a, b) => b.score - a.score)
-      .filter((c) => {
-        const k = `${c.tcgId}|${c.lang}|${c.id}`;
-        return !seen.has(k) && seen.add(k);
-      })
-      .slice(0, 12),
-  };
+  const list = candidates
+    .sort((a, b) => b.score - a.score)
+    .filter((c) => {
+      const k = `${c.tcgId}|${c.lang}|${c.id}`;
+      return !seen.has(k) && seen.add(k);
+    })
+    .slice(0, 12);
+  return { printed, detections, candidates: list, ...rate(list, text) };
 }
+
+// Fiabilité du résultat (0 → 1) :
+// - code imprimé retrouvé : 0,88 (0,92 quand il désigne une seule carte : extension + numéro + langue) ; nom seul : 0,55 ;
+// - + 0,07 si le nom de la carte est aussi lu sur la photo ;
+// - − jusqu'à 0,1 si une autre carte (autre nom) est presque aussi probable ;
+// - deux versions de la même carte à égalité (illustration alternative…) : « tie », plafonné à 0,94 → deux choix.
+const UNIQUE_CODE = new Set(['lorcana', 'magic', 'yugioh']);
+const nameRead = (name, text) => {
+  const latin = nameScore(name, text);
+  if (latin || /[A-Za-z]/.test(name)) return latin;
+  return String(text).replace(/\s/g, '').includes(String(name).replace(/\s/g, '')) ? 1 : 0; // japonais, chinois
+};
+function rate(list, text) {
+  const [a, b] = list;
+  if (!a) return { confidence: 0, tie: false };
+  const byCode = !a.why.startsWith('nom');
+  let confidence = (byCode ? (UNIQUE_CODE.has(a.tcgId) ? 0.92 : 0.88) : 0.55) + 0.07 * nameRead(a.name, text);
+  let tie = false;
+  if (b) {
+    const gap = a.score - b.score;
+    if (b.name.toLowerCase() !== a.name.toLowerCase()) {
+      if (gap < 0.1) confidence -= 0.1 * (1 - gap / 0.1);
+    } else if (gap < 0.03) tie = true;
+  }
+  confidence = Math.min(confidence, tie ? 0.94 : 0.995);
+  return { confidence, tie };
+}
+
+// Plusieurs images qui lisent le même code renforcent la fiabilité (+0,02 par image en accord), sans dépasser
+// le plafond (une égalité entre deux versions ne se résout pas en relisant).
+export const agreed = (r, agree) => Math.min(r.tie ? 0.94 : 0.995, r.confidence + 0.02 * Math.max(0, agree - 1));
+export const SURE = 0.95; // au-dessus : carte validée seule
+export const TWO_CHOICES = 0.9; // entre 0,90 et 0,95 : deux choix proposés ; en dessous : on continue à chercher

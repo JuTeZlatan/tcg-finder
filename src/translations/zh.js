@@ -389,4 +389,8 @@ export default {
   "Carte détectée, lecture du code…": "已检测到卡牌，正在读取编号…",
   "En attente d’une carte dans le cadre…": "等待取景框中的卡牌…",
   "Pas encore de données dans la langue de cette carte : nom et image de la version anglaise.": "暂无该卡牌语言的数据：显示英文版的名称和图片。",
+  "Deux cartes possibles : touche la bonne": "可能是两张卡牌：请点选正确的一张",
+  "⚠ Carte pas reconnue avec certitude : vérifie-la, ou rescanne-la plus près, bien éclairée et sans reflet.": "⚠ 无法确定识别结果：请核对，或靠近、在光线充足且无反光的环境下重新扫描。",
+  "À vérifier": "待确认",
+  "À vérifier : deux cartes possibles": "待确认：可能是两张卡牌",
 };

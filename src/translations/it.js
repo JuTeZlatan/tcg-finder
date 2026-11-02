@@ -389,4 +389,8 @@ export default {
   "Carte détectée, lecture du code…": "Carta rilevata, lettura del codice…",
   "En attente d’une carte dans le cadre…": "In attesa di una carta nel riquadro…",
   "Pas encore de données dans la langue de cette carte : nom et image de la version anglaise.": "Nessun dato ancora nella lingua di questa carta: nome e immagine della versione inglese.",
+  "Deux cartes possibles : touche la bonne": "Due carte possibili: tocca quella giusta",
+  "⚠ Carte pas reconnue avec certitude : vérifie-la, ou rescanne-la plus près, bien éclairée et sans reflet.": "⚠ Carta non riconosciuta con certezza: controllala o riscansionala più vicino, ben illuminata e senza riflessi.",
+  "À vérifier": "Da verificare",
+  "À vérifier : deux cartes possibles": "Da verificare: due carte possibili",
 };
