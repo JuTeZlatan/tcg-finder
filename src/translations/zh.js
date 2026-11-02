@@ -383,4 +383,7 @@ export default {
   "Évolution sur le dernier mois (moyennes de vente Cardmarket) :": "最近一个月的走势（Cardmarket 成交均价）：",
   "Courbe jour par jour enregistrée depuis le {date}.": "自 {date} 起每日记录。",
   "Prix du {date}": "{date} 的价格",
+  "Salut {name}": "你好，{name}",
+  "Salut !": "你好！",
+  "Jeux": "游戏",
 };

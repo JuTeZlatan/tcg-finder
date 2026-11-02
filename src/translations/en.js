@@ -383,4 +383,7 @@ export default {
   "Évolution sur le dernier mois (moyennes de vente Cardmarket) :": "Change over the last month (Cardmarket sales averages):",
   "Courbe jour par jour enregistrée depuis le {date}.": "Day-by-day chart recorded since {date}.",
   "Prix du {date}": "Prices from {date}",
+  "Salut {name}": "Hi {name}",
+  "Salut !": "Hi!",
+  "Jeux": "Games",
 };

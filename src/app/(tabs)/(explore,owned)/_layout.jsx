@@ -22,7 +22,8 @@ export default function TabStack() {
         contentStyle: { backgroundColor: colors.bg },
       }}
     >
-      <Stack.Screen name="index" options={{ title: t('TCG Finder') }} />
+      {/* Accueil Explorer : en-tête intégré à l'écran (salutation, avatar) */}
+      <Stack.Screen name="index" options={{ title: t('TCG Finder'), headerShown: false }} />
       <Stack.Screen name="collection" options={{ title: t('Ma collection') }} />
     </Stack>
   );

@@ -383,4 +383,7 @@ export default {
   "Évolution sur le dernier mois (moyennes de vente Cardmarket) :": "Evolução no último mês (médias de venda da Cardmarket):",
   "Courbe jour par jour enregistrée depuis le {date}.": "Gráfico diário registado desde {date}.",
   "Prix du {date}": "Preços de {date}",
+  "Salut {name}": "Olá {name}",
+  "Salut !": "Olá!",
+  "Jeux": "Jogos",
 };
