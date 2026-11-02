@@ -388,4 +388,5 @@ export default {
   "Carte ajoutée ✓ — présente la suivante": "已添加卡牌 ✓ — 请放下一张",
   "Carte détectée, lecture du code…": "已检测到卡牌，正在读取编号…",
   "En attente d’une carte dans le cadre…": "等待取景框中的卡牌…",
+  "Pas encore de données dans la langue de cette carte : nom et image de la version anglaise.": "暂无该卡牌语言的数据：显示英文版的名称和图片。",
 };

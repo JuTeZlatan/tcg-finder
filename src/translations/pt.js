@@ -388,4 +388,5 @@ export default {
   "Carte ajoutée ✓ — présente la suivante": "Carta adicionada ✓ — mostra a seguinte",
   "Carte détectée, lecture du code…": "Carta detetada, a ler o código…",
   "En attente d’une carte dans le cadre…": "À espera de uma carta no quadro…",
+  "Pas encore de données dans la langue de cette carte : nom et image de la version anglaise.": "Ainda sem dados no idioma desta carta: nome e imagem da versão inglesa.",
 };

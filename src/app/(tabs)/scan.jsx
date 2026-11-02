@@ -227,7 +227,7 @@ function LastScanned({ card, count, onPress }) {
   const tcg = getTcg(card.tcgId);
   const { priceSource } = useSettings().settings;
   const info = useAsync(async () => {
-    const [full, fx] = await Promise.all([tcg.getCard(card.id, card.setId, card.lang), getUsdToEur()]);
+    const [full, fx] = await Promise.all([tcg.getCard(card.id, card.setId, card.dataLang ?? card.lang), getUsdToEur()]);
     return averagePrice(full.prices, fx, { source: priceSource });
   }, [card.tcgId, card.id, card.setId, card.lang, priceSource]);
   return (
@@ -327,7 +327,7 @@ function ScannedCard({ c }) {
   const tcg = getTcg(c.tcgId);
   const { items, add } = useCollection();
   const info = useAsync(async () => {
-    const [card, fx] = await Promise.all([tcg.getCard(c.id, c.setId, c.lang), getUsdToEur()]);
+    const [card, fx] = await Promise.all([tcg.getCard(c.id, c.setId, c.dataLang ?? c.lang), getUsdToEur()]);
     return { card, fx };
   }, [c.tcgId, c.id, c.setId, c.lang]);
   // Version de l'exemplaire scanné (foil, reverse…) : demandée à l'ajout, le prix en dépend.
@@ -350,6 +350,11 @@ function ScannedCard({ c }) {
       {c.why.startsWith('nom') ? (
         <Text style={styles.nameOnly}>
           {t('⚠ Code de la carte illisible : reconnue par son nom. Vérifie la version (édition, version alternative) dans les choix plus bas, le prix peut beaucoup varier.')}
+        </Text>
+      ) : null}
+      {c.dataLang && c.dataLang !== c.lang ? (
+        <Text style={styles.mutedCenter}>
+          {t('Pas encore de données dans la langue de cette carte : nom et image de la version anglaise.')}
         </Text>
       ) : null}
       {image ? <Image source={image} style={styles.cardImg} contentFit="contain" transition={150} /> : null}
@@ -377,7 +382,7 @@ function ScannedCard({ c }) {
       </Pressable>
       <Pressable
         style={styles.secondary}
-        onPress={() => router.push({ pathname: '/(tabs)/(explore)/[tcg]/card/[cardId]', params: { tcg: c.tcgId, cardId: c.id, setId: c.setId ?? '' } })}
+        onPress={() => router.push({ pathname: '/(tabs)/(explore)/[tcg]/card/[cardId]', params: { tcg: c.tcgId, cardId: c.id, setId: c.setId ?? '', lang: c.lang } })}
       >
         <Text style={styles.secondaryText}>{t('Voir la fiche complète')}</Text>
       </Pressable>
@@ -435,7 +440,7 @@ function BatchRow({ row, onChange, onRemove }) {
   const c = row.candidates[row.selected];
   const tcg = getTcg(c.tcgId);
   const info = useAsync(async () => {
-    const [card, fx] = await Promise.all([tcg.getCard(c.id, c.setId, c.lang), getUsdToEur()]);
+    const [card, fx] = await Promise.all([tcg.getCard(c.id, c.setId, c.dataLang ?? c.lang), getUsdToEur()]);
     return { card, fx };
   }, [c.tcgId, c.id, c.setId, c.lang]);
   const { priceSource } = useSettings().settings;

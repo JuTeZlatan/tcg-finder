@@ -173,3 +173,30 @@ export function nameScore(cardName, ocrText) {
   const text = ` ${fold(ocrText)} `;
   return words.filter((w) => text.includes(` ${w} `) || text.includes(w)).length / words.length;
 }
+
+// Langue imprimée sur la carte, devinée par ses petits mots (« vous », « the », « der »…) ou son écriture
+// (kana → japonais, idéogrammes seuls → chinois). null si le texte ne permet pas de trancher.
+const LANG_WORDS = {
+  fr: 'le la les des du une est vous votre vos pour avec quand dans sur chaque adversaire peut cette ses leur qui pioche main tour jouez lorsque cartes',
+  en: 'the you your when this that with each opponent may from into its and of to draw hand turn play card cards whenever',
+  de: 'der die das und ein eine einen deine du wenn mit auf jede kann karte karten gegner deinen ziehe hand zug spiele',
+  it: 'il lo gli della delle tuo tua tuoi quando con ogni avversario puoi questa questo pesca mano turno gioca carte',
+  es: 'el los las del tu tus cuando con cada oponente puedes esta este roba mano turno juega cartas',
+  pt: 'o os do da dos das teu tua quando com cada oponente podes esta este compra mao turno joga cartas voce',
+};
+const LANG_SETS = Object.fromEntries(Object.entries(LANG_WORDS).map(([l, w]) => [l, new Set(w.split(' '))]));
+
+export function detectLanguage(text) {
+  const raw = String(text || '');
+  const kana = (raw.match(/[\u3040-\u30ff]/g) || []).length;
+  const han = (raw.match(/[\u4e00-\u9fff]/g) || []).length;
+  if (kana >= 3) return 'ja';
+  if (han >= 4) return 'zh';
+  const words = fold(raw).split(' ');
+  const scores = Object.entries(LANG_SETS)
+    .map(([l, set]) => [l, words.filter((w) => set.has(w)).length])
+    .sort((a, b) => b[1] - a[1]);
+  const [[lang, best], [, second]] = scores;
+  // Assez de mots reconnus, et nettement plus que la langue suivante (beaucoup de mots se ressemblent).
+  return best >= 3 && best >= second * 1.5 ? lang : null;
+}
