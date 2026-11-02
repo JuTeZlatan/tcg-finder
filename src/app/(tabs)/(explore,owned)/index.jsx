@@ -2,12 +2,12 @@
 // langue des cartes, puis les jeux en grandes cartes à dégradé aux couleurs de chacun. Un jeu sans cartes dans la
 // langue choisie est grisé avec un cadenas (sauf les jeux affichés en anglais en attendant une version officielle).
 import { router, useScrollToTop } from 'expo-router';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { TCGS } from '../../../api';
+import { TCGS, dataLang } from '../../../api';
 import { useCollection, summarize, groupBy } from '../../../lib/collection';
 import { CARD_LANGS, LANG_NAMES, useCardLang } from '../../../lib/cardLang';
 import { formatPrice } from '../../../lib/prices';
@@ -38,6 +38,10 @@ export default function Home() {
   const [query, setQuery] = useState('');
   const search = () => query.trim() && router.push({ pathname: '/search', params: { q: query.trim() } });
   const available = (g) => g.languages.includes(cardLang) || !!g.englishFallback;
+  // Préchargement des listes d'extensions de chaque jeu : l'ouverture d'un jeu devient instantanée.
+  useEffect(() => {
+    for (const g of TCGS) g.getSets(dataLang(g, cardLang)).catch(() => {});
+  }, [cardLang]);
 
   return (
     <View style={styles.screen}>

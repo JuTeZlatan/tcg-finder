@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Image } from 'expo-image';
+import CardImage from './CardImage';
 import { useAsync } from '../lib/useAsync';
 import { colors, radius } from '../lib/theme';
 import { Loading, ErrorView } from './Status';
@@ -38,7 +38,9 @@ export default function CardGrid({ tcg, lang, load, deps, setId, headerExtra }) 
       columnWrapperStyle={{ gap: GAP }}
       keyboardShouldPersistTaps="handled"
       initialNumToRender={18}
-      windowSize={7}
+      maxToRenderPerBatch={12}
+      windowSize={9}
+      removeClippedSubviews
       ListHeaderComponent={
         <View style={styles.header}>
           {headerExtra}
@@ -59,7 +61,7 @@ export default function CardGrid({ tcg, lang, load, deps, setId, headerExtra }) 
         <Pressable style={({ pressed }) => [{ width: tileWidth }, pressed && { opacity: 0.7 }]} onPress={() => open(c)}>
           <View style={styles.imgBox}>
             {c.image ? (
-              <Image source={c.image} style={styles.img} contentFit="cover" recyclingKey={c.id} transition={100} />
+              <CardImage source={c.image} style={styles.img} contentFit="cover" recyclingKey={`${c.id}-${c.finish || ''}`} transition={100} />
             ) : (
               <Text style={styles.noImg}>{t('Pas d’image')}</Text>
             )}
