@@ -30,6 +30,8 @@ export default function TabsLayout() {
   return (
     <>
     <Tabs
+      // Retour Android : onglet précédent (et non le premier de la barre, « Menu », qui n'a pas d'écran).
+      backBehavior="history"
       screenOptions={{
         headerStyle: { backgroundColor: colors.bg },
         headerTintColor: colors.text,

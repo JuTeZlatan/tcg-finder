@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { router, useIsFocused } from 'expo-router';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
@@ -118,6 +118,16 @@ export default function ScanScreen() {
       stop = true;
     };
   }, [running, cardLang]);
+
+  // Retour Android depuis le résultat ou la liste de la rafale : on revient à l'appareil photo.
+  useEffect(() => {
+    if (!focused || state.step === 'camera' || state.step === 'analyzing') return undefined;
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      setState({ step: 'camera' });
+      return true;
+    });
+    return () => sub.remove();
+  }, [focused, state.step]);
 
   if (!permission) return <View style={styles.page} />;
   if (!permission.granted) {
