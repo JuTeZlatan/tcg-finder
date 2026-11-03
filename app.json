@@ -60,6 +60,14 @@
         {
           "color": "#F5B82E"
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
       ]
     ],
     "scheme": "tcgfinder",

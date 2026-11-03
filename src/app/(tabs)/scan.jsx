@@ -18,6 +18,7 @@ import { useFinishChoice } from '../../components/collection';
 import { useSettings } from '../../lib/settings';
 import { finishLabel, storedFinish } from '../../lib/finishes';
 import { plural, t } from '../../lib/i18n';
+import { scanFeedback } from '../../lib/scanFeedback';
 
 // Fiabilité (voir lib/scan.js) : ≥ 95 % → carte validée ; 90-95 % → deux choix proposés ; en dessous → on continue
 // à lire (chaque image qui relit le même code renforce la fiabilité).
@@ -50,8 +51,25 @@ const misread = (a, b) => a.length === b.length && [...a].filter((ch, i) => ch !
 const sameCard = (present, code, name) =>
   present.code === code || (misread(present.code, code) && present.name.toLowerCase() === String(name).toLowerCase());
 
+// Valeur (en euros) d'une carte reconnue, pour le son et la vibration du scan.
+async function cardValue(c, source) {
+  const tcg = getTcg(c.tcgId);
+  const [full, fx] = await Promise.all([tcg.getCard(c.id, c.setId, c.dataLang ?? c.lang), getUsdToEur()]);
+  return averagePrice(full.prices, fx, { source })?.value ?? null;
+}
+
 export default function ScanScreen() {
-  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
+  const { settings } = useSettings(); // réaffiche aussi les prix quand la devise (ou le taux du jour) change
+  // Son / vibration d'une carte reconnue (réglages lus au moment du scan, sans relancer la boucle de lecture).
+  const feedbackSettings = useRef(settings);
+  useEffect(() => { feedbackSettings.current = settings; }, [settings]);
+  const feedback = useCallback((card) => {
+    const { scanSound, scanVibrate, priceSource } = feedbackSettings.current;
+    if (scanSound === false && scanVibrate === false) return;
+    cardValue(card, priceSource)
+      .catch(() => null)
+      .then((value) => scanFeedback(value, { sound: scanSound !== false, vibrate: scanVibrate !== false }));
+  }, []);
   const [permission, requestPermission] = useCameraPermissions();
   const focused = useIsFocused();
   const camera = useRef(null);
@@ -139,6 +157,7 @@ export default function ScanScreen() {
       // Photo de la carte (ajout à la main dans « Autres ») : dernière image analysée.
       if (LIVE && !best.photo) best.photo = (await scanner.current?.capture?.().catch(() => null)) || undefined;
       setState({ step: 'result', ...best, selected: 0 });
+      if (best.candidates[0]) feedback(best.candidates[0]);
     } catch (e) {
       setState({ step: 'result', error: e?.message || String(e), candidates: [], detections: [] });
     }
@@ -204,6 +223,7 @@ export default function ScanScreen() {
                 const row = { key: `${Date.now()}`, candidates: twoChoices ? candidates.slice(0, 2) : candidates, selected: 0, finish: null, finishName: null, price: null, confidence, twoChoices };
                 setBatch((b) => [...b, row]);
                 setLastAdded({ ...best, rowKey: row.key, at: Date.now(), confidence, twoChoices });
+                feedback(best);
                 setLook('added');
               } else {
                 m.pending = { code, agree };
@@ -220,7 +240,7 @@ export default function ScanScreen() {
     return () => {
       stop = true;
     };
-  }, [running, cardLang]);
+  }, [running, cardLang, feedback]);
 
   // Retour Android depuis le résultat ou la liste de la rafale : on revient à l'appareil photo.
   useEffect(() => {

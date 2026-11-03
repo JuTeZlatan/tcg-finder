@@ -14,6 +14,9 @@ const DEFAULTS = {
   priceSource: 'both',
   // Devise d'affichage des prix : 'EUR', 'USD' ou 'GBP' (voir src/lib/prices.js)
   currency: 'EUR',
+  // Scan : son et vibration à chaque carte reconnue, selon sa valeur (src/lib/scanFeedback.js)
+  scanSound: true,
+  scanVibrate: true,
   // Sorties suivies (onglet « Sorties ») : clés de src/lib/releases.js
   followed: [],
   // Cartes recherchées (liste de souhaits) : clé → { tcg, lang, cardId, setId, name, image, number, target, price… }

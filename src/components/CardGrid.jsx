@@ -6,6 +6,8 @@ import { useAsync } from '../lib/useAsync';
 import { colors, radius } from '../lib/theme';
 import { Loading, ErrorView } from './Status';
 import { QuickAdd } from './collection';
+import { copyLang } from '../api';
+import { useCardLang } from '../lib/cardLang';
 import { plural, t } from '../lib/i18n';
 
 const GAP = 10;
@@ -15,6 +17,8 @@ const PADDING = 16;
 // sont des versions précises (master set) : le « + » ajoute directement cette version.
 export default function CardGrid({ tcg, lang, load, deps, setId, headerExtra }) {
   const cards = useAsync(load, deps);
+  // « + » : exemplaire dans la langue choisie, même si les données affichées sont anglaises (Riftbound en français).
+  const own = copyLang(tcg, useCardLang().cardLang);
   const [filter, setFilter] = useState('');
   const { width } = useWindowDimensions();
   const columns = width > 700 ? 5 : 3;
@@ -65,7 +69,7 @@ export default function CardGrid({ tcg, lang, load, deps, setId, headerExtra }) 
             ) : (
               <Text style={styles.noImg}>{t('Pas d’image')}</Text>
             )}
-            <QuickAdd tcgId={tcg.id} lang={lang} setId={c.setId ?? setId} card={c} version={'label' in c ? { finish: c.finish, label: c.label } : null} />
+            <QuickAdd tcgId={tcg.id} lang={own} setId={c.setId ?? setId} card={c} version={'label' in c ? { finish: c.finish, label: c.label } : null} />
           </View>
           <Text style={styles.name} numberOfLines={1}>{c.name}</Text>
           {c.label ? <Text style={styles.version} numberOfLines={2}>{c.label}</Text> : null}

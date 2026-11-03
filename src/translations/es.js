@@ -418,4 +418,12 @@ export default {
   "Valeur des cartes scannées": "Valor de las cartas escaneadas",
   "{n} carte sans prix (non comptée)": "{n} carta sin precio (no contada)",
   "{n} cartes sans prix (non comptées)": "{n} cartas sin precio (no contadas)",
+  "Scan": "Escaneo",
+  "Son à chaque carte scannée": "Sonido con cada carta escaneada",
+  "Vibration à chaque carte scannée": "Vibración con cada carta escaneada",
+  "Activé": "Activado",
+  "Désactivé": "Desactivado",
+  "Activée": "Activada",
+  "Désactivée": "Desactivada",
+  "Plus la carte vaut cher, plus le son est riche : moins de 1 €, de 1 à 10 €, 10 € et plus.": "Cuanto más vale la carta, más rico es el sonido: menos de 1 €, de 1 a 10 €, 10 € o más.",
 };

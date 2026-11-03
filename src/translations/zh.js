@@ -418,4 +418,12 @@ export default {
   "Valeur des cartes scannées": "已扫描卡牌总价值",
   "{n} carte sans prix (non comptée)": "{n} 张卡牌无价格（未计入）",
   "{n} cartes sans prix (non comptées)": "{n} 张卡牌无价格（未计入）",
+  "Scan": "扫描",
+  "Son à chaque carte scannée": "每张扫描卡牌的提示音",
+  "Vibration à chaque carte scannée": "每张扫描卡牌的振动",
+  "Activé": "开启",
+  "Désactivé": "关闭",
+  "Activée": "开启",
+  "Désactivée": "关闭",
+  "Plus la carte vaut cher, plus le son est riche : moins de 1 €, de 1 à 10 €, 10 € et plus.": "卡牌越值钱，提示音越丰富：低于 1 €、1 至 10 €、10 € 及以上。",
 };

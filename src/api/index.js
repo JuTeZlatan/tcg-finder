@@ -124,6 +124,9 @@ export const TCGS = [pokemon, magic, yugioh, onepiece, lorcana, riftbound, dbsfw
 export const CUSTOM_TCG = { id: 'custom', name: 'Autres', tagline: 'Cartes saisies à la main', color: '#9B8AFB', languages: ['en'] };
 export const getTcg = (id) => (id === 'custom' ? CUSTOM_TCG : TCGS.find((t) => t.id === id));
 export const dataLang = (tcg, lang) => (tcg.languages.includes(lang) ? lang : 'en');
+// Langue d'un exemplaire de la collection : celle choisie, même quand le jeu n'a pas de données dans cette langue
+// (Riftbound, Cyberpunk en français : données anglaises affichées, exemplaire bien rangé en français).
+export const copyLang = (tcg, lang) => (tcg.languages.includes(lang) || tcg.englishFallback ? lang : dataLang(tcg, lang));
 
 // Message affiché sous le sélecteur de langue pour un jeu donné.
 export function langNote(tcg, lang) {

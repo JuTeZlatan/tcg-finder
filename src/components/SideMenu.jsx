@@ -11,6 +11,7 @@ import { useSettings } from '../lib/settings';
 import { useCollection, summarize } from '../lib/collection';
 import { CARD_LANGS, LANG_NAMES, useCardLang } from '../lib/cardLang';
 import { GAME_ICONS } from '../lib/gameIcons';
+import { scanFeedback } from '../lib/scanFeedback';
 import { CURRENCIES, PRICE_SOURCES, formatPrice } from '../lib/prices';
 import { colors, radius } from '../lib/theme';
 import AccountSection from './AccountSection';
@@ -181,6 +182,21 @@ export default function SideMenu({ open, onClose, initialPage = 'main' }) {
               ))}
             </View>
             <Text style={styles.muted}>{t('Tous les prix sont convertis au taux de change du jour.')}</Text>
+          </Section>
+
+          <Section title={t('Scan')}>
+            {/* Son et vibration selon la valeur de la carte scannée (moins de 1 €, 1 à 10 €, 10 € et plus). */}
+            <Text style={styles.label}>{t('Son à chaque carte scannée')}</Text>
+            <View style={styles.chipRow}>
+              <Chip label={t('Activé')} active={settings.scanSound !== false} onPress={() => { update({ scanSound: true }); scanFeedback(12, { sound: true, vibrate: false }); }} />
+              <Chip label={t('Désactivé')} active={settings.scanSound === false} onPress={() => update({ scanSound: false })} />
+            </View>
+            <Text style={styles.label}>{t('Vibration à chaque carte scannée')}</Text>
+            <View style={styles.chipRow}>
+              <Chip label={t('Activée')} active={settings.scanVibrate !== false} onPress={() => { update({ scanVibrate: true }); scanFeedback(12, { sound: false, vibrate: true }); }} />
+              <Chip label={t('Désactivée')} active={settings.scanVibrate === false} onPress={() => update({ scanVibrate: false })} />
+            </View>
+            <Text style={styles.muted}>{t('Plus la carte vaut cher, plus le son est riche : moins de 1 €, de 1 à 10 €, 10 € et plus.')}</Text>
           </Section>
 
           <Section title={t('Cartes')}>

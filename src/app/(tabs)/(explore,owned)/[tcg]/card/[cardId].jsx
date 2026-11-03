@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Stack, useLocalSearchParams } from 'expo-router';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
-import { getTcg, dataLang } from '../../../../../api';
+import { getTcg, dataLang, copyLang } from '../../../../../api';
 import { useAsync } from '../../../../../lib/useAsync';
 import { useCardLang } from '../../../../../lib/cardLang';
 import { PRICE_SOURCES, averagePrice, formatPrice, getUsdToEur, isRecentSet, isShownSource } from '../../../../../lib/prices';
@@ -26,7 +26,8 @@ export default function CardScreen() {
   const tcg = getTcg(tcgId);
   // Ouverte depuis la collection : langue de l'exemplaire ; sinon la langue des cartes choisie dans l'appli.
   const { cardLang } = useCardLang();
-  const lang = dataLang(tcg, langParam || cardLang);
+  const lang = dataLang(tcg, langParam || cardLang); // données affichées
+  const own = copyLang(tcg, langParam || cardLang); // langue de l'exemplaire (collection, gradées, souhaits)
   const card = useAsync(() => tcg.getCard(cardId, setId || null, lang), [tcg.id, cardId, setId, lang]);
   const fx = useAsync(() => getUsdToEur(), []);
   const { width } = useWindowDimensions();
@@ -84,11 +85,11 @@ export default function CardScreen() {
 
             <PriceHistory tcg={tcg} cardId={cardId} setId={setId || c.setId} lang={lang} usdToEur={fx.data} finish={chosen} prices={c.prices} />
 
-            <CollectionEditor tcgId={tcg.id} lang={lang} setId={setId || c.setId || null} card={{ ...c, id: cardId }} unitPrice={avg?.value ?? null} finish={chosen} onFinishChosen={setFinish} />
+            <CollectionEditor tcgId={tcg.id} lang={own} setId={setId || c.setId || null} card={{ ...c, id: cardId }} unitPrice={avg?.value ?? null} finish={chosen} onFinishChosen={setFinish} />
 
-            <GradedSection tcgId={tcg.id} lang={lang} setId={setId || c.setId || null} card={{ ...c, id: cardId }} finish={chosen} />
+            <GradedSection tcgId={tcg.id} lang={own} setId={setId || c.setId || null} card={{ ...c, id: cardId }} finish={chosen} />
 
-            <WishButton tcgId={tcg.id} lang={lang} setId={setId || c.setId || null} card={{ ...c, id: cardId }} unitPrice={avg?.value ?? null} />
+            <WishButton tcgId={tcg.id} lang={own} setId={setId || c.setId || null} card={{ ...c, id: cardId }} unitPrice={avg?.value ?? null} />
 
             {c.prices.filter((p) => !p.versions && isShownSource(p, priceSource)).map((p) => (
               <View key={sourceLabel(p)} style={styles.block}>
