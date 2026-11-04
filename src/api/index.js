@@ -24,12 +24,14 @@ const onepiece = createStaticTcg({
   name: 'One Piece',
   tagline: 'One Piece Card Game',
   color: '#D62828',
-  languages: ['fr', 'en', 'ja'],
+  // Chinois : site officiel de Taïwan (chinois traditionnel). Coréen et chinois simplifié : pas de liste officielle en ligne.
+  languages: ['fr', 'en', 'ja', 'zh'],
   source: { name: 'Bandai, Cardmarket, TCGplayer' },
   characters: { label: 'Personnages', of: (c) => (ONE_PIECE_CHARACTER.test(typeOf(c)) ? withoutTags(c.name) : null) },
   note: {
     fr: 'Les cartes françaises existent à partir d’OP-09.',
     ja: 'Prix des versions japonaises : ceux des cartes internationales de même code (les extensions sorties seulement au Japon n’ont pas encore de prix).',
+    zh: 'Cartes chinoises (chinois traditionnel, site officiel de Taïwan). Prix : ceux des cartes internationales de même code.',
   },
 });
 const riftbound = createStaticTcg({
@@ -52,7 +54,8 @@ const lorcana = createStaticTcg({
   name: 'Lorcana',
   tagline: 'Disney Lorcana TCG',
   color: '#3D6FD9',
-  languages: ['fr', 'en'],
+  // LorcanaJSON : anglais, français, allemand, italien (pas d'espagnol, de japonais ni de chinois).
+  languages: ['fr', 'en', 'de', 'it'],
   source: { name: 'LorcanaJSON, Cardmarket, TCGplayer' },
   characters: { label: 'Personnages', of: (c) => (LORCANA_CHARACTER.test(typeOf(c)) ? withoutTags(c.name.split(' - ')[0]) : null) },
 });
@@ -61,9 +64,10 @@ const dbsfw = createStaticTcg({
   name: 'Dragon Ball Fusion World',
   tagline: 'Dragon Ball Super Card Game Fusion World',
   color: '#F28C28',
-  languages: ['en'],
+  // Japonais : noms et images du site officiel japonais (prix des cartes anglaises de même code).
+  languages: ['en', 'ja'],
   source: { name: 'TCGplayer, Cardmarket' },
-  characters: { label: 'Personnages', resolveSuffix: true, of: (c) => (DBS_CHARACTER.test(typeOf(c)) ? dbsName(c.name) || null : null) },
+  characters: { label: 'Personnages', keyLang: 'en', resolveSuffix: true, of: (c) => (DBS_CHARACTER.test(typeOf(c)) ? dbsName(c.name) || null : null) },
 });
 const dbsmasters = createStaticTcg({
   id: 'dbsmasters',
@@ -80,8 +84,8 @@ const swu = createStaticTcg({
   name: 'Star Wars Unlimited',
   tagline: 'Star Wars: Unlimited TCG',
   color: '#3A5BD9',
-  // Pas de version japonaise ni chinoise publiée.
-  languages: ['fr', 'en'],
+  // Base officielle : français, anglais, allemand, italien, espagnol (pas de version japonaise, chinoise ni coréenne).
+  languages: ['fr', 'en', 'de', 'it', 'es'],
   source: { name: 'Fantasy Flight Games, Cardmarket, TCGplayer' },
   // Leaders et unités « Nom - Titre » (noms anglais, aussi pour regrouper les cartes françaises : Dark Vador = Darth Vader).
   characters: { label: 'Personnages', keyLang: 'en', of: (c) => (/leader|unit/i.test(typeOf(c)) ? withoutTags(c.name.split(' - ')[0]) : null) },

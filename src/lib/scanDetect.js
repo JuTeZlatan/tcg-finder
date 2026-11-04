@@ -32,7 +32,7 @@ const RIFT_SETS = ['OGN', 'OGS', 'SFD', 'UNL', 'VEN', 'RAD', 'ARC', 'JDG', 'OPP'
 const OP_SETS = ['OP', 'ST', 'EB', 'PRB'];
 const FW_SETS = ['FB', 'FS', 'SB', 'FP'];
 const DBS_SETS = ['BT', 'TB', 'SD', 'EX', 'DB', 'XD', 'BE'];
-const YGO_LANGS = { EN: 'en', E: 'en', FR: 'fr', F: 'fr' };
+const YGO_LANGS = { EN: 'en', E: 'en', FR: 'fr', F: 'fr', DE: 'de', G: 'de', IT: 'it', I: 'it', SP: 'es', S: 'es', KR: 'ko', K: 'ko' };
 const MAGIC_LANGS = new Set(['EN', 'FR', 'DE', 'IT', 'ES', 'PT', 'JA', 'KO', 'RU', 'ZHS', 'ZHT', 'PH']);
 
 export function detectCodes(rawText) {
@@ -194,6 +194,8 @@ export function detectLanguage(text) {
   const latin = (raw.match(/[A-Za-z]/g) || []).length;
   if (kana >= 3 && kana + han >= latin * 0.3) return 'ja';
   if (han >= 4 && han >= latin * 0.3) return 'zh';
+  const hangul = (raw.match(/[\uac00-\ud7af]/g) || []).length;
+  if (hangul >= 3 && hangul >= latin * 0.3) return 'ko';
   const words = fold(raw).split(' ');
   const scores = Object.entries(LANG_SETS)
     .map(([l, set]) => [l, words.filter((w) => set.has(w)).length])

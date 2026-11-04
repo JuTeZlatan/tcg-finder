@@ -100,7 +100,7 @@ const adapter = {
   name: 'Yu-Gi-Oh!',
   tagline: 'Yu-Gi-Oh! Trading Card Game',
   color: '#7B4FD6',
-  languages: ['fr', 'en'],
+  languages: ['fr', 'en', 'de', 'it'],
   source: { name: 'YGOPRODeck', url: 'https://ygoprodeck.com' },
 
   getSets: memo(async () => {

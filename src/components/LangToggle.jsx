@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { CARD_LANGS, LANG_NAMES, useCardLang } from '../lib/cardLang';
 import { t } from '../lib/i18n';
 import { colors } from '../lib/theme';
@@ -12,13 +12,13 @@ export default function LangToggle({ note, langs = CARD_LANGS, shown }) {
     <View style={styles.wrap}>
       <View style={styles.row}>
         <Text style={styles.label}>{t('Cartes en')}</Text>
-        <View style={styles.segment}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.segment}>
           {langs.map((l) => (
             <Pressable key={l} onPress={() => setCardLang(l)} style={[styles.option, active === l && styles.active]}>
               <Text style={[styles.optionText, active === l && styles.activeText]}>{t(LANG_NAMES[l])}</Text>
             </Pressable>
           ))}
-        </View>
+        </ScrollView>
       </View>
       {note ? <Text style={styles.note}>{t(note)}</Text> : null}
     </View>

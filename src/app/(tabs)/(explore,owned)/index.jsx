@@ -17,7 +17,7 @@ import { useSettings } from '../../../lib/settings';
 import { Avatar } from '../../../components/SideMenu';
 import { plural, t } from '../../../lib/i18n';
 
-const FLAGS = { fr: '🇫🇷', en: '🇬🇧', ja: '🇯🇵', zh: '🇨🇳' };
+const FLAGS = { fr: '🇫🇷', en: '🇬🇧', de: '🇩🇪', it: '🇮🇹', es: '🇪🇸', ja: '🇯🇵', zh: '🇨🇳', ko: '🇰🇷' };
 const GAP = 12;
 const PAD = 18;
 
@@ -183,9 +183,9 @@ const styles = StyleSheet.create({
   searchInput: { flex: 1, color: colors.text, fontSize: 16 },
   searchGo: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   sectionLabel: { color: colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.2 },
-  langs: { flexDirection: 'row', gap: 8 },
+  langs: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, // 8 langues : deux lignes de 4
   lang: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 10,
+    width: '22.8%', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 10, paddingHorizontal: 4,
     borderRadius: 16, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
   },
   langActive: { backgroundColor: `${colors.accent}26`, borderColor: colors.accent },

@@ -14,20 +14,23 @@ import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
 import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
+import com.google.mlkit.vision.text.korean.KoreanTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-// Lecture du texte : un lecteur par écriture (le japonais et le chinois lisent aussi l'alphabet latin).
+// Lecture du texte : un lecteur par écriture (japonais, chinois et coréen lisent aussi l'alphabet latin).
 object Ocr {
   private val latin: TextRecognizer by lazy { TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS) }
   private val japanese: TextRecognizer by lazy { TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build()) }
   private val chinese: TextRecognizer by lazy { TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build()) }
+  private val korean: TextRecognizer by lazy { TextRecognition.getClient(KoreanTextRecognizerOptions.Builder().build()) }
 
   private fun client(script: String) = when (script) {
     "ja" -> japanese
     "zh" -> chinese
+    "ko" -> korean
     else -> latin
   }
 

@@ -41,4 +41,5 @@ export const loadBundledFile = memo(async (key) => {
 });
 
 // { generatedAt, sets: [...], cards: { [setId]: [...] } }
-export const loadBundled = (tcgId, lang) => loadBundledFile(`${tcgId}-${lang}`);
+// Langues non intégrées à l'appli (allemand, italien, espagnol… : données téléchargées) : à défaut, l'anglais.
+export const loadBundled = (tcgId, lang) => loadBundledFile(FILES[`${tcgId}-${lang}`] ? `${tcgId}-${lang}` : `${tcgId}-en`);

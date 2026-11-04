@@ -40,7 +40,7 @@ async function addVariants(sets, { categoryId, groups, cm, fx, lang, enCards }) 
         prices: [tcgplayerBlock(p.prices, p.url)],
         links: [
           { label: 'TCGplayer', url: p.url },
-          { label: 'Cardmarket', url: `https://www.cardmarket.com/${lang === 'fr' ? 'fr' : 'en'}/Lorcana/Products/Search?searchString=${encodeURIComponent(p.name.replace(/\s*\(.*$/, ''))}` },
+          { label: 'Cardmarket', url: `https://www.cardmarket.com/${['fr', 'de', 'it'].includes(lang) ? lang : 'en'}/Lorcana/Products/Search?searchString=${encodeURIComponent(p.name.replace(/\s*\(.*$/, ''))}` },
         ],
       };
     },
@@ -73,9 +73,11 @@ const CARDMARKET_GAME = 19;
 export async function build(outDir) {
   console.log('Lorcana…');
   const categoryId = await tcgcsvCategoryId('lorcana');
-  const [fx, cm, tcg, groups, en, fr] = await Promise.all([
+  const [fx, cm, tcg, groups, en, fr, de, it] = await Promise.all([
     getUsdToEur(), loadCardmarket(CARDMARKET_GAME), tcgcsvPrices(categoryId), tcgcsvGroups(categoryId),
     getJSON(LORCANAJSON('en')), getJSON(LORCANAJSON('fr')),
+    // Allemand et italien : publiés plus tard, une absence ne bloque pas les autres langues.
+    getJSON(LORCANAJSON('de')).catch(() => null), getJSON(LORCANAJSON('it')).catch(() => null),
   ]);
   const enById = new Map(en.cards.map((c) => [c.id, c]));
   const groupByCode = new Map(groups.map((g) => [String(g.abbreviation).trim(), g]));
@@ -105,7 +107,7 @@ export async function build(outDir) {
   });
   console.log(`  lorcana : secours TCGplayer ${fallbackTcg.size}, Cardmarket ${fallbackCm.size} (sur ${missing.length} cartes sans identifiant)`);
 
-  for (const [lang, data] of [['fr', fr], ['en', en]]) {
+  for (const [lang, data] of [['fr', fr], ['en', en], ['de', de], ['it', it]].filter(([, d]) => d)) {
     const sets = Object.entries(data.sets).map(([code, s]) => ({
       id: code,
       name: s.name,

@@ -5,7 +5,7 @@ import { requireNativeView, requireOptionalNativeModule } from 'expo';
 const native = Platform.OS === 'android' ? requireOptionalNativeModule('CardVision') : null;
 
 export const available = !!native;
-// Texte d'une image (fichier) ; script : 'latin' | 'ja' | 'zh' (les deux derniers lisent aussi l'alphabet latin).
+// Texte d'une image (fichier) ; script : 'latin' | 'ja' | 'zh' | 'ko' (les trois derniers lisent aussi l'alphabet latin).
 export const recognize = (uri, script = 'latin') => native.recognize(uri, script);
 // Empreinte visuelle d'une image de carte (couleurs et formes sur une petite grille), voir lib/imageMatch.js.
 export const fingerprint = (uri) => native.fingerprint(uri);

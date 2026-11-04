@@ -427,4 +427,9 @@ export default {
   "Désactivée": "Disattivata",
   "Plus la carte vaut cher, plus le son est riche : moins de 1 €, de 1 à 10 €, 10 € et plus.": "Più la carta vale, più il suono è ricco: meno di 1 €, da 1 a 10 €, 10 € e oltre.",
   "Voir la carte en grand": "Vedi la carta in grande",
+  "Allemand": "Tedesco",
+  "Italien": "Italiano",
+  "Espagnol": "Spagnolo",
+  "Coréen": "Coreano",
+  "Cartes chinoises (chinois traditionnel, site officiel de Taïwan). Prix : ceux des cartes internationales de même code.": "Carte cinesi (cinese tradizionale, sito ufficiale di Taiwan). Prezzi: quelli della carta internazionale con lo stesso codice.",
 };

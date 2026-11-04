@@ -10,7 +10,8 @@ import {
 } from './lib.mjs';
 
 // Le site japonais a plus de séries (sorties en avance au Japon) ; leurs prix sont ceux des cartes internationales de même code.
-const SITES = { fr: 'https://fr.onepiece-cardgame.com', en: 'https://en.onepiece-cardgame.com', ja: 'https://www.onepiece-cardgame.com' };
+// Chinois : site officiel de Taïwan (chinois traditionnel, comme les cartes chinoises de Pokémon), même présentation.
+const SITES = { fr: 'https://fr.onepiece-cardgame.com', en: 'https://en.onepiece-cardgame.com', ja: 'https://www.onepiece-cardgame.com', zh: 'https://asia-tw.onepiece-cardgame.com' };
 const OPTCG = 'https://optcgapi.com/api';
 const TCGCSV_CATEGORY = 68;
 const CARDMARKET_GAME = 18;
@@ -86,7 +87,7 @@ export async function build(outDir) {
 
   // Anglais en premier : ses cartes servent de base aux variantes absentes des sites FR / JA.
   const enBases = new Map();
-  for (const lang of ['en', 'fr', 'ja']) {
+  for (const lang of ['en', 'fr', 'ja', 'zh']) {
     const site = SITES[lang];
     const series = parseSeries(await getText(`${site}/cardlist/`));
     const sets = [];

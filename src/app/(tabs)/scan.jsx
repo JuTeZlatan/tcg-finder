@@ -118,8 +118,8 @@ export default function ScanScreen() {
     const text = [codeText, cardText].filter(Boolean).join('\n');
     // Image lue avec le lecteur japonais / chinois sur une carte latine : texte inutilisable (charabia), seule
     // image ignorée (les autres images, lues avec le lecteur latin, suffisent).
-    const cjk = (text.match(/[぀-ヿ一-鿿]/g) || []).length;
-    if ((script === 'ja' || script === 'zh') && cjk < text.replace(/\s/g, '').length * 0.15) return;
+    const cjk = (text.match(/[぀-ヿ一-鿿\uac00-\ud7af]/g) || []).length;
+    if ((script === 'ja' || script === 'zh' || script === 'ko') && cjk < text.replace(/\s/g, '').length * 0.15) return;
     // Code reconnu, ou au moins un numéro/total (« 030/298 », « 300*/298 » : Riftbound dont l'extension n'est pas lue).
     const hasCode = detectCodes(text).length > 0 || /\d{3}\*?\s?\/\s?\d{3}/.test(text);
     const found = box?.length === 4;
@@ -318,7 +318,7 @@ export default function ScanScreen() {
           // Analyse en continu (la carte est entourée dès qu'elle est vue) ; lue au toucher du bouton ou en rafale.
           analyzing={state.step === 'camera' || state.step === 'analyzing'}
           // Cartes japonaises / chinoises lues aussi avec le réglage en français (une image sur trois).
-          scripts={cardLang === 'ja' || cardLang === 'zh' ? [cardLang, 'latin'] : ['latin', 'latin', 'ja']}
+          scripts={['ja', 'zh', 'ko'].includes(cardLang) ? [cardLang, 'latin'] : ['latin', 'latin', 'ja']}
           onFrame={onFrame}
         />
       ) : focused ? (

@@ -1,12 +1,13 @@
 // Star Wars: Unlimited. Anglais : catalogue et prix TCGplayer (via TCGCSV), prix Cardmarket (jeu 21).
-// Français : base officielle de Fantasy Flight Games (starwarsunlimited.com, publique) : noms, textes et images
-// des cartes françaises, reliés aux cartes anglaises par extension + numéro (mêmes prix : une carte, plusieurs langues).
-// Pas de version japonaise ni chinoise publiée.
+// Français, allemand, italien, espagnol : base officielle de Fantasy Flight Games (starwarsunlimited.com, publique) :
+// noms, textes et images des cartes, reliés aux cartes anglaises par extension + numéro (mêmes prix : une carte,
+// plusieurs langues). Pas de version japonaise, chinoise ni coréenne publiée.
 import { getJSON, normName, sleep, writeTcg, htmlToText, clean } from './lib.mjs';
 import { buildTcgcsvGame } from './tcgcsvGame.mjs';
 
 const OFFICIAL = 'https://admin.starwarsunlimited.com/api/card-list';
 const PAGE = 100;
+const LOCALES = ['fr', 'de', 'it', 'es'];
 
 // « Security Complex // Experience Token » et mentions entre parenthèses retirées : clé de nom commune.
 const baseName = (s) => normName(String(s).replace(/\s*\/\/.*$/, '').replace(/\s*\([^)]*\)/g, ''));
@@ -41,8 +42,12 @@ export async function build(outDir) {
     cmUrl,
   });
 
-  console.log('Star Wars Unlimited (français)…');
-  const fr = await officialCards('fr');
+  for (const locale of LOCALES) await buildLocale(outDir, sets, locale);
+}
+
+async function buildLocale(outDir, sets, locale) {
+  console.log(`Star Wars Unlimited (${locale})…`);
+  const fr = await officialCards(locale);
   // Les promos d'une extension partagent son code et ses numéros (« 3/20 » contre « 003/252 ») : on relie par code,
   // numéro ET total imprimé ; sans total (variantes Hyperspace 285…), la carte de la série principale (plus grand total).
   const byExact = new Map();
@@ -82,6 +87,6 @@ export async function build(outDir) {
     return { ...s, name: setNames.get(code) || s.name, cards };
   });
   const total = sets.reduce((n, s) => n + s.cards.length, 0);
-  console.log(`  swu/fr : ${matched}/${total} cartes avec leur version française officielle`);
-  await writeTcg(outDir, 'swu', 'fr', frSets);
+  console.log(`  swu/${locale} : ${matched}/${total} cartes avec leur version officielle dans cette langue`);
+  await writeTcg(outDir, 'swu', locale, frSets);
 }

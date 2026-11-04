@@ -62,7 +62,7 @@ const adapter = {
   name: 'Magic',
   tagline: 'Magic: The Gathering',
   color: '#C77D2B',
-  languages: ['fr', 'en', 'ja', 'zh'],
+  languages: ['fr', 'en', 'de', 'it', 'es', 'ja', 'zh', 'ko'],
   source: { name: 'Scryfall', url: 'https://scryfall.com' },
 
   getSets: memo(async () => {

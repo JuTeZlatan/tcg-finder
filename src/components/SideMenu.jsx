@@ -201,8 +201,12 @@ export default function SideMenu({ open, onClose, initialPage = 'main' }) {
 
           <Section title={t('Cartes')}>
             <Text style={styles.label}>{t('Langue des cartes')}</Text>
-            <View style={styles.chipRow}>
-              {CARD_LANGS.map((l) => <Chip key={l} label={t(LANG_NAMES[l])} active={cardLang === l} onPress={() => setCardLang(l)} />)}
+            <View style={[styles.chipRow, styles.wrapRow]}>
+              {CARD_LANGS.map((l) => (
+                <View key={l} style={styles.langCell}>
+                  <Chip label={t(LANG_NAMES[l])} active={cardLang === l} onPress={() => setCardLang(l)} />
+                </View>
+              ))}
             </View>
             <Text style={styles.label}>{t('Affichage des extensions')}</Text>
             <View style={styles.chipRow}>
@@ -280,6 +284,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   // rangée de choix des réglages : toujours sur une ligne, boutons de même largeur
   chipRow: { flexDirection: 'row', gap: 6 },
+  wrapRow: { flexWrap: 'wrap', rowGap: 6 },
+  langCell: { width: '23.5%', flexDirection: 'row' },
   chip: { flex: 1, alignItems: 'center', paddingVertical: 8, paddingHorizontal: 6, borderRadius: 999, backgroundColor: ITEM_BG },
   chipActive: { backgroundColor: colors.accent },
   chipText: { color: colors.muted, fontWeight: '600' },

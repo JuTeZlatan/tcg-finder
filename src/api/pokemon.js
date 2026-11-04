@@ -74,7 +74,7 @@ const asianSetDates = memo(async () => {
 // { [id carte TCGdex]: [productId, [[finition, marché, plus bas], …]] }
 // Cartes japonaises : catalogue TCGplayer « Pokemon Japan » ; cartes chinoises : pas de prix TCGplayer.
 // Cartes chinoises : même numérotation que les japonaises → prix et photo de la carte japonaise équivalente.
-const TCGPLAYER_FILE = { fr: 'tcgplayer', en: 'tcgplayer', ja: 'tcgplayer-ja', zh: 'tcgplayer-ja' };
+const TCGPLAYER_FILE = { fr: 'tcgplayer', en: 'tcgplayer', de: 'tcgplayer', it: 'tcgplayer', es: 'tcgplayer', ja: 'tcgplayer-ja', zh: 'tcgplayer-ja' };
 const loadImageFallback = memo(async () => {
   imageFallback = await loadData('pokemon/images.json', async () => ({})).catch(() => ({}));
   return imageFallback;
@@ -239,7 +239,8 @@ const adapter = {
   name: 'Pokémon',
   tagline: 'Pokémon Trading Card Game',
   color: '#E3350D',
-  languages: ['fr', 'en', 'ja', 'zh'],
+  // Coréen absent : TCGdex liste les extensions coréennes, mais sans leurs cartes.
+  languages: ['fr', 'en', 'de', 'it', 'es', 'ja', 'zh'],
   source: { name: 'TCGdex', url: 'https://tcgdex.dev' },
 
   getSets: memo(async (lang) => {
@@ -345,7 +346,7 @@ const adapter = {
       prices: [...prices(withOwnCardmarket(c.pricing, ownCm[id]), collected[id], c.variants), ...versionsBlock(versions[id])],
       versions: versionsOf(versions[id]),
       links: [
-        { label: 'Cardmarket', url: `https://www.cardmarket.com/${lang === 'fr' ? 'fr' : 'en'}/Pokemon/Products/Search?searchString=${encodeURIComponent(c.name)}` },
+        { label: 'Cardmarket', url: `https://www.cardmarket.com/${['fr', 'de', 'it', 'es'].includes(lang) ? lang : 'en'}/Pokemon/Products/Search?searchString=${encodeURIComponent(c.name)}` },
         collected[id] && { label: 'TCGplayer', url: `https://www.tcgplayer.com/product/${collected[id][0]}` },
       ].filter(Boolean),
     };

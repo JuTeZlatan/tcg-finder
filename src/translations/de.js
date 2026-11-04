@@ -427,4 +427,9 @@ export default {
   "Désactivée": "Aus",
   "Plus la carte vaut cher, plus le son est riche : moins de 1 €, de 1 à 10 €, 10 € et plus.": "Je wertvoller die Karte, desto reicher der Klang: unter 1 €, 1 bis 10 €, ab 10 €.",
   "Voir la carte en grand": "Karte groß anzeigen",
+  "Allemand": "Deutsch",
+  "Italien": "Italienisch",
+  "Espagnol": "Spanisch",
+  "Coréen": "Koreanisch",
+  "Cartes chinoises (chinois traditionnel, site officiel de Taïwan). Prix : ceux des cartes internationales de même code.": "Chinesische Karten (traditionelles Chinesisch, offizielle Seite Taiwans). Preise: die der internationalen Karte mit demselben Code.",
 };
