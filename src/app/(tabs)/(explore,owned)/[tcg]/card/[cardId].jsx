@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { getTcg, dataLang, copyLang } from '../../../../../api';
 import { useAsync } from '../../../../../lib/useAsync';
@@ -44,6 +44,9 @@ export default function CardScreen() {
   const { priceSource } = useSettings().settings;
   const avg = c && fx.data ? averagePrice(c.prices, fx.data, { recent: isRecentSet(set?.date), finish: chosen, source: priceSource }) : null;
   const priceTitle = priceSource === 'both' ? t('Prix moyen') : t('Prix {0}', { 0: PRICE_SOURCES[priceSource] });
+  // Image en grand (toucher la vignette) : la fiche commence par l'image réduite pour que le prix soit visible d'emblée.
+  const [zoom, setZoom] = useState(false);
+  const thumbWidth = Math.min((width - 32) * 0.42, 200);
 
   return (
     <>
@@ -53,35 +56,50 @@ export default function CardScreen() {
         {card.error && <ErrorView error={card.error} onRetry={card.retry} />}
         {c && (
           <>
-            {c.image ? (
-              <Image source={c.image} style={[styles.image, { width: Math.min(width - 64, 360) }]} contentFit="contain" transition={150} />
+            {/* En-tête : image réduite à gauche (touchée : en grand), nom et prix à droite, visibles sans faire défiler. */}
+            <View style={styles.hero}>
+              {c.image ? (
+                <Pressable onPress={() => setZoom(true)} accessibilityLabel={t('Voir la carte en grand')}>
+                  <Image source={c.image} style={[styles.image, { width: thumbWidth }]} contentFit="contain" transition={150} />
+                  <View style={styles.zoomHint}>
+                    <Ionicons name="expand" size={14} color="#fff" />
+                  </View>
+                </Pressable>
+              ) : null}
+              <View style={styles.heroInfo}>
+                <Text style={styles.name} numberOfLines={4}>{c.name}</Text>
+                {c.subtitle ? <Text style={styles.mutedLeft} numberOfLines={2}>{c.subtitle}</Text> : null}
+                <View style={styles.avgBox}>
+                  <Text style={styles.avgLabel} numberOfLines={2}>{priceTitle}{chosen ? ` · ${finishLabel(c.prices, chosen)}` : ''}</Text>
+                  {avg ? (
+                    <>
+                      <Text style={styles.avgValue} adjustsFontSizeToFit numberOfLines={1}>{formatPrice(avg.value, 'EUR')}</Text>
+                      {priceSource === 'both' ? (
+                        <Text style={styles.avgSources}>{avg.sources.length > 1 ? t('Moyenne de {sources}', { sources: avg.sources.join(' + ') }) : t('Moyenne de {sources} (une seule source)', { sources: avg.sources.join(' + ') })}</Text>
+                      ) : null}
+                    </>
+                  ) : (
+                    <Text style={styles.avgSources}>{fx.loading ? t('Calcul…') : (priceSource === 'both' ? t('Aucun prix disponible pour cette carte.') : t('Pas de prix {0} pour cette carte.', { 0: PRICE_SOURCES[priceSource] }))}</Text>
+                  )}
+                </View>
+              </View>
+            </View>
+            {avg?.divergent ? (
+              <Text style={styles.warning}>
+                {t('⚠ Les sites donnent des prix très différents : vérifie la version exacte (édition, version alternative) avant d’acheter ou de vendre.')}
+              </Text>
             ) : null}
-            <Text style={styles.name}>{c.name}</Text>
-            {c.subtitle ? <Text style={styles.muted}>{c.subtitle}</Text> : null}
+            {avg?.recent ? (
+              <Text style={styles.muted}>{t('Extension sortie il y a moins de 40 jours : les prix bougent encore beaucoup.')}</Text>
+            ) : null}
 
             <FinishPicker prices={c.prices} value={finish} onChange={setFinish} ownedFinishes={ownedFinishes} />
 
-            <View style={styles.avgBox}>
-              <Text style={styles.avgLabel}>{priceTitle}{chosen ? ` · ${finishLabel(c.prices, chosen)}` : ''}</Text>
-              {avg ? (
-                <>
-                  <Text style={styles.avgValue}>{formatPrice(avg.value, 'EUR')}</Text>
-                  {priceSource === 'both' ? (
-                    <Text style={styles.muted}>{avg.sources.length > 1 ? t('Moyenne de {sources}', { sources: avg.sources.join(' + ') }) : t('Moyenne de {sources} (une seule source)', { sources: avg.sources.join(' + ') })}</Text>
-                  ) : null}
-                  {avg.divergent ? (
-                    <Text style={styles.warning}>
-                      {t('⚠ Les sites donnent des prix très différents : vérifie la version exacte (édition, version alternative) avant d’acheter ou de vendre.')}
-                    </Text>
-                  ) : null}
-                  {avg.recent ? (
-                    <Text style={styles.muted}>{t('Extension sortie il y a moins de 40 jours : les prix bougent encore beaucoup.')}</Text>
-                  ) : null}
-                </>
-              ) : (
-                <Text style={styles.muted}>{fx.loading ? t('Calcul…') : (priceSource === 'both' ? t('Aucun prix disponible pour cette carte.') : t('Pas de prix {0} pour cette carte.', { 0: PRICE_SOURCES[priceSource] }))}</Text>
-              )}
-            </View>
+            <Modal visible={zoom} transparent animationType="fade" onRequestClose={() => setZoom(false)}>
+              <Pressable style={styles.zoomPage} onPress={() => setZoom(false)}>
+                <Image source={c.image} style={styles.zoomImage} contentFit="contain" />
+              </Pressable>
+            </Modal>
 
             <PriceHistory tcg={tcg} cardId={cardId} setId={setId || c.setId} lang={lang} usdToEur={fx.data} finish={chosen} prices={c.prices} />
 
@@ -163,12 +181,18 @@ export default function CardScreen() {
 
 const styles = StyleSheet.create({
   page: { padding: 16, gap: 12, alignItems: 'stretch' },
-  image: { aspectRatio: 63 / 88, alignSelf: 'center', borderRadius: 10 },
-  name: { color: colors.text, fontSize: 24, fontWeight: '800', textAlign: 'center' },
+  hero: { flexDirection: 'row', gap: 14, alignItems: 'flex-start' },
+  heroInfo: { flex: 1, gap: 6 },
+  image: { aspectRatio: 63 / 88, borderRadius: 8 },
+  zoomHint: { position: 'absolute', right: 6, bottom: 6, backgroundColor: 'rgba(0,0,0,0.55)', borderRadius: 999, padding: 5 },
+  zoomPage: { flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  zoomImage: { width: '100%', height: '85%' },
+  name: { color: colors.text, fontSize: 20, fontWeight: '800' },
+  avgSources: { color: colors.muted, fontSize: 12, textAlign: 'center' },
   muted: { color: colors.muted, fontSize: 13, textAlign: 'center' },
-  avgBox: { backgroundColor: colors.surfaceAlt, borderRadius: radius, padding: 16, alignItems: 'center', gap: 4, borderWidth: 1, borderColor: colors.accent },
-  avgLabel: { color: colors.muted, fontSize: 13, textTransform: 'uppercase', letterSpacing: 1 },
-  avgValue: { color: colors.accent, fontSize: 32, fontWeight: '800' },
+  avgBox: { backgroundColor: colors.surfaceAlt, borderRadius: radius, padding: 12, alignItems: 'center', gap: 2, borderWidth: 1, borderColor: colors.accent, marginTop: 4 },
+  avgLabel: { color: colors.muted, fontSize: 11, textTransform: 'uppercase', letterSpacing: 1, textAlign: 'center' },
+  avgValue: { color: colors.accent, fontSize: 28, fontWeight: '800' },
   warning: { color: colors.accent, fontSize: 13, textAlign: 'center', marginTop: 6, lineHeight: 18 },
   section: { color: colors.text, fontSize: 18, fontWeight: '700', marginTop: 8 },
   block: { backgroundColor: colors.surface, borderRadius: radius, padding: 14, gap: 6 },

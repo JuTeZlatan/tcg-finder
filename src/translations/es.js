@@ -426,4 +426,5 @@ export default {
   "Activée": "Activada",
   "Désactivée": "Desactivada",
   "Plus la carte vaut cher, plus le son est riche : moins de 1 €, de 1 à 10 €, 10 € et plus.": "Cuanto más vale la carta, más rico es el sonido: menos de 1 €, de 1 a 10 €, 10 € o más.",
+  "Voir la carte en grand": "Ver la carta en grande",
 };

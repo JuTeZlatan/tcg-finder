@@ -426,4 +426,5 @@ export default {
   "Activée": "An",
   "Désactivée": "Aus",
   "Plus la carte vaut cher, plus le son est riche : moins de 1 €, de 1 à 10 €, 10 € et plus.": "Je wertvoller die Karte, desto reicher der Klang: unter 1 €, 1 bis 10 €, ab 10 €.",
+  "Voir la carte en grand": "Karte groß anzeigen",
 };

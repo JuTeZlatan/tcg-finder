@@ -426,4 +426,5 @@ export default {
   "Activée": "开启",
   "Désactivée": "关闭",
   "Plus la carte vaut cher, plus le son est riche : moins de 1 €, de 1 à 10 €, 10 € et plus.": "卡牌越值钱，提示音越丰富：低于 1 €、1 至 10 €、10 € 及以上。",
+  "Voir la carte en grand": "查看大图",
 };
