@@ -476,6 +476,24 @@ function keptDays(days) {
 }
 
 // values : { idCarte: [cardmarket, tcgplayer] } pour aujourd'hui.
+// Langue d'un jeu en échec aujourd'hui (source indisponible) : la version publiée la veille est recopiée telle quelle,
+// historique des prix compris, au lieu de disparaître du site. Renvoie faux s'il n'y a rien à recopier.
+export async function keepPrevious(outDir, tcgId, lang) {
+  const sets = await previousJSON(`${tcgId}/${lang}/sets.json`);
+  if (!Array.isArray(sets)) return false;
+  await writeJSON(`${outDir}/${tcgId}/${lang}/sets.json`, sets);
+  const search = await previousJSON(`${tcgId}/${lang}/search.json`);
+  if (search) await writeJSON(`${outDir}/${tcgId}/${lang}/search.json`, search);
+  for (const s of sets) {
+    const f = fileId(s.id);
+    const cards = await previousJSON(`${tcgId}/${lang}/sets/${f}.json`);
+    if (cards) await writeJSON(`${outDir}/${tcgId}/${lang}/sets/${f}.json`, cards);
+    const history = await previousJSON(`history/${tcgId}/${lang}/${f}.json`);
+    if (history) await writeJSON(`${outDir}/history/${tcgId}/${lang}/${f}.json`, history);
+  }
+  return true;
+}
+
 export async function updateHistory(outDir, path, values) {
   const previous = (await previousJSON(`history/${path}.json`)) || { days: [], cards: {} };
   const day = today();

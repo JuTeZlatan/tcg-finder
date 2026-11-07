@@ -2,7 +2,7 @@
 // Français, allemand, italien, espagnol : base officielle de Fantasy Flight Games (starwarsunlimited.com, publique) :
 // noms, textes et images des cartes, reliés aux cartes anglaises par extension + numéro (mêmes prix : une carte,
 // plusieurs langues). Pas de version japonaise, chinoise ni coréenne publiée.
-import { getJSON, normName, sleep, writeTcg, htmlToText, clean } from './lib.mjs';
+import { getJSON, normName, sleep, writeTcg, htmlToText, clean, keepPrevious } from './lib.mjs';
 import { buildTcgcsvGame } from './tcgcsvGame.mjs';
 
 const OFFICIAL = 'https://admin.starwarsunlimited.com/api/card-list';
@@ -18,7 +18,17 @@ async function officialCards(locale) {
   const out = [];
   for (let page = 1; ; page++) {
     const url = `${OFFICIAL}?locale=${locale}&pagination%5Bpage%5D=${page}&pagination%5BpageSize%5D=${PAGE}`;
-    const d = await getJSON(url);
+    // Erreurs passagères du serveur officiel (502…) : la page est retentée, avec une attente croissante.
+    let d;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        d = await getJSON(url);
+        break;
+      } catch (e) {
+        if (attempt >= 4) throw e;
+        await sleep(3000 * attempt);
+      }
+    }
     out.push(...d.data.map((x) => x.attributes));
     if (page >= d.meta.pagination.pageCount) break;
     await sleep(150);
@@ -42,7 +52,13 @@ export async function build(outDir) {
     cmUrl,
   });
 
-  for (const locale of LOCALES) await buildLocale(outDir, sets, locale);
+  // Une langue en échec n'empêche pas les autres (ni la publication des autres jeux) : la version de la veille reste.
+  for (const locale of LOCALES) {
+    await buildLocale(outDir, sets, locale).catch(async (e) => {
+      const kept = await keepPrevious(outDir, 'swu', locale).catch(() => false);
+      console.error(`✗ swu/${locale} : ${e.message}${kept ? ' (version de la veille republiée)' : ''}`);
+    });
+  }
 }
 
 async function buildLocale(outDir, sets, locale) {

@@ -1,6 +1,6 @@
 // Script de collecte quotidien : node pipeline/build.mjs [--only=onepiece,lorcana,riftbound,pokemon,yugioh,dragonball,magic,swu,cyberpunk,naruto,upcoming] [--out=dossier]
 // Produit des fichiers JSON statiques lus par l'appli (publiés sur GitHub Pages par .github/workflows/data.yml).
-import { writeJSON } from './lib.mjs';
+import { writeJSON, keepPrevious } from './lib.mjs';
 import * as onepiece from './onepiece.mjs';
 import * as riftbound from './riftbound.mjs';
 import * as lorcana from './lorcana.mjs';
@@ -20,12 +20,32 @@ const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.spli
 const outDir = arg('out') || 'pipeline/out';
 const only = arg('only')?.split(',') || Object.keys(BUILDERS);
 
+// Jeux entièrement publiés en fichiers (extensions, cartes, recherche) : en cas d'échec, la version de la veille est
+// republiée et la collecte des autres jeux continue (une source en panne ne bloque plus la mise à jour de tout le site).
+const STATIC_GAMES = {
+  onepiece: ['onepiece'], riftbound: ['riftbound'], lorcana: ['lorcana'], dragonball: ['dbsfw', 'dbsmasters'],
+  swu: ['swu'], cyberpunk: ['cyberpunk'], naruto: ['naruto'],
+};
+const LANGS = ['en', 'fr', 'de', 'it', 'es', 'ja', 'zh', 'ko'];
+
 const failures = [];
+const kept = [];
 for (const id of only) {
   try {
     await BUILDERS[id].build(outDir);
   } catch (e) {
     console.error(`✗ ${id} : ${e.stack || e.message}`);
+    if (STATIC_GAMES[id]) {
+      let any = false;
+      for (const tcg of STATIC_GAMES[id]) {
+        for (const lang of LANGS) any = (await keepPrevious(outDir, tcg, lang).catch(() => false)) || any;
+      }
+      if (any) {
+        console.log(`::warning::${id} : source indisponible aujourd'hui, version de la veille republiée`);
+        kept.push(id);
+        continue;
+      }
+    }
     failures.push(id);
   }
 }
@@ -35,5 +55,5 @@ try {
 } catch (e) {
   console.error(`✗ contrôle de complétude : ${e.stack || e.message}`);
 }
-await writeJSON(`${outDir}/meta.json`, { generatedAt: new Date().toISOString(), tcgs: only.filter((id) => !failures.includes(id)) });
+await writeJSON(`${outDir}/meta.json`, { generatedAt: new Date().toISOString(), tcgs: only.filter((id) => !failures.includes(id)), kept });
 if (failures.length) process.exit(1);
