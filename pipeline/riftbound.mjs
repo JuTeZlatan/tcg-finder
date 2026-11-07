@@ -1,7 +1,7 @@
 // Riftbound : catalogue depuis la galerie officielle Riot (en-us, zh-cn ; fr-fr dès que Riot y publie les noms français),
 // prix TCGplayer via Riftcodex (identifiants) + TCGCSV, prix Cardmarket via ses fichiers publics.
 import {
-  getJSON, getText, sleep, htmlToText, normName, loadCardmarket, cardmarketBlock, cardmarketRef, matchByPrice,
+  tcgplayerDetails, getJSON, getText, sleep, htmlToText, normName, loadCardmarket, cardmarketBlock, cardmarketRef, matchByPrice,
   getUsdToEur, tcgcsvPrices, tcgcsvGroups, tcgcsvGroupProducts, tcgplayerBlock, tcgplayerRef, isFoilOnly, writeTcg,
   isRecent, addTcgplayerVariants, productTag, addSetImages,
 } from './lib.mjs';
@@ -205,6 +205,14 @@ export async function build(outDir) {
           const v = fieldValue(f);
           if (v && f.label) details.push([f.label, v]);
         }
+        // Type absent de la galerie (extension récente) : celui de Riftcodex (range la carte dans l'appli).
+        if (!details.some(([k]) => /^(type|card type)$/i.test(k))) {
+          const k = ref?.classification;
+          // … sinon celui du produit TCGplayer associé à la carte.
+          const fromTcg = tcgFallback.get(c) && tcgplayerDetails(tcgFallback.get(c)).details.find(([key]) => key === 'type')?.[1];
+          const type = [k?.supertype, k?.type].filter(Boolean).join(' ') || fromTcg;
+          if (type) details.push(['type', type]);
+        }
         const text = c.text?.richText?.body ?? c.effect?.richText?.body;
         return {
           id: c.id,
@@ -266,8 +274,8 @@ function addVariants(sets, { allProducts, groups, cm, cmUsed, fx, lang }) {
         subtitle: base?.subtitle,
         image: p.image,
         thumb: p.thumb,
-        details: [['set', g?.name], ...(base ? base.details.filter(([k]) => k !== 'set') : [['number', p.number]])],
-        texts: base?.texts || [],
+        details: [['set', g?.name], ...(base ? base.details.filter(([k]) => k !== 'set') : tcgplayerDetails(p).details)],
+        texts: base?.texts || tcgplayerDetails(p).texts,
         prices: [tcgplayerBlock(p.prices, p.url)],
         links: [
           { label: 'TCGplayer', url: p.url },

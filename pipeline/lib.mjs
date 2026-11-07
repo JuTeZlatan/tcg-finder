@@ -89,6 +89,17 @@ export function htmlToText(html) {
 // ---------- Cardmarket : fichiers publics quotidiens (catalogue + guide des prix) ----------
 const CM = 'https://downloads.s3.cardmarket.com/productCatalog';
 
+// Caractéristiques d'un produit TCGplayer quand aucune carte de base ne les fournit (cartes ajoutées depuis TCGplayer) :
+// type, rareté, couleur, coût… et texte. Le type range la carte dans l'appli (personnage, événement, lieu…).
+const TCGPLAYER_FIELDS = { CardType: 'type', 'Card Type': 'type', Rarity: 'rarity', Color: 'color', Cost: 'cost', Power: 'power', Subtypes: 'subTypes', Domain: 'domain', Might: 'might' };
+export function tcgplayerDetails(p) {
+  const ext = Object.fromEntries((p.extendedData || []).map((e) => [e.name, htmlToText(e.value)]));
+  return {
+    details: clean([['number', p.number], ...Object.entries(TCGPLAYER_FIELDS).map(([k, key]) => [key, ext[k]?.replace(/;/g, ', ')])]),
+    texts: ext.Description ? [{ titleKey: 'effect', body: ext.Description }] : [],
+  };
+}
+
 export async function loadCardmarket(gameId) {
   const [catalog, guide] = await Promise.all([
     getJSON(`${CM}/productList/products_singles_${gameId}.json`),

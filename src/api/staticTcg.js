@@ -98,13 +98,33 @@ const productId = (c) => {
   return m ? Number(m[1]) : null;
 };
 
+// Type d'une carte (« Event », « LIEU », « Objet »…) → groupe de cartes non-personnages, pour qu'aucune carte ne manque
+// à l'onglet des personnages. Libellés en français (traduits à l'affichage).
+const TYPE_GROUPS = [
+  [/event|évén|evén|événement|イベント/i, 'Événements'],
+  [/stage|location|lieu|battlefield|ステージ/i, 'Lieux et terrains'],
+  [/item|objet|gear|attachment|upgrade|equipment/i, 'Objets et équipements'],
+  [/action|spell|program|sort/i, 'Actions et sorts'],
+  [/^base$/i, 'Bases'],
+  [/rune/i, 'Runes'],
+  [/mission/i, 'Missions'],
+  [/extra/i, 'Cartes Extra'],
+  [/token|jeton/i, 'Jetons'],
+  [/energy|énergie/i, 'Énergies'],
+];
+const OTHER_GROUP = 'Autres cartes';
+const withoutTag = (name) => String(name).replace(/\s*\(.*$/, '').trim();
+const typeOfCard = (c) => String(c.details?.find(([k]) => k === 'type' || k === 'Card Type')?.[1] || '');
+const typeGroup = (type) => (type && TYPE_GROUPS.find(([re]) => re.test(type))?.[1]) || OTHER_GROUP;
+
 function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadSet) {
   // Toutes les cartes de toutes les extensions, avec leur personnage, de la plus récente à la plus ancienne.
   const allCards = memo(async (lang) => {
     const sets = [...(await loadSets(lang))].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    const keySets = keyLang && keyLang !== lang ? await loadSets(keyLang) : null;
-    const keyById = new Map();
-    if (keySets) for (const s of keySets) for (const c of await loadSet(s.id, keyLang)) keyById.set(c.id, of(c));
+    // Langue de référence (noms anglais communs à toutes les langues) : rangement complet de cette langue, par carte.
+    const keyById = keyLang && keyLang !== lang
+      ? new Map((await allCards(keyLang)).map((x) => [x.card.id, x]))
+      : null;
     const out = [];
     // Repères de dates pour les cartes des extensions « fourre-tout » (promos, tournois…), datées de leur première
     // sortie (ou d'une mise à jour TCGplayer) alors que leurs cartes s'étalent sur des années :
@@ -113,11 +133,24 @@ function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadS
     const prefixDate = new Map();
     const productStarts = [];
     const totalDates = new Map(); // nombre de cartes → dates des extensions de cette taille
+    const pending = []; // cartes non rattachées à un personnage au premier passage
     for (const s of sets) {
       const cards = await loadSet(s.id, lang);
+      // Cartes sans type (ajoutées depuis TCGplayer, versions alternatives) : type de la carte de même numéro.
+      const typed = new Map();
+      for (const c of cards) if (typeOfCard(c) && !typed.has(c.number)) typed.set(c.number, c);
       for (const c of cards) {
-        const key = keySets ? keyById.get(c.id) : of(c);
-        if (key) out.push({ key, card: c, set: s, date: s.date || '' });
+        const sibling = !typeOfCard(c) ? typed.get(c.number) : null;
+        const type = typeOfCard(c) || (sibling ? typeOfCard(sibling) : '');
+        const ref = keyById?.get(c.id);
+        if (ref) {
+          out.push({ key: ref.key, group: ref.group, card: c, set: s, date: s.date || '', type });
+          continue;
+        }
+        const key = keyById ? null : of(c) || (sibling ? of({ ...c, details: sibling.details }) : null);
+        const x = { key, card: c, set: s, date: s.date || '', type };
+        if (key) out.push(x);
+        else pending.push(x);
       }
       if (isUmbrella(s) || !s.date) continue;
       if (s.count) totalDates.set(s.count, [...(totalDates.get(s.count) || []), s.date]);
@@ -126,6 +159,15 @@ function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadS
       // repère fiable seulement si l'extension vient surtout de TCGplayer (sinon n° ajoutés après coup, dans le désordre)
       const ids = cards.map(productId).filter(Boolean);
       if (ids.length >= 10 && ids.length >= cards.length / 2) productStarts.push([Math.min(...ids), s.date]);
+    }
+    // Cartes restantes : nom d'un personnage connu (« Nico Robin » sans type), sinon groupe de leur type
+    // (Événements, Lieux…), sinon « Autres cartes » : aucune carte ne manque à l'onglet.
+    const known = new Map(out.filter((x) => !x.group).map((x) => [groupKey(x.key), x.key]));
+    for (const x of pending) {
+      const byName = !x.type ? known.get(groupKey(withoutTag(x.card.name))) : null;
+      if (byName) out.push({ ...x, key: byName });
+      // sans type : le nom peut suffire (« Energy Marker (E-02) » → Énergies)
+      else out.push({ ...x, key: typeGroup(x.type || withoutTag(x.card.name)), group: true });
     }
     productStarts.sort((a, b) => a[0] - b[0]);
     let latest = '';
@@ -148,10 +190,11 @@ function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadS
       const counts = new Map();
       for (const x of out) counts.set(x.key, (counts.get(x.key) || 0) + 1);
       // Le plus court d'au moins deux mots d'abord (« Ultra Instinct Son Goku » → « Son Goku »), puis un mot seul.
-      const known = [...counts].filter(([, n]) => n >= 3).map(([k]) => k)
+      const known = [...counts].filter(([k, n]) => n >= 3 && !out.find((x) => x.key === k)?.group).map(([k]) => k)
         .sort((a, b) => (b.includes(' ') - a.includes(' ')) || a.length - b.length);
       const knownSet = new Set(known);
       for (const x of out) {
+        if (x.group) continue;
         if (knownSet.has(x.key) && x.key.split(' ').length === 2) continue; // vrai nom (« Son Goku », « Goku Black »)
         const match = known.find((k) => k !== x.key && x.key.endsWith(` ${k}`));
         if (match) x.key = match;
@@ -165,22 +208,23 @@ function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadS
     // [{ id, name, image, count }] par ordre alphabétique ; image : carte la plus récente du personnage.
     getCharacters: memo(async (lang) => {
       const groups = new Map();
-      for (const { key, card } of await allCards(lang)) {
-        const id = groupKey(key);
-        if (!groups.has(id)) groups.set(id, { id, image: card.thumb || card.image, count: 0, spellings: new Map() });
+      for (const { key, card, group } of await allCards(lang)) {
+        const id = group ? `group-${groupKey(key)}` : groupKey(key);
+        if (!groups.has(id)) groups.set(id, { id, image: card.thumb || card.image, count: 0, spellings: new Map(), group: !!group });
         const g = groups.get(id);
         g.count++;
         g.spellings.set(key, (g.spellings.get(key) || 0) + 1);
       }
       // Nom affiché : l'orthographe la plus fréquente (« Monkey D. Luffy » plutôt que « Monkey.D.Luffy »).
+      // Groupes de types (Événements, Lieux…) : après les personnages.
       return [...groups.values()]
         .map(({ spellings, ...g }) => ({ ...g, name: [...spellings].sort((a, b) => b[1] - a[1])[0][0] }))
-        .sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+        .sort((a, b) => (a.group - b.group) || a.name.localeCompare(b.name, 'fr'));
     }),
     // Toutes les cartes d'un personnage, de la plus récente à la plus ancienne.
     getCharacterCards: memo(async (id, lang) =>
       (await allCards(lang))
-        .filter((x) => groupKey(x.key) === id)
+        .filter((x) => (x.group ? `group-${groupKey(x.key)}` : groupKey(x.key)) === id)
         .map(({ card: c, set: s, date }) => ({
           id: c.id, name: c.name, number: c.number, image: c.thumb || c.image, setId: s.id,
           subtitle: [s.name, date].filter(Boolean).join(' · '),

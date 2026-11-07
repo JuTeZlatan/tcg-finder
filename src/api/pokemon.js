@@ -211,6 +211,11 @@ const speciesList = memo(async () => {
   }
 });
 const SPECIES_LANG = { fr: 1, en: 2, ja: 3, zh: 4 };
+// Nom de la catégorie chez TCGdex, dans chaque langue (le filtre se fait sur le texte localisé).
+const CATEGORY_NAMES = {
+  trainer: { en: 'Trainer', fr: 'Dresseur', de: 'Trainer', it: 'Allenatore', es: 'Entrenador', ja: 'Trainer', zh: 'Trainer' },
+  energy: { en: 'Energy', fr: 'Énergie', de: 'Energie', it: 'Energia', es: 'Energía', ja: 'Energy', zh: 'Energy' },
+};
 
 // Promos « Black Star » (SVP, SWSH…) : une seule extension datée de son début, numérotée au fil des sorties sur
 // plusieurs années. Date estimée d'une carte : sa place dans la numérotation, entre le début de cette série
@@ -355,15 +360,22 @@ const adapter = {
   // Onglet « Pokémon » : une entrée par espèce (n° du Pokédex national), illustration officielle, nom dans la langue des cartes.
   charactersLabel: 'Pokémon',
   characterOrder: 'Pokédex',
-  getCharacters: memo(async (lang) =>
-    (await speciesList()).map((row) => ({
+  // Après les espèces : les cartes Dresseur et Énergie, pour qu'aucune carte ne manque à l'onglet.
+  getCharacters: memo(async (lang) => [
+    ...(await speciesList()).map((row) => ({
       id: String(row[0]), number: row[0], name: row[SPECIES_LANG[lang] ?? 2] || row[2],
       image: `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${row[0]}.png`,
-    }))),
-  // Toutes les cartes d'une espèce (TCGdex filtre par n° de Pokédex), de la plus récente à la plus ancienne.
+    })),
+    { id: 'trainer', number: 100000, name: 'Dresseurs', group: true, image: null },
+    { id: 'energy', number: 100001, name: 'Énergies', group: true, image: null },
+  ]),
+  // Toutes les cartes d'une espèce (TCGdex filtre par n° de Pokédex) ou d'une catégorie (Dresseurs, Énergies),
+  // de la plus récente à la plus ancienne.
   getCharacterCards: memo(async (dexId, lang) => {
+    const category = CATEGORY_NAMES[dexId]?.[lang] ?? CATEGORY_NAMES[dexId]?.en;
+    const query = category ? `category=${encodeURIComponent(category)}` : `dexId=eq:${encodeURIComponent(dexId)}`;
     const [cards, sets, collected] = await Promise.all([
-      getJSON(`${base(lang)}/cards?dexId=eq:${encodeURIComponent(dexId)}`, { allowMissing: true }),
+      getJSON(`${base(lang)}/cards?${query}`, { allowMissing: true }),
       adapter.getSets(lang),
       tcgplayerPrices(lang),
     ]);

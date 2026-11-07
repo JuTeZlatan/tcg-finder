@@ -4,7 +4,7 @@
 //   les versions d'une même carte sont départagées grâce aux prix relevés par OPTCG API pour chaque identifiant officiel ;
 // - prix Cardmarket via ses fichiers publics, associés par code de carte puis par proximité de prix.
 import {
-  getJSON, getText, sleep, htmlToText, clean, loadCardmarket, cardmarketBlock, cardmarketRef, matchByPrice,
+  tcgplayerDetails, getJSON, getText, sleep, htmlToText, clean, loadCardmarket, cardmarketBlock, cardmarketRef, matchByPrice,
   getUsdToEur, tcgcsvGroups, tcgcsvGroupProducts, tcgplayerBlock, tcgplayerRef, isFoilOnly, writeTcg,
   isRecent, addTcgplayerVariants, productTag, addSetImages,
 } from './lib.mjs';
@@ -225,8 +225,8 @@ function addVariants(sets, { tcg, cm, cmUsed, codeOf, fx, lang, enBases }) {
         subtitle: base?.subtitle,
         image: p.image,
         thumb: p.thumb,
-        details: [['set', g?.name], ...(base ? base.details.filter(([k]) => k !== 'set') : [['number', p.number]])],
-        texts: base?.texts || [],
+        details: [['set', g?.name], ...(base ? base.details.filter(([k]) => k !== 'set') : tcgplayerDetails(p).details)],
+        texts: base?.texts || tcgplayerDetails(p).texts,
         prices: [tcgplayerBlock(p.prices, p.url)],
         links: [
           { label: 'Cardmarket', url: `https://www.cardmarket.com/${lang === 'fr' ? 'fr' : 'en'}/OnePiece/Products/Search?searchString=${encodeURIComponent(p.number)}` },

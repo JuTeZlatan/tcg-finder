@@ -44,7 +44,14 @@ const riftbound = createStaticTcg({
   englishFallback: true,
   source: { name: 'Riot Games, Riftcodex, Cardmarket, TCGplayer' },
   // Champions : cartes « Nom - Titre » (noms anglais, aussi pour regrouper les cartes chinoises).
-  characters: { label: 'Champions', keyLang: 'en', of: (c) => (c.name.includes(' - ') ? c.name.split(' - ')[0].trim() : null) },
+  characters: {
+    label: 'Personnages',
+    keyLang: 'en',
+    // « Sett - Kingpin », « Sett, Brawler » (cartes ajoutées depuis TCGplayer) → « Sett ».
+    of: (c) => (c.name.includes(' - ') || /unit|legend|champion/i.test(typeOf(c)) || (!typeOf(c) && c.name.includes(', '))
+      ? withoutTags(c.name).split(/ - |, /)[0].trim() || null
+      : null),
+  },
   note: {
     zh: 'Galerie officielle en chinois simplifié. Prix : ceux des cartes internationales de même numéro.',
   },
@@ -100,7 +107,7 @@ const cyberpunk = createStaticTcg({
   languages: ['en'],
   englishFallback: true,
   source: { name: 'Cardmarket, TCGplayer' },
-  characters: { label: 'Légendes', of: (c) => (/legend/i.test(typeOf(c)) ? withoutTags(c.name.split(' - ')[0]) : null) },
+  characters: { label: 'Personnages', of: (c) => (/legend|unit/i.test(typeOf(c)) ? withoutTags(c.name.split(' - ')[0]) : null) },
 });
 const naruto = createStaticTcg({
   id: 'naruto',

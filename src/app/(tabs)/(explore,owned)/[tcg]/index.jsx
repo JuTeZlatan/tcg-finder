@@ -40,10 +40,12 @@ export default function TcgScreen() {
 
   const shownCharacters = useMemo(() => {
     const f = filter.trim().toLowerCase();
-    const list = (characters.data || []).filter((c) => !f || c.name.toLowerCase().includes(f) || String(c.number ?? '') === f);
+    const list = (characters.data || []).filter((c) => !f || c.name.toLowerCase().includes(f) || t(c.name).toLowerCase().includes(f) || String(c.number ?? '') === f);
+    // Groupes de cartes (Événements, Lieux, Dresseurs…) toujours après les personnages.
+    const groupsLast = (a, b) => (!!a.group - !!b.group);
     return order === 'number' && tcg.characterOrder
-      ? [...list].sort((a, b) => a.number - b.number)
-      : [...list].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+      ? [...list].sort((a, b) => groupsLast(a, b) || a.number - b.number)
+      : [...list].sort((a, b) => groupsLast(a, b) || a.name.localeCompare(b.name, 'fr'));
   }, [characters.data, filter, order, tcg.characterOrder]);
 
   const search = () => {
@@ -131,13 +133,13 @@ export default function TcgScreen() {
           renderItem={({ item: c }) => (
             <Pressable
               style={({ pressed }) => [{ width: tileWidth }, pressed && { opacity: 0.7 }]}
-              onPress={() => router.push({ pathname: '/[tcg]/character/[charId]', params: { tcg: tcg.id, charId: c.id, name: c.name } })}
+              onPress={() => router.push({ pathname: '/[tcg]/character/[charId]', params: { tcg: tcg.id, charId: c.id, name: c.group ? t(c.name) : c.name } })}
             >
               <View style={styles.charImg}>
                 {c.image ? <Image source={c.image} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" recyclingKey={String(c.id)} /> : null}
                 {c.number && tcg.characterOrder ? <Text style={styles.charNumber}>#{c.number}</Text> : null}
               </View>
-              <Text style={styles.charName} numberOfLines={2}>{c.name}</Text>
+              <Text style={[styles.charName, c.group && styles.groupName]} numberOfLines={2}>{c.group ? `${t(c.name)} (${c.count})` : c.name}</Text>
             </Pressable>
           )}
         />
@@ -214,5 +216,6 @@ const styles = StyleSheet.create({
   meta: { color: colors.muted, fontSize: 12, marginTop: 2 },
   charImg: { aspectRatio: 1, borderRadius: radius, overflow: 'hidden', backgroundColor: colors.surfaceAlt },
   charNumber: { position: 'absolute', top: 4, left: 6, color: colors.muted, fontSize: 11, fontWeight: '700' },
+  groupName: { color: colors.accent },
   charName: { color: colors.text, fontSize: 12, fontWeight: '600', marginTop: 4, textAlign: 'center' },
 });
