@@ -13,22 +13,25 @@ const fwCode = (s) => s.match(/\(([A-Z]{2,4}\d{0,2}-\d{2,3})\)/)?.[1];
 // Masters : par nom, sans les mentions entre parenthèses / crochets ni le code TCGplayer.
 const mastersName = (s) => normName(s.replace(/\s*\[[^\]]*\]/g, '').replace(/\s*\([^)]*\)/g, '').replace(/\s+-\s+[A-Z0-9_]+-[A-Z0-9]+$/i, ''));
 
-const FW_JP = 'https://www.dbs-cardgame.com/fw/jp/cardlist/';
-const FW_IMAGES = 'https://www.dbs-cardgame.com/fw/images/cards/card/jp/';
+const FW_SITE = 'https://www.dbs-cardgame.com/fw';
+const FW_LISTS = { en: `${FW_SITE}/en/cardlist/`, ja: `${FW_SITE}/jp/cardlist/` };
+const FW_IMAGES = { en: `${FW_SITE}/images/cards/card/en/`, ja: `${FW_SITE}/images/cards/card/jp/` };
 
-// Cartes du site japonais : code → [{ name, image, variant }] (« _p1 », « _p2 » : versions alternatives).
-async function fwJapanese() {
+// Cartes du site officiel (anglais ou japonais) : code → [{ name, image, variant }] (« _p1 », « _p2 » : versions
+// alternatives).
+async function fwOfficial(lang) {
+  const FW_JP = FW_LISTS[lang];
   const home = await getText(FW_JP);
   const categories = [...home.matchAll(/data-val="(\d+)"/g)].map((m) => m[1]);
   const byCode = new Map();
   for (const cat of categories) {
     const html = await getText(`${FW_JP}?search=true&category%5B%5D=${cat}`);
     await sleep(400);
-    for (const m of html.matchAll(/data-src="detail\.php\?card_no=([A-Z0-9-]+)(?:&p=(_p\d+))?"[^>]*>\s*<img[^>]*data-src="[^"]*\/jp\/([^"]+)"[^>]*alt="[A-Z0-9-]+ ([^"]*)"/g)) {
+    for (const m of html.matchAll(/data-src="detail\.php\?card_no=([A-Z0-9-]+)(?:&p=(_p\d+))?"[^>]*>\s*<img[^>]*data-src="[^"]*\/(?:jp|en)\/([^"]+)"[^>]*alt="[A-Z0-9-]+ ([^"]*)"/g)) {
       const [, code, variant = '', file, name] = m;
       if (!byCode.has(code)) byCode.set(code, []);
       const list = byCode.get(code);
-      if (!list.some((x) => x.variant === variant)) list.push({ name: name.trim(), image: FW_IMAGES + file, variant });
+      if (!list.some((x) => x.variant === variant)) list.push({ name: name.trim(), image: FW_IMAGES[lang] + file, variant });
     }
   }
   for (const list of byCode.values()) list.sort((a, b) => a.variant.localeCompare(b.variant, undefined, { numeric: true }));
@@ -37,8 +40,31 @@ async function fwJapanese() {
 
 // Version japonaise : chaque carte anglaise prend le nom et l'image japonais de même code ; une carte anglaise marquée
 // (Alternate Art, SPR…) prend la n-ième version alternative japonaise, dans l'ordre des numéros TCGplayer.
+// Cartes du site officiel absentes de TCGplayer (ex. FB10-067) : ajoutées à leur extension (même préfixe de code), sans
+// prix, pour que chaque extension soit complète.
+function addOfficialMissing(sets, official, lang) {
+  const known = new Set(sets.flatMap((s) => s.cards.map((c) => String(c.number).toUpperCase())));
+  const setOf = (code) => sets.find((s) => s.cards.some((c) => String(c.number).toUpperCase().startsWith(`${code.split('-')[0]}-`)));
+  let added = 0;
+  for (const [code, list] of official) {
+    if (known.has(code)) continue;
+    const set = setOf(code);
+    if (!set) continue;
+    const base = list.find((x) => !x.variant) || list[0];
+    set.cards.push({
+      id: `fw-${code}`, name: base.name, number: code, image: base.image, thumb: base.image,
+      details: [['set', set.name], ['number', code]], texts: [], prices: [],
+      links: [{ label: 'Dragon Ball Super Card Game', url: `${FW_LISTS[lang]}?search=true&q=${code}` }],
+    });
+    added++;
+  }
+  for (const s of sets) s.cards.sort((a, b) => String(a.number).localeCompare(String(b.number), undefined, { numeric: true }));
+  if (added) console.log(`  dbsfw/${lang} : ${added} carte(s) du site officiel absentes de TCGplayer ajoutées`);
+  return added;
+}
+
 async function writeFusionWorldJapanese(outDir, sets) {
-  const jp = await fwJapanese();
+  const jp = await fwOfficial('ja');
   let matched = 0;
   const jaSets = sets.map((set) => {
     const altRank = new Map();
@@ -73,6 +99,9 @@ export async function build(outDir) {
     cardKey: (p) => p.number.toUpperCase(),
     cmUrl: (name, number) => cmUrl(number),
   });
+  // Anglais complété avec la liste officielle (cartes absentes de TCGplayer), puis le japonais.
+  const en = await fwOfficial('en').catch((e) => { console.error(`✗ dbsfw liste officielle : ${e.message}`); return null; });
+  if (en && addOfficialMissing(fwSets, en, 'en')) await writeTcg(outDir, 'dbsfw', 'en', fwSets);
   await writeFusionWorldJapanese(outDir, fwSets).catch((e) => console.error(`✗ dbsfw/ja : ${e.message}`));
   await buildTcgcsvGame(outDir, {
     id: 'dbsmasters',

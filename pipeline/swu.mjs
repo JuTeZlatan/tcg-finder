@@ -52,6 +52,14 @@ export async function build(outDir) {
     cmUrl,
   });
 
+  // Cartes de la base officielle absentes de TCGplayer (ex. versions Hyperspace pas encore listées) : ajoutées à leur
+  // extension, sans prix, pour que chaque extension soit complète. Les langues sont dérivées de l'anglais complété.
+  try {
+    if (addOfficialMissing(sets, await officialCards('en'))) await writeTcg(outDir, 'swu', 'en', sets);
+  } catch (e) {
+    console.error(`✗ swu : liste officielle anglaise indisponible (${e.message})`);
+  }
+
   // Une langue en échec n'empêche pas les autres (ni la publication des autres jeux) : la version de la veille reste.
   for (const locale of LOCALES) {
     await buildLocale(outDir, sets, locale).catch(async (e) => {
@@ -59,6 +67,37 @@ export async function build(outDir) {
       console.error(`✗ swu/${locale} : ${e.message}${kept ? ' (version de la veille republiée)' : ''}`);
     });
   }
+}
+
+// Numéro de base d'une carte TCGplayer : « 019/252 » → 19, « 19/264 // T01 » → 19, « 285 » → 285.
+const baseNumber = (number) => parseInt(String(number || '').split('//')[0], 10) || null;
+
+function addOfficialMissing(sets, official) {
+  let added = 0;
+  for (const set of sets) {
+    const code = String(set.id).replace(/-\d+$/, '');
+    const present = new Set(set.cards.map((c) => baseNumber(c.number)).filter(Boolean));
+    const missing = official.filter((c) => c.expansion?.data?.attributes?.code === code && c.cardNumber && !present.has(Number(c.cardNumber)));
+    for (const c of missing) {
+      present.add(Number(c.cardNumber));
+      const image = imageOf(c);
+      const variant = c.variantTypes?.data?.map((v) => v.attributes?.name).filter((n) => n && n !== 'Standard').join(', ');
+      set.cards.push({
+        id: `swu-${code}-${c.cardNumber}`,
+        name: `${c.title}${c.subtitle ? ` - ${c.subtitle}` : ''}${variant ? ` (${variant})` : ''}`,
+        number: c.cardCount && Number(c.cardNumber) <= Number(c.cardCount) ? `${String(c.cardNumber).padStart(3, '0')}/${c.cardCount}` : String(c.cardNumber),
+        image, thumb: image,
+        details: clean([['set', set.name], ['number', String(c.cardNumber)], ['type', c.type?.data?.attributes?.name], ['rarity', c.rarity?.data?.attributes?.name]]),
+        texts: c.text ? [{ titleKey: 'effect', body: htmlToText(c.text) }] : [],
+        prices: [],
+        links: [{ label: 'Star Wars: Unlimited', url: `https://starwarsunlimited.com/cards?cid=${c.cardId}` }],
+      });
+      added++;
+    }
+  }
+  for (const set of sets) set.cards.sort((a, b) => (baseNumber(a.number) || 0) - (baseNumber(b.number) || 0));
+  if (added) console.log(`  swu/en : ${added} carte(s) de la base officielle absentes de TCGplayer ajoutées`);
+  return added;
 }
 
 async function buildLocale(outDir, sets, locale) {

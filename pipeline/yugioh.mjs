@@ -3,11 +3,26 @@
 // puis l'édition (rareté) par proximité de prix avec TCGplayer (prix de l'édition fourni par YGOPRODeck).
 // Sortie : pipeline/out/yugioh/cardmarket.json = { "LOB-EN001|Ultra Rare": [idProduct, réf, tendance, plus bas, moy. 30 j] }
 import {
-  getJSON, writeJSON, num, sleep, normName, loadCardmarket, cardmarketRef, buildProductIndex, matchByPrice, getUsdToEur,
+  getJSON, getText, htmlToText, writeJSON, num, sleep, normName, loadCardmarket, cardmarketRef, buildProductIndex, matchByPrice, getUsdToEur,
   tcgcsvCategoryId, tcgcsvGroups, tcgcsvGroupProducts,
 } from './lib.mjs';
 
 const CARDMARKET_GAME = 3;
+
+// Base officielle Konami : liste des produits (nom → n° de produit) et cartes d'un produit (noms anglais).
+const KONAMI = 'https://www.db.yugioh-card.com/yugiohdb';
+async function konamiPacks() {
+  const html = await getText(`${KONAMI}/card_list.action?request_locale=en`);
+  const out = new Map();
+  for (const m of html.matchAll(/<p>([^<]*)<\/p>\s*<input type="hidden" class="link_value" value="[^"]*pid=(\d+)/g)) {
+    out.set(normName(htmlToText(m[1])), m[2]);
+  }
+  return out;
+}
+async function konamiPackCards(pid) {
+  const html = await getText(`${KONAMI}/card_search.action?ope=1&sess=1&pid=${pid}&rp=99999&request_locale=en`);
+  return [...html.matchAll(/<span class="card_name">\s*([^<]+?)\s*<\/span>/g)].map((m) => htmlToText(m[1]));
+}
 
 export async function build(outDir) {
   console.log('Yu-Gi-Oh! (prix Cardmarket par édition)…');
@@ -22,6 +37,53 @@ export async function build(outDir) {
       if (!bySet.has(e.set_name)) bySet.set(e.set_name, []);
       bySet.get(e.set_name).push({ name: c.name, code: e.set_code, rarity: e.set_rarity, tcgUsd: num(e.set_price) });
     }
+  }
+
+  // Complétude : codes de carte distincts de chaque extension (LOB-001…) comparés au nombre annoncé par YGOPRODeck.
+  // Extension incomplète : sa liste officielle (base Konami) donne les cartes manquantes, retrouvées par leur nom chez
+  // YGOPRODeck (yugioh/completions.json, ajoutées par l'appli) ; le reste est signalé dans le rapport du jour.
+  try {
+    const announced = await getJSON('https://db.ygoprodeck.com/api/v7/cardsets.php');
+    const idByName = new Map(ygo.data.map((c) => [normName(c.name), c.id]));
+    const namesBySet = new Map();
+    for (const c of ygo.data) for (const e of c.card_sets || []) {
+      if (!namesBySet.has(e.set_name)) namesBySet.set(e.set_name, new Set());
+      namesBySet.get(e.set_name).add(normName(c.name));
+    }
+    const packs = await konamiPacks().catch(() => new Map());
+    const completions = {};
+    const incomplete = [];
+    let added = 0;
+    for (const set of announced) {
+      const codes = new Set((bySet.get(set.set_name) || []).map((e) => e.code));
+      if (!(set.num_of_cards > 0 && codes.size < set.num_of_cards)) continue;
+      let missing = set.num_of_cards - codes.size;
+      const pid = packs.get(normName(set.set_name));
+      if (pid) {
+        const known = namesBySet.get(set.set_name) || new Set();
+        // Produit Konami du même contenu seulement (même nombre de cartes, à 2 près) : une boîte « Tin » regroupe
+        // chez Konami ce que YGOPRODeck découpe en plusieurs extensions. Jamais plus que le nombre de cartes manquantes.
+        const list = await konamiPackCards(pid).catch(() => []);
+        const sameProduct = Math.abs(new Set(list.map(normName)).size - set.num_of_cards) <= 2;
+        for (const name of sameProduct ? list : []) {
+          if (missing <= 0) break;
+          const id = idByName.get(normName(name));
+          if (!id || known.has(normName(name))) continue;
+          (completions[set.set_name] ||= []).push(id);
+          known.add(normName(name));
+          added++;
+          missing--;
+        }
+        await sleep(300);
+      }
+      if (missing > 0) incomplete.push([set.set_name, missing, []]);
+    }
+    incomplete.sort((a, b) => b[1] - a[1]);
+    await writeJSON(`${outDir}/yugioh/completions.json`, completions);
+    await writeJSON(`${outDir}/yugioh/completeness.json`, { en: { added, incomplete } });
+    console.log(`  yugioh : ${added} carte(s) ajoutée(s) depuis la base Konami, ${incomplete.length} extension(s) encore incomplète(s)`);
+  } catch (e) {
+    console.error(`✗ yugioh : contrôle de complétude impossible (${e.message})`);
   }
 
   const keyOfProduct = (p) => normName(p.name);

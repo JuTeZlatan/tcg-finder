@@ -74,6 +74,10 @@ async function queryCards(param, lang) {
 const langParam = (lang) => (lang === 'en' ? '' : `&language=${lang}`);
 const fullCards = new Map();
 
+// Cartes d'une extension absentes de YGOPRODeck, retrouvées dans la base officielle Konami (yugioh/completions.json,
+// contrôlé chaque jour) : nom d'extension → identifiants de cartes.
+const completions = memo(async () => loadData('yugioh/completions.json', async () => ({})).catch(() => ({})));
+
 function summary(c, setName, lang) {
   fullCards.set(`${lang}:${c.id}`, c);
   const entry = setName ? c.card_sets?.find((s) => s.set_name === setName) : null;
@@ -119,9 +123,13 @@ const adapter = {
   }),
 
   getCards: memo(async (setName, lang) => {
-    return (await queryCards(`cardset=${encodeURIComponent(setName)}`, lang))
+    const cards = await queryCards(`cardset=${encodeURIComponent(setName)}`, lang);
+    const known = new Set(cards.map((c) => c.id));
+    const extra = ((await completions())?.[setName] || []).filter((id) => !known.has(id));
+    const added = extra.length ? await queryCards(`id=${extra.join(',')}`, lang).catch(() => []) : [];
+    return [...cards, ...added]
       .map((c) => summary(c, setName, lang))
-      .sort((a, b) => (a.number || '').localeCompare(b.number || '', undefined, { numeric: true }));
+      .sort((a, b) => (a.number || '~').localeCompare(b.number || '~', undefined, { numeric: true }));
   }),
 
   // Master set : chaque rareté et chaque tirage (1re édition, Unlimited, Limited) des cartes de l’extension.

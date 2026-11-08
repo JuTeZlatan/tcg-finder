@@ -253,6 +253,116 @@ async function imageFallbacks({ intlSets, jaSets, zhCards, intl, ja }) {
   return { images: out, missing };
 }
 
+// ---------- Complétude des extensions (toutes les langues) ----------
+// Chaque extension doit avoir tous ses numéros, de 1 au nombre officiel de cartes. Un numéro absent d'une langue chez
+// TCGdex est repris de la même extension dans une autre langue (pokemon/completions.json, ajouté par l'appli) ;
+// ce qui reste introuvable est signalé dans le rapport du jour.
+const INTL_LANGS = ['en', 'fr', 'de', 'it', 'es'];
+const SOURCE_ORDER = { en: ['fr', 'de', 'it', 'es'], fr: ['en', 'de', 'it', 'es'], de: ['en', 'fr', 'it', 'es'], it: ['en', 'fr', 'es', 'de'], es: ['en', 'fr', 'it', 'de'], ja: ['zh'], zh: ['ja'] };
+
+async function setsOfLang(lang, shown) {
+  const out = [];
+  for (const s of ((await getJSON(`${TCGDEX}/${lang}/sets`)) || []).filter((x) => shown.has(x.id))) {
+    const full = await getJSON(`${TCGDEX}/${lang}/sets/${encodeURIComponent(s.id)}`).catch(() => null);
+    if (full?.cards?.length) out.push({ id: full.id, cardCount: full.cardCount, cards: full.cards });
+    await sleep(40);
+  }
+  return out;
+}
+
+// Numéro d'une carte : chiffres de son numéro local (« 012 » → 12, « SV001 » → 1, « TG05 » → 5).
+const localNumber = (c) => Number(String(c.localId).match(/(\d+)/)?.[1]) || null;
+// Promos, kits, decks de championnat, cartes géantes : numérotation libre, pas de contrôle.
+const LOOSE_POKEMON = /promo|jumbo|black star|kit|deck|wcs|championship|mcdonald|futsal|poke ?card creator|^(.*p|tk-.*|wp|mcd.*|sp|np|basep)$/i;
+
+// Carte introuvable chez TCGdex dans toutes les langues : produit TCGplayer de l'extension reliée, même numéro
+// (catalogue international pour les langues occidentales, japonais pour le japonais et le chinois). Nom anglais,
+// photo TCGplayer ; n° de Pokédex d'après le nom de l'espèce, catégorie d'après le type de carte.
+function tcgplayerCard(tcgplayer, lang, setId, n, dexOfName, official) {
+  const res = tcgplayer?.[INTL_LANGS.includes(lang) ? 'intl' : 'ja'];
+  const groupId = res?.groupOfSet[setId];
+  const products = groupId && res.catalog.get(groupId)?.byNumber.get(String(n));
+  // Même total imprimé que l'extension (« 127/190 ») : écarte les groupes mal reliés (promos, decks…).
+  const same = (products || []).filter((x) => x.total && sameTotal(x, official));
+  const p = same.find((x) => !productTag(x.name)) || same[0];
+  if (!p) return null;
+  const name = p.name.replace(/\s*-\s*[A-Z]*\d+\/\S+$/, '').replace(/\s*\(.*\)\s*$/, '').trim();
+  const type = p.extendedData?.find((e) => e.name === 'CardType')?.value || '';
+  const category = /^trainer/i.test(type) ? 'Trainer' : /energy/i.test(type) ? 'Energy' : 'Pokemon';
+  const dex = category === 'Pokemon' ? dexOfName(name) : null;
+  return {
+    id: `tcg${p.productId}`, set: setId, localId: String(p.number).split('/')[0], name, tcgplayer: p.productId,
+    prices: p.prices.map((x) => [x.subTypeName, x.marketPrice ?? null, x.lowPrice ?? null]), dexId: dex ? [dex] : [], category,
+    details: (p.extendedData || []).filter((e) => ['Rarity', 'CardType', 'HP', 'Stage', 'Weakness', 'Retreat Cost'].includes(e.name) && e.value !== 'None').map((e) => [e.displayName, e.value]),
+    texts: (p.extendedData || []).filter((e) => /^(Attack \d|Ability|Description)$/.test(e.name))
+      .map((e) => e.value.replace(/<br\s*\/?>/g, '\n').replace(/<[^>]+>/g, '')),
+  };
+}
+
+async function completeness(byLang, knownSets, tcgplayer) {
+  // Nom anglais (ou japonais…) d'une espèce → n° du Pokédex national, pour les cartes reprises de TCGplayer.
+  const speciesCsv = await getText('https://raw.githubusercontent.com/PokeAPI/pokeapi/master/data/v2/csv/pokemon_species_names.csv').catch(() => '');
+  const dexByName = new Map();
+  for (const line of speciesCsv.split('\n').slice(1)) {
+    const [id, , name] = line.split(',');
+    if (name && !dexByName.has(normName(name))) dexByName.set(normName(name), Number(id));
+  }
+  const dexOfName = (name) => {
+    const words = normName(name).split(' ');
+    for (let k = words.length; k > 0; k--) for (let i = 0; i + k <= words.length; i++) {
+      const id = dexByName.get(words.slice(i, i + k).join(' '));
+      if (id) return id;
+    }
+    return null;
+  };
+  const completions = {};
+  const report = {};
+  const index = Object.fromEntries(Object.entries(byLang).map(([l, sets]) => [l, new Map(sets.map((s) => [s.id, s]))]));
+  for (const [lang, sets] of Object.entries(byLang)) {
+    completions[lang] = {};
+    let added = 0;
+    const incomplete = [];
+    for (const s of sets) {
+      if (LOOSE_POKEMON.test(s.id) || LOOSE_POKEMON.test(s.name || index.en?.get(s.id)?.name || '')) continue;
+      // Numérotation sans chiffres (« A », « ! » : Unown) ou à suffixe (« 24a ») : pas de contrôle de 1 au total ;
+      // extension vide chez TCGdex (cartes rangées dans l'extension principale) : rien à compléter.
+      if (!s.cards.length || s.cards.filter((c) => /^[A-Z]*\d+$/i.test(String(c.localId))).length < s.cards.length / 2) continue;
+      const official = s.cardCount?.official || index.en?.get(s.id)?.cardCount?.official;
+      if (!official || official > 600) continue;
+      const present = new Set(s.cards.map(localNumber).filter(Boolean));
+      const missing = [];
+      for (let n = 1; n <= official; n++) {
+        if (present.has(n)) continue;
+        const source = (SOURCE_ORDER[lang] || []).map((l) => index[l]?.get(s.id)).filter(Boolean)
+          .map((other) => other.cards.find((c) => localNumber(c) === n)).find(Boolean);
+        if (source) {
+          // N° de Pokédex et catégorie (fiche complète) : la carte rejoint aussi son Pokémon, les Dresseurs ou les Énergies.
+          const lang2 = Object.entries(index).find(([, m]) => m.get(s.id)?.cards.includes(source))?.[0] || 'en';
+          const full = await getJSON(`${TCGDEX}/${lang2 === 'zh' ? 'zh-tw' : lang2}/cards/${encodeURIComponent(source.id)}`).catch(() => null);
+          (completions[lang][s.id] ||= []).push({
+            id: source.id, localId: source.localId, name: source.name, image: source.image,
+            dexId: full?.dexId || [], category: full?.category || null,
+          });
+          added++;
+        } else {
+          const fromTcgplayer = tcgplayerCard(tcgplayer, lang, s.id, n, dexOfName, official);
+          if (fromTcgplayer) {
+            (completions[lang][s.id] ||= []).push(fromTcgplayer);
+            added++;
+          } else missing.push(n);
+        }
+      }
+      if (missing.length) incomplete.push([s.id, missing.length, missing.slice(0, 12)]);
+    }
+    // Nouvelle extension (inconnue la veille) encore incomplète : masquée dans l'appli jusqu'à ce qu'elle soit complète.
+    const known = new Set(knownSets?.[lang] || []);
+    const withheld = known.size ? incomplete.map(([id]) => id).filter((id) => !known.has(id)) : [];
+    report[lang] = { added, incomplete, withheld };
+    console.log(`  pokemon/${lang} : ${added} carte(s) manquante(s) reprises d'une autre langue, ${incomplete.length} extension(s) encore incomplète(s)`);
+  }
+  return { completions, report };
+}
+
 // Historique des prix (history/pokemon/<intl|ja>/<extension>.json) : TCGplayer « marché » de la version de base
 // (normale, sinon holo, sinon la première) et Cardmarket « tendance » (sinon moyenne).
 const BASE_FINISHES = ['Normal', 'Holofoil', 'Unlimited', '1st Edition'];
@@ -289,22 +399,44 @@ export async function build(outDir) {
 
   console.log('Pokémon (prix TCGplayer japonais)…');
   const jaSets = await japaneseSets();
-  const ja = matchSets(jaSets, await catalog(85), { compareNames: false });
+  const jaCatalog = await catalog(85);
+  const ja = matchSets(jaSets, jaCatalog, { compareNames: false });
   await writeJSON(`${outDir}/pokemon/tcgplayer-ja.json`, ja.out);
   await writeHistory(outDir, 'ja', ja.out);
   console.log(`  pokemon ja : ${ja.matchedSets}/${jaSets.length} extensions reliées, ${ja.matchedCards}/${ja.totalCards} cartes avec prix TCGplayer`);
 
   // Dates de sortie des extensions japonaises et chinoises (pour les trier de la plus récente à la plus ancienne).
   const zhDates = {};
+  const zhCounts = {};
   const zhCards = [];
   for (const s of (await getJSON(`${TCGDEX}/zh-tw/sets`)) || []) {
     const full = await getJSON(`${TCGDEX}/zh-tw/sets/${encodeURIComponent(s.id)}`).catch(() => null);
     if (full?.releaseDate) zhDates[s.id] = full.releaseDate;
+    if (full?.cardCount) zhCounts[s.id] = full.cardCount;
     zhCards.push(...(full?.cards || []));
     await sleep(40);
   }
   const jaDates = Object.fromEntries(jaSets.filter((s) => s.releaseDate).map((s) => [s.id, s.releaseDate]));
   await writeJSON(`${outDir}/pokemon/setdates.json`, { ja: jaDates, zh: zhDates });
+
+  // Complétude des extensions, dans chaque langue.
+  const shown = new Set(intlSets.map((s) => s.id));
+  const byLang = { en: intlSets };
+  for (const lang of INTL_LANGS.filter((l) => l !== 'en')) byLang[lang] = await setsOfLang(lang, shown);
+  byLang.ja = jaSets;
+  byLang.zh = [...Map.groupBy(zhCards, (c) => c.id.slice(0, c.id.lastIndexOf('-')))].map(([id, cards]) => ({ id, cards, cardCount: zhCounts[id] }));
+  const knownSets = await previousJSON('pokemon/known-sets.json');
+  const done = await completeness(byLang, knownSets, {
+    intl: { catalog: intlCatalog, groupOfSet: intl.groupOfSet }, ja: { catalog: jaCatalog, groupOfSet: ja.groupOfSet },
+  });
+  await writeJSON(`${outDir}/pokemon/completions.json`, done.completions);
+  await writeJSON(`${outDir}/pokemon/completeness.json`, done.report);
+  // Extensions publiées (connues) : toutes sauf celles mises en attente ; masquées par l'appli (pokemon/withheld.json).
+  const withheld = Object.fromEntries(Object.entries(done.report).map(([l, r]) => [l, r.withheld]));
+  await writeJSON(`${outDir}/pokemon/withheld.json`, withheld);
+  await writeJSON(`${outDir}/pokemon/known-sets.json`, Object.fromEntries(Object.entries(byLang).map(([l, sets]) => [
+    l, sets.map((s) => s.id).filter((id) => !withheld[l]?.includes(id)),
+  ])));
 
   const { images: fallbacks, missing } = await imageFallbacks({ intlSets, jaSets, zhCards, intl: intl.out, ja: ja.out });
   await writeJSON(`${outDir}/pokemon/images.json`, fallbacks);

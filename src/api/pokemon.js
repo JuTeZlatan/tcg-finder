@@ -17,8 +17,10 @@ const img = (url, quality = 'low') => (url ? `${url}/${quality}.webp` : null);
 const tcgplayerImage = (entry, size) => (entry ? `https://tcgplayer-cdn.tcgplayer.com/product/${entry[0]}_${size}.jpg` : null);
 // En dernier recours : la même carte dans une autre langue (pokemon/images.json, collecté chaque jour).
 let imageFallback = {};
+// Prix TCGplayer d'une carte ; carte reprise de TCGplayer (introuvable chez TCGdex) : son propre produit.
+const tcgplayerOf = (c, collected) => collected?.[c.id] || (c.tcgplayer ? [c.tcgplayer, c.prices || []] : undefined);
 const imageOf = (c, collected, quality = 'low', lang = null) => img(c.image, quality)
-  || tcgplayerImage(collected?.[c.id], quality === 'high' ? 'in_1000x1000' : '400w')
+  || tcgplayerImage(tcgplayerOf(c, collected), quality === 'high' ? 'in_1000x1000' : '400w')
   || fallbackImage(imageFallback[lang]?.[c.id], quality);
 // Adresse TCGdex (sans extension : on ajoute la qualité) ou image complète d'un site officiel.
 const fallbackImage = (url, quality) => (url && /\.(png|jpe?g|webp)$/i.test(url) ? url : img(url, quality));
@@ -75,6 +77,41 @@ const asianSetDates = memo(async () => {
 // Cartes japonaises : catalogue TCGplayer « Pokemon Japan » ; cartes chinoises : pas de prix TCGplayer.
 // Cartes chinoises : même numérotation que les japonaises → prix et photo de la carte japonaise équivalente.
 const TCGPLAYER_FILE = { fr: 'tcgplayer', en: 'tcgplayer', de: 'tcgplayer', it: 'tcgplayer', es: 'tcgplayer', ja: 'tcgplayer-ja', zh: 'tcgplayer-ja' };
+// Cartes absentes d'une extension dans une langue chez TCGdex, reprises de la même extension dans une autre langue
+// (pokemon/completions.json, contrôlé chaque jour) : chaque extension est complète.
+const completions = memo(async () => loadData('pokemon/completions.json', async () => ({})).catch(() => ({})));
+// Nouvelles extensions encore incomplètes (masquées jusqu'à ce qu'elles le soient) : langue → identifiants.
+const withheldSets = memo(async () => loadData('pokemon/withheld.json', async () => ({})).catch(() => ({})));
+const withCompletions = async (set, lang) => {
+  const extra = (await completions())?.[lang]?.[set.id] || [];
+  const known = new Set((set.cards || []).map((c) => c.localId));
+  return [...(set.cards || []), ...extra.filter((c) => !known.has(c.localId))];
+};
+// Fiche d'une carte reprise de TCGplayer (introuvable chez TCGdex dans toutes les langues) : nom anglais, photo,
+// caractéristiques et prix TCGplayer.
+const TCGPLAYER_DETAILS = { Rarity: 'rarity', HP: 'hp', Stage: 'stage', Weakness: 'weakness', 'Retreat Cost': 'retreat', 'Card Type': 'types' };
+async function completionCard(id, lang) {
+  const [all, sets] = await Promise.all([completions(), adapter.getSets(lang)]);
+  const c = Object.values(all?.[lang] || {}).flat().find((x) => x.id === id);
+  if (!c) throw new Error(`Carte ${id} introuvable`);
+  const set = sets.find((x) => x.id === c.set);
+  const entry = tcgplayerOf(c);
+  return {
+    name: c.name,
+    setId: c.set,
+    setName: set?.name,
+    image: imageOf(c, null, 'high', lang),
+    details: clean([
+      ['set', set?.name], ['number', set?.count ? `${c.localId} / ${set.count}` : c.localId], ['category', c.category],
+      ...(c.details || []).map(([k, v]) => [TCGPLAYER_DETAILS[k], v]).filter(([k]) => k),
+    ]),
+    variants: [],
+    texts: (c.texts || []).map((body) => ({ body })),
+    prices: prices(null, entry),
+    versions: [],
+    links: [{ label: 'TCGplayer', url: `https://www.tcgplayer.com/product/${c.tcgplayer}` }],
+  };
+}
 const loadImageFallback = memo(async () => {
   imageFallback = await loadData('pokemon/images.json', async () => ({})).catch(() => ({}));
   return imageFallback;
@@ -249,16 +286,17 @@ const adapter = {
   source: { name: 'TCGdex', url: 'https://tcgdex.dev' },
 
   getSets: memo(async (lang) => {
-    const [sets, { dates: intlDates, pocket }, localDates, setLogos] = await Promise.all([
-      getJSON(`${base(lang)}/sets`), setsMeta(), asianSetDates(), collectedSetLogos(),
+    const [sets, { dates: intlDates, pocket }, localDates, setLogos, withheld] = await Promise.all([
+      getJSON(`${base(lang)}/sets`), setsMeta(), asianSetDates(), collectedSetLogos(), withheldSets(),
     ]);
+    const waiting = new Set(withheld?.[lang] || []);
     // Extensions japonaises / chinoises : dates collectées chaque jour (l'API GraphQL ne couvre que l'international).
     const asian = lang === 'ja' || lang === 'zh';
     const dates = asian ? new Map(Object.entries(localDates[lang] || {})) : intlDates;
     // Sans logo ni symbole TCGdex : image du booster TCGplayer (le chinois reprend les codes japonais).
     const fallbackLogos = (asian ? setLogos.ja : setLogos.intl) || {};
     return sets
-      .filter((s) => !pocket.has(s.id))
+      .filter((s) => !pocket.has(s.id) && !waiting.has(s.id))
       .map((s) => ({
         id: s.id,
         name: s.name,
@@ -273,7 +311,7 @@ const adapter = {
   getCards: memo(async (setId, lang) => {
     const set = await getJSON(`${base(lang)}/sets/${encodeURIComponent(setId)}`);
     const collected = await tcgplayerPrices(lang);
-    return sortByNumber(set.cards || [], (c) => c.localId, setId).map((c) => ({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected, 'low', lang) }));
+    return sortByNumber(await withCompletions(set, lang), (c) => c.localId, setId).map((c) => ({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected, 'low', lang) }));
   }),
 
   // Master set : versions de chaque carte d'après les prix collectés (TCGplayer, Cardmarket, versions vendues à part),
@@ -286,9 +324,9 @@ const adapter = {
       intl ? tcgplayerVersions() : {},
       intl ? cardmarketProducts() : {},
     ]);
-    return sortByNumber(set.cards || [], (c) => c.localId, setId).flatMap((c) => {
+    return sortByNumber(await withCompletions(set, lang), (c) => c.localId, setId).flatMap((c) => {
       const pricing = ownCm[c.id] ? { cardmarket: { unit: 'EUR', ...ownCm[c.id][1] } } : null;
-      const cardPrices = [...prices(pricing, collected[c.id]), ...versionsBlock(versions[c.id])];
+      const cardPrices = [...prices(pricing, tcgplayerOf(c, collected)), ...versionsBlock(versions[c.id])];
       return versionsOfCard({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected, 'low', lang) }, cardPrices);
     });
   }),
@@ -305,9 +343,11 @@ const adapter = {
   }),
 
   getCard: memo(async (id, _setId, lang) => {
+    if (/^tcg\d+$/.test(id)) return completionCard(id, lang);
     const intl = TCGPLAYER_FILE[lang] === 'tcgplayer';
+    const cardIn = (l) => getJSON(`${base(l)}/cards/${encodeURIComponent(id)}`);
     const [c, collected, versions, ownCm] = await Promise.all([
-      getJSON(`${base(lang)}/cards/${encodeURIComponent(id)}`),
+      cardIn(lang).catch(() => cardIn(intl ? 'en' : 'ja')).catch(() => cardIn(intl ? 'fr' : 'zh')),
       tcgplayerPrices(lang),
       intl ? tcgplayerVersions() : {},
       intl ? cardmarketProducts() : {},
@@ -374,14 +414,21 @@ const adapter = {
   getCharacterCards: memo(async (dexId, lang) => {
     const category = CATEGORY_NAMES[dexId]?.[lang] ?? CATEGORY_NAMES[dexId]?.en;
     const query = category ? `category=${encodeURIComponent(category)}` : `dexId=eq:${encodeURIComponent(dexId)}`;
-    const [cards, sets, collected] = await Promise.all([
+    const [found, sets, collected, extra] = await Promise.all([
       getJSON(`${base(lang)}/cards?${query}`, { allowMissing: true }),
       adapter.getSets(lang),
       tcgplayerPrices(lang),
+      completions(),
     ]);
+    // Cartes reprises d'une autre langue (extension complétée) du même Pokémon ou de la même catégorie.
+    const known = new Set((found || []).map((c) => c.id));
+    const added = Object.values(extra?.[lang] || {}).flat().filter((c) => !known.has(c.id) && (category
+      ? c.category && CATEGORY_NAMES[dexId] && Object.values(CATEGORY_NAMES[dexId]).includes(c.category)
+      : (c.dexId || []).map(String).includes(String(dexId))));
+    const cards = [...(found || []), ...added];
     const setById = new Map(sets.map((s) => [s.id, s]));
     return (cards || [])
-      .map((c) => ({ c, set: setById.get(c.id.slice(0, c.id.lastIndexOf('-'))) }))
+      .map((c) => ({ c, set: setById.get(c.set || c.id.slice(0, c.id.lastIndexOf('-'))) }))
       .filter(({ set }) => set) // extensions TCG Pocket et inconnues écartées
       .map((x) => ({ ...x, date: promoDate(x.set, x.c.localId, sets) || x.set.date || '' }))
       .sort((a, b) => b.date.localeCompare(a.date))
