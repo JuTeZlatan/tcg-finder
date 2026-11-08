@@ -1,8 +1,8 @@
 // Données produites par le script de collecte (pipeline/) : publiées chaque jour en ligne (DATA_URL, GitHub Pages)
 // et intégrées à l'appli au moment de la compilation (assets/data).
-// Affichage immédiat : la copie gardée sur le téléphone sert tout de suite ; si elle a plus de 6 h, la version du
-// jour est téléchargée en arrière-plan (visible à la prochaine ouverture de l'appli). Sans copie : en ligne (délai
-// maximum de 15 s), sinon les données intégrées. Une extension sortie aujourd'hui apparaît donc sans nouvelle version.
+// Copie gardée sur le téléphone : servie telle quelle pendant 6 h ; plus ancienne, la version du jour est demandée
+// (4 s au plus, la copie sert si le réseau est lent ou absent), pour ne jamais afficher une extension corrigée depuis.
+// Sans copie : en ligne (délai maximum de 15 s), sinon les données intégrées.
 import { Directory, File, Paths } from 'expo-file-system';
 import { fetchWithTimeout } from './http';
 import { DATA_URL } from '../config';
@@ -34,8 +34,10 @@ async function readCopy(path) {
   }
 }
 
-async function download(path) {
-  const res = await fetchWithTimeout(`${DATA_URL}/${path}`, { headers: { Accept: 'application/json' } });
+const STALE_TIMEOUT = 4000;
+
+async function download(path, timeout) {
+  const res = await fetchWithTimeout(`${DATA_URL}/${path}`, { headers: { Accept: 'application/json' } }, timeout);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   saveCopy(path, data);
@@ -47,11 +49,15 @@ export async function loadData(path, bundled) {
   if (!DATA_URL) return bundled();
   const copy = await readCopy(path);
   if (copy) {
-    if (Date.now() - copy.at > FRESH_FOR && !refreshing.has(path)) {
-      refreshing.add(path);
-      download(path).catch(() => {}).finally(() => refreshing.delete(path));
+    if (Date.now() - copy.at <= FRESH_FOR || refreshing.has(path)) return copy.data;
+    refreshing.add(path);
+    try {
+      return await download(path, STALE_TIMEOUT);
+    } catch {
+      return copy.data;
+    } finally {
+      refreshing.delete(path);
     }
-    return copy.data;
   }
   try {
     return await download(path);
