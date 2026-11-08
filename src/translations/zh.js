@@ -444,4 +444,5 @@ export default {
   "Énergies": "能量",
   "Autres cartes": "其他卡牌",
   "Dresseurs": "训练家",
+  "Pas encore de cartes dans cette langue : affichage en anglais, et tes cartes sont ajoutées dans la langue choisie.": "暂无该语言的卡牌：以英文显示，你的卡牌会以所选语言加入收藏。",
 };

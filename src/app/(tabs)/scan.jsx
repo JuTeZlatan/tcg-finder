@@ -5,10 +5,10 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { getTcg, dataLang } from '../../api';
-import { agreed, identify, SURE, TWO_CHOICES, withVisual } from '../../lib/scan';
+import { addLanguageScores, agreed, applyLanguage, identify, SURE, TWO_CHOICES, withVisual } from '../../lib/scan';
 import { available as LIVE, CardScannerView } from '../../../modules/card-vision';
 import { discard, readCard, readCardQuick } from '../../lib/scanImage';
-import { detectCodes, nameCandidates } from '../../lib/scanDetect';
+import { detectCodes, nameCandidates, pickLanguage } from '../../lib/scanDetect';
 import { useCardLang, CARD_LANGS } from '../../lib/cardLang';
 import { useCollection, ownedQty } from '../../lib/collection';
 import { useAsync } from '../../lib/useAsync';
@@ -154,13 +154,15 @@ export default function ScanScreen() {
       let best = null;
       let last = { code: null, agree: 0 };
       let richest = null; // image au texte le plus long : recherche par nom si aucun code n'est lu
+      let votes = null; // indices de langue cumulés sur toutes les images
       for (let i = 0; i < SINGLE_TRIES; i++) {
         const frame = await nextFrame(true);
         if (!frame) break; // caméra muette : on garde ce qui a déjà été lu
         const { text, fp, photo } = frame;
         if (!richest || text.length > richest.text.length) richest = frame;
+        votes = addLanguageScores(votes, text);
         // Codes seulement à chaque image (rapide, sans réseau pour la plupart des jeux) ; le nom en dernier recours.
-        const first = await identify(text, cardLang, { codesOnly: LIVE });
+        const first = await identify(text, cardLang, { codesOnly: LIVE, votes });
         const code = codeOf(first);
         last = { code, agree: code && code === last.code ? last.agree + 1 : 1 };
         const { result, confidence } = await evaluate(first, fp, text, last.agree);
@@ -174,12 +176,14 @@ export default function ScanScreen() {
       if (!best) best = { candidates: [], detections: [], confidence: 0 };
       // Aucun code lu sur aucune image : recherche par le nom (et comparaison d'images) sur l'image la plus lisible.
       if (LIVE && !best.candidates.length && richest?.text) {
-        const first = await identify(richest.text, cardLang);
+        const first = await identify(richest.text, cardLang, { votes });
         const { result, confidence } = await evaluate(first, richest.fp, richest.text, 1);
         best = { text: richest.text, ...result, confidence };
       }
       // Photo de la carte (ajout à la main dans « Autres ») : dernière image analysée.
       if (LIVE && !best.photo) best.photo = (await scanner.current?.capture?.().catch(() => null)) || undefined;
+      // Langue décidée sur l'ensemble des images (le meilleur résultat peut venir d'une image où elle était illisible).
+      applyLanguage(best.candidates, pickLanguage(votes));
       setState({ step: 'result', ...best, selected: 0 });
       if (best.candidates[0]) feedback(best.candidates[0]);
     } catch (e) {
@@ -214,19 +218,20 @@ export default function ScanScreen() {
             // cadre vide : après deux images, la même carte pourra être ajoutée à nouveau
             m.empty += 1;
             m.pending = null;
-            if (m.empty >= EMPTY_FRAMES) Object.assign(m, { present: null, frames: 0, best: null, richest: null });
+            if (m.empty >= EMPTY_FRAMES) Object.assign(m, { present: null, frames: 0, best: null, richest: null, votes: null });
             if (m.empty >= EMPTY_FRAMES) setLook('none'); // une seule image vide ne change pas le cadre (pas de clignotement)
           } else {
             m.empty = 0;
             m.frames += 1; // images de cette carte (pas encore ajoutée)
+            m.votes = addLanguageScores(m.votes, text); // indices de langue de cette carte
             if (!m.richest || text.length > m.richest.text.length) m.richest = { text, fp };
-            let first = hasCode ? await identify(text, cardLang, { codesOnly: true }) : { candidates: [] };
+            let first = hasCode ? await identify(text, cardLang, { codesOnly: true, votes: m.votes }) : { candidates: [] };
             let seen = { text, fp };
             // Aucun code exploitable : recherche par le nom puis comparaison des illustrations, sur l'image la plus
             // lisible, toutes les quelques images (comme le mode une carte), pour une carte pas encore ajoutée.
             if (LIVE && !m.present && !first.candidates.length && m.richest.fp && m.frames >= NAME_AFTER && (m.frames - NAME_AFTER) % NAME_EVERY === 0) {
               seen = m.richest;
-              first = await identify(seen.text, cardLang);
+              first = await identify(seen.text, cardLang, { votes: m.votes });
             }
             const code = codeOf(first);
             const agree = m.pending?.code === code ? m.pending.agree + 1 : 1;
@@ -247,9 +252,9 @@ export default function ScanScreen() {
               const sure = settle(confidence, result.tie, agree);
               if (sure || (m.frames >= GIVE_UP_FRAMES && m.best.confidence >= MIN_KEEP)) {
                 const pick = sure ? { result, confidence, code } : m.best;
-                const list = pick.result.candidates;
+                const list = applyLanguage(pick.result.candidates, pickLanguage(m.votes));
                 const twoChoices = pick.confidence < SURE && list.length > 1;
-                Object.assign(m, { present: { code: pick.code, name: list[0].name }, pending: null, frames: 0, best: null, richest: null });
+                Object.assign(m, { present: { code: pick.code, name: list[0].name }, pending: null, frames: 0, best: null, richest: null, votes: null });
                 const row = { key: `${Date.now()}`, candidates: twoChoices ? list.slice(0, pick.confidence < TWO_CHOICES ? 4 : 2) : list, selected: 0, finish: null, finishName: null, price: null, confidence: pick.confidence, twoChoices };
                 setBatch((rows) => [...rows, row]);
                 feedback(list[0]);

@@ -142,7 +142,9 @@ export const copyLang = (tcg, lang) => (tcg.languages.includes(lang) || tcg.engl
 // Message affiché sous le sélecteur de langue pour un jeu donné.
 export function langNote(tcg, lang) {
   if (!tcg.languages.includes(lang)) {
-    return 'Pas de version dans cette langue pour ce jeu : cartes affichées en anglais.';
+    return tcg.englishFallback
+      ? 'Pas encore de cartes dans cette langue : affichage en anglais, et tes cartes sont ajoutées dans la langue choisie.'
+      : 'Pas de version dans cette langue pour ce jeu : cartes affichées en anglais.';
   }
   return tcg.note?.[lang] ?? null;
 }

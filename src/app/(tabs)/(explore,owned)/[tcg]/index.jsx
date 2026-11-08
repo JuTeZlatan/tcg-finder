@@ -4,7 +4,7 @@ import { FlatList, Pressable, StyleSheet, Text, TextInput, View, useWindowDimens
 import { Image } from 'expo-image';
 import { getTcg, dataLang, langNote } from '../../../../api';
 import { useAsync } from '../../../../lib/useAsync';
-import { useCardLang } from '../../../../lib/cardLang';
+import { CARD_LANGS, useCardLang } from '../../../../lib/cardLang';
 import { colors, radius } from '../../../../lib/theme';
 import LangToggle from '../../../../components/LangToggle';
 import { Loading, ErrorView } from '../../../../components/Status';
@@ -19,6 +19,11 @@ export default function TcgScreen() {
   const tcg = getTcg(tcgId);
   const { cardLang } = useCardLang();
   const lang = dataLang(tcg, cardLang);
+  // Jeu affiché en anglais faute de cartes dans la langue choisie (Riftbound, Cyberpunk en français) : cette langue reste
+  // proposée et sélectionnée (les cartes s'ajoutent dans cette langue), avec les cartes anglaises à l'écran.
+  const toggleLangs = tcg.englishFallback && !tcg.languages.includes(cardLang)
+    ? CARD_LANGS.filter((l) => l === cardLang || tcg.languages.includes(l))
+    : tcg.languages;
   const [tab, setTab] = useState('sets');
   const showCharacters = tab === 'characters' && !!tcg.getCharacters;
   const sets = useAsync(() => tcg.getSets(lang), [tcg.id, lang]);
@@ -54,7 +59,7 @@ export default function TcgScreen() {
 
   const header = (
     <View style={styles.header}>
-      {tcg.languages.length > 1 ? <LangToggle langs={tcg.languages} shown={lang} note={langNote(tcg, lang)} /> : null}
+      {toggleLangs.length > 1 ? <LangToggle langs={toggleLangs} shown={lang} note={langNote(tcg, cardLang)} /> : null}
       <View style={styles.searchRow}>
         <TextInput
           style={[styles.input, { flex: 1 }]}

@@ -176,31 +176,44 @@ export function nameScore(cardName, ocrText) {
 
 // Langue imprimée sur la carte, devinée par ses petits mots (« vous », « the », « der »…) ou son écriture
 // (kana → japonais, idéogrammes seuls → chinois). null si le texte ne permet pas de trancher.
+// Petits mots et vocabulaire des jeux de cartes, par langue (les mots communs à plusieurs langues sont évités).
 const LANG_WORDS = {
-  fr: 'le la les des du une est vous votre vos pour avec quand dans sur chaque adversaire peut cette ses leur qui pioche main tour jouez lorsque cartes',
-  en: 'the you your when this that with each opponent may from into its and of to draw hand turn play card cards whenever',
-  de: 'der die das und ein eine einen deine du wenn mit auf jede kann karte karten gegner deinen ziehe hand zug spiele',
-  it: 'il lo gli della delle tuo tua tuoi quando con ogni avversario puoi questa questo pesca mano turno gioca carte',
-  es: 'el los las del tu tus cuando con cada oponente puedes esta este roba mano turno juega cartas',
-  pt: 'o os do da dos das teu tua quando com cada oponente podes esta este compra mao turno joga cartas voce',
+  fr: 'le la les des du une est vous votre vos pour avec quand dans sur chaque adversaire peut cette ses leur qui pioche piochez main tour jouez jouee lorsque cartes carte defaussez defausse degats ennemie ennemi unite unites allie allies gagnez cible ciblez puis aussi chaque fois si votre adverse attaque attaquant bataille champ mettez ajoutez renvoyez inflige infligez points puissance cout coute pendant jusqu fin debut ce cet ces ou',
+  en: 'the you your when this that with each opponent may from into its and of to draw hand turn play card cards whenever discard damage enemy unit units ally allies gain target then also if attack attacking battle field put add return deal deals points power cost costs during until end start an or',
+  de: 'der die das und ein eine einen deine du wenn mit auf jede kann karte karten gegner deinen ziehe hand zug spiele dem den des einer abwerfen schaden feindliche einheit einheiten verbundete ziel dann auch angriff schlacht lege fuge zuruck bis ende beginn oder ist nicht',
+  it: 'il lo gli della delle tuo tua tuoi quando con ogni avversario puoi questa questo pesca mano turno gioca carte carta scarta danni nemica nemico unita alleata alleato bersaglio poi anche attacco battaglia aggiungi metti fino fine inizio oppure non che',
+  es: 'el los las del tu tus cuando con cada oponente puedes esta este roba mano turno juega cartas carta descarta dano enemiga enemigo unidad unidades aliada aliado objetivo luego tambien ataque batalla anade pon hasta final inicio que no',
+  pt: 'o os do da dos das teu tua quando com cada oponente podes esta este compra mao turno joga cartas voce carta descarta dano inimiga inimigo unidade aliada alvo depois tambem ataque batalha adiciona coloca ate fim inicio nao',
 };
 const LANG_SETS = Object.fromEntries(Object.entries(LANG_WORDS).map(([l, w]) => [l, new Set(w.split(' '))]));
+// Lettres propres à une langue (comptées une demi-voix chacune) : é è ç ê pour le français, ä ö ü ß pour l'allemand…
+const LANG_LETTERS = { fr: /[éèêëçàùûœ]/gi, de: /[äöüß]/gi, es: /[ñ¿¡]/gi, it: /[ìòàù]/gi, pt: /[ãõç]/gi };
 
-export function detectLanguage(text) {
+// Indices de langue d'un texte : { fr: 4.5, en: 1, ja: 12… }. S'additionnent d'une image à l'autre (voir pickLanguage).
+export function languageScores(text) {
   const raw = String(text || '');
+  const scores = {};
+  const add = (l, n) => { if (n) scores[l] = (scores[l] || 0) + n; };
   const kana = (raw.match(/[\u3040-\u30ff]/g) || []).length;
   const han = (raw.match(/[\u4e00-\u9fff]/g) || []).length;
-  // Écriture asiatique seulement si elle domine (quelques signes isolés : erreurs de lecture d'une carte latine).
-  const latin = (raw.match(/[A-Za-z]/g) || []).length;
-  if (kana >= 3 && kana + han >= latin * 0.3) return 'ja';
-  if (han >= 4 && han >= latin * 0.3) return 'zh';
   const hangul = (raw.match(/[\uac00-\ud7af]/g) || []).length;
-  if (hangul >= 3 && hangul >= latin * 0.3) return 'ko';
+  const latin = (raw.match(/[A-Za-z]/g) || []).length;
+  // Écriture asiatique seulement si elle domine (quelques signes isolés : erreurs de lecture d'une carte latine).
+  if (kana >= 3 && kana + han >= latin * 0.3) add('ja', kana + han);
+  else if (han >= 4 && han >= latin * 0.3) add('zh', han);
+  if (hangul >= 3 && hangul >= latin * 0.3) add('ko', hangul);
   const words = fold(raw).split(' ');
-  const scores = Object.entries(LANG_SETS)
-    .map(([l, set]) => [l, words.filter((w) => set.has(w)).length])
-    .sort((a, b) => b[1] - a[1]);
-  const [[lang, best], [, second]] = scores;
-  // Assez de mots reconnus, et nettement plus que la langue suivante (beaucoup de mots se ressemblent).
-  return best >= 3 && best >= second * 1.5 ? lang : null;
+  for (const [l, set] of Object.entries(LANG_SETS)) add(l, words.filter((w) => set.has(w)).length);
+  for (const [l, re] of Object.entries(LANG_LETTERS)) add(l, 0.5 * (raw.match(re) || []).length);
+  return scores;
 }
+
+// Langue la plus probable : assez d'indices, et nettement plus que la suivante (beaucoup de mots se ressemblent).
+export function pickLanguage(scores) {
+  const sorted = Object.entries(scores || {}).sort((x, y) => y[1] - x[1]);
+  const [lang, best = 0] = sorted[0] || [];
+  const second = sorted[1]?.[1] || 0;
+  return lang && best >= 3 && best >= second * 1.5 ? lang : null;
+}
+
+export const detectLanguage = (text) => pickLanguage(languageScores(text));

@@ -2,7 +2,7 @@
 import { getTcg, dataLang } from '../api';
 import { getJSON } from '../api/http';
 import { imageMatchAvailable, refFingerprint, similarity as imageSimilarity } from './imageMatch';
-import { detectCodes, detectLanguage, nameCandidates, nameScore, similarity, textOverlap } from './scanDetect';
+import { detectCodes, pickLanguage, languageScores, nameCandidates, nameScore, similarity, textOverlap } from './scanDetect';
 
 const SCRYFALL = 'https://api.scryfall.com';
 const YGO = 'https://db.ygoprodeck.com/api/v7';
@@ -219,11 +219,34 @@ async function rerankByText(candidates, text) {
   return candidates;
 }
 
+// Jeux dont le code imprimé donne la langue (« • FR • », « FDN • FR », « LOB-FR001 ») : il prime sur l'écriture.
+const CODED_LANG = new Set(['lorcana', 'magic', 'yugioh']);
+
+// Langue lue sur la carte appliquée aux cartes trouvées : l'exemplaire est dans cette langue, et ses données aussi
+// quand le jeu les publie (sinon anglaises : Riftbound en français). Le code d'abord, l'écriture ensuite.
+export function applyLanguage(candidates, lang) {
+  if (!lang) return candidates;
+  for (const c of candidates) {
+    if (CODED_LANG.has(c.tcgId) || c.lang === lang) continue;
+    c.lang = lang;
+    c.dataLang = dataLang(getTcg(c.tcgId), lang);
+  }
+  return candidates;
+}
+
+// Indices de langue cumulés de plusieurs images d'une même carte (un texte court ou mal lu ne suffit pas seul).
+export const addLanguageScores = (total, text) => {
+  const out = { ...(total || {}) };
+  for (const [l, n] of Object.entries(languageScores(text))) out[l] = (out[l] || 0) + n;
+  return out;
+};
+
 // codesOnly : seulement par le code imprimé (rafale : pas de recherche par nom sur un décor sans carte).
-export async function identify(text, preferredLang, { codesOnly = false } = {}) {
+// votes : indices de langue cumulés sur les images précédentes de la même carte (voir addLanguageScores).
+export async function identify(text, preferredLang, { codesOnly = false, votes = null } = {}) {
   const detections = detectCodes(text);
   // Langue de la carte scannée (lue sur la carte), à défaut celle choisie dans l'appli.
-  const printed = detectLanguage(text);
+  const printed = pickLanguage(votes || languageScores(text));
   if (printed) preferredLang = printed;
   let candidates = [];
   for (const d of detections) {
@@ -250,10 +273,9 @@ export async function identify(text, preferredLang, { codesOnly = false } = {}) 
   if (candidates.length > 1) await rerankByText(candidates, text);
   // Jeux sans code de langue imprimé : l'exemplaire prend la langue lue sur la carte, même sans données dans
   // cette langue (affiché et rangé comme carte française, images et prix de la version anglaise).
-  const coded = new Set(['lorcana', 'magic', 'yugioh']);
   if (printed) {
     for (const c of candidates) {
-      if (!coded.has(c.tcgId)) c.lang = printed; // dataLang garde la langue des données trouvées
+      if (!CODED_LANG.has(c.tcgId)) c.lang = printed; // dataLang garde la langue des données trouvées
     }
   }
   const seen = new Set();

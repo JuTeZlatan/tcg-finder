@@ -444,4 +444,5 @@ export default {
   "Énergies": "Energías",
   "Autres cartes": "Otras cartas",
   "Dresseurs": "Entrenadores",
+  "Pas encore de cartes dans cette langue : affichage en anglais, et tes cartes sont ajoutées dans la langue choisie.": "Aún no hay cartas en este idioma: se muestran en inglés, y tus cartas se añaden en el idioma elegido.",
 };
