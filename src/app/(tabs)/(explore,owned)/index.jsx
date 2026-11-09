@@ -1,4 +1,4 @@
-// Accueil « Explorer » : en-tête personnalisé (pseudo, avatar, valeur de la collection), recherche dans tous les jeux,
+// Accueil « Explorer » : en-tête personnalisé (pseudo, avatar), recherche dans tous les jeux,
 // langue des cartes, puis les jeux en grandes cartes à dégradé aux couleurs de chacun. Un jeu sans cartes dans la
 // langue choisie est grisé avec un cadenas (sauf les jeux affichés en anglais en attendant une version officielle).
 import { router, useScrollToTop } from 'expo-router';
@@ -15,7 +15,7 @@ import { colors } from '../../../lib/theme';
 import { GAME_ICONS } from '../../../lib/gameIcons';
 import { useSettings } from '../../../lib/settings';
 import { Avatar } from '../../../components/SideMenu';
-import { plural, t } from '../../../lib/i18n';
+import { t } from '../../../lib/i18n';
 
 const FLAGS = { fr: '🇫🇷', en: '🇬🇧', de: '🇩🇪', it: '🇮🇹', es: '🇪🇸', ja: '🇯🇵', zh: '🇨🇳', ko: '🇰🇷' };
 const GAP = 12;
@@ -25,7 +25,6 @@ export default function Home() {
   const { settings } = useSettings(); // (réaffiche aussi les prix quand la devise ou le taux du jour change)
   const { items } = useCollection();
   const perTcg = useMemo(() => groupBy(items, (i) => i.tcg), [items]);
-  const total = useMemo(() => summarize(items), [items]);
   const { cardLang, setCardLang } = useCardLang();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -54,18 +53,6 @@ export default function Home() {
         </View>
         <Avatar avatar={settings.avatar} pseudo={settings.pseudo} size={48} />
       </View>
-
-      {/* Valeur de la collection (raccourci vers « Ma collection ») */}
-      <Pressable style={({ pressed }) => [styles.hero, pressed && styles.pressed]} onPress={() => router.navigate('/(tabs)/(owned)')}>
-        <View style={{ flex: 1, gap: 2 }}>
-          <Text style={styles.heroLabel}>{t('Valeur de ma collection')}</Text>
-          <Text style={styles.heroValue}>{formatPrice(total.value, 'EUR')}</Text>
-          <Text style={styles.heroMeta}>{plural(total.cards, '{n} carte', '{n} cartes')} · {plural(perTcg.size, '{n} jeu', '{n} jeux')}</Text>
-        </View>
-        <View style={styles.heroIcon}>
-          <Ionicons name="albums" size={26} color="#1A1A1A" />
-        </View>
-      </Pressable>
 
       {/* Recherche dans tous les jeux */}
       <View style={styles.search}>
@@ -167,15 +154,6 @@ const styles = StyleSheet.create({
   hello: { color: colors.muted, fontSize: 15, fontWeight: '600' },
   title: { color: colors.text, fontSize: 30, fontWeight: '900', letterSpacing: -0.5 },
   pressed: { transform: [{ scale: 0.97 }], opacity: 0.9 },
-  hero: {
-    flexDirection: 'row', alignItems: 'center', gap: 14, padding: 18, borderRadius: 24,
-    borderWidth: 1, borderColor: `${colors.accent}66`,
-    backgroundImage: `linear-gradient(135deg, ${colors.accent}40 0%, ${colors.surfaceAlt} 60%, ${colors.surface} 100%)`,
-  },
-  heroLabel: { color: colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1.2 },
-  heroValue: { color: colors.accent, fontSize: 30, fontWeight: '900' },
-  heroMeta: { color: colors.text, fontSize: 13, opacity: 0.8 },
-  heroIcon: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
   search: {
     flexDirection: 'row', alignItems: 'center', gap: 10, paddingLeft: 16, paddingRight: 6, height: 54,
     borderRadius: 27, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,

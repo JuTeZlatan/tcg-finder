@@ -200,15 +200,28 @@ async function readRefs() {
 // items : cartes de la collection avec leur prix du jour (`price`, € l'unité). Première fois : les prix actuels
 // deviennent la référence, sans alerte. Ensuite, toute carte qui a bougé d'au moins `percent` % est signalée
 // (une notification, regroupée s'il y en a plusieurs) et prend son nouveau prix comme référence.
+// Seuls les prix mis à jour depuis moins de 36 h comptent : un vieux prix (collection pas encore rafraîchie) ne sert
+// ni de référence ni d'alerte, sinon sa première mise à jour passerait pour une forte variation.
+const FRESH_PRICE = 36 * 3600 * 1000;
 export async function checkCollection(items, watch) {
   if (!watch?.enabled) return;
   const refs = await readRefs();
   const limit = (watch.percent || 20) / 100;
   const moved = [];
-  let total = 0;
+  // Valeur totale : prix de référence de chaque carte (à l'unité, refs.__total) et prix du jour, tous deux multipliés
+  // par la quantité actuelle — une carte ajoutée ou retirée ne passe donc pas pour une variation du marché.
+  const totalRefs = refs.__total && typeof refs.__total === 'object' ? refs.__total : {};
+  const nextTotalRefs = {};
+  let before = 0;
+  let after = 0;
   for (const i of items) {
     if (i.tcg === 'custom' || i.grading || i.price == null) continue;
-    total += i.price * (i.qty || 1);
+    if (!i.priceAt || Date.now() - i.priceAt > FRESH_PRICE) continue;
+    nextTotalRefs[i.key] = totalRefs[i.key] ?? i.price;
+    if (totalRefs[i.key] != null) {
+      before += totalRefs[i.key] * (i.qty || 1);
+      after += i.price * (i.qty || 1);
+    }
     if (i.price < (watch.minPrice ?? 0)) continue;
     const ref = refs[i.key];
     if (ref == null) {
@@ -238,17 +251,15 @@ export async function checkCollection(items, watch) {
     );
   }
   // Valeur totale de la collection.
-  if (total > 0) {
-    const ref = refs.__total;
-    if (ref == null) refs.__total = total;
-    else if (Math.abs(total / ref - 1) >= limit) {
-      await send(
-        { title: t('Ta collection : {change}', { change: pct(total / ref - 1) }), body: t('{from} → {to}', { from: formatPrice(ref, 'EUR'), to: formatPrice(total, 'EUR') }) },
-        { url: '/collection' },
-      );
-      refs.__total = total;
-    }
+  if (before > 0 && Math.abs(after / before - 1) >= limit) {
+    await send(
+      { title: t('Ta collection : {change}', { change: pct(after / before - 1) }), body: t('{from} → {to}', { from: formatPrice(before, 'EUR'), to: formatPrice(after, 'EUR') }) },
+      { url: '/collection' },
+    );
+    // Nouvelle référence : les prix du jour.
+    for (const i of items) if (nextTotalRefs[i.key] != null) nextTotalRefs[i.key] = i.price;
   }
+  refs.__total = nextTotalRefs;
   await AsyncStorage.setItem(REFS_KEY, JSON.stringify(refs)).catch(() => {});
 }
 
@@ -288,7 +299,7 @@ export async function checkAlertsInBackground() {
         // carte momentanément indisponible
       }
     }
-    await checkCollection(items.map((i) => (fresh.has(i.key) ? { ...i, price: fresh.get(i.key) } : i)), settings.collectionWatch);
+    await checkCollection(items.map((i) => (fresh.has(i.key) ? { ...i, price: fresh.get(i.key), priceAt: Date.now() } : i)), settings.collectionWatch);
   }
 }
 
