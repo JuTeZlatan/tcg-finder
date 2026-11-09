@@ -80,18 +80,14 @@ export async function localizedReleaseNames(releases, cardLang) {
   return names;
 }
 
-// Rubrique Cardmarket de chaque jeu.
-const CARDMARKET_GAME = {
-  pokemon: 'Pokemon', magic: 'Magic', yugioh: 'YuGiOh', onepiece: 'OnePiece', lorcana: 'Lorcana', riftbound: 'Riftbound',
-  dbsfw: 'DragonBallSuper', dbsmasters: 'DragonBallSuper', swu: 'StarWarsUnlimited', cyberpunk: 'Cyberpunk',
-};
-
-// Recherches de précommande / d'achat d'une extension (son nom, sans le préfixe de code « ME06: »).
+// Recherches de précommande / d'achat d'une extension (son nom, sans le préfixe de code « ME06: ») ; Amazon : précédé
+// du nom du jeu, pour trouver les produits scellés (boosters, coffrets) et non des articles homonymes.
 export function releaseLinks(release) {
-  const q = encodeURIComponent(release.name.replace(/^[A-Z0-9]+:\s*/, ''));
+  const name = release.name.replace(/^[A-Z0-9]+:\s*/, '');
+  const q = encodeURIComponent(name);
+  const game = getTcg(release.tcg)?.name;
   return [
+    { key: 'amazon', label: 'Amazon', url: `https://www.amazon.fr/s?k=${encodeURIComponent(game ? `${game} ${name}` : name)}` },
     { key: 'ebay', label: 'eBay', url: `https://www.ebay.fr/sch/i.html?_nkw=${q}` },
-    { key: 'cardmarket', label: 'Cardmarket', url: `https://www.cardmarket.com/fr/${CARDMARKET_GAME[release.tcg] || 'Pokemon'}/Products/Search?searchString=${q}` },
-    { key: 'vinted', label: 'Vinted', url: `https://www.vinted.fr/catalog?search_text=${q}` },
   ];
 }
