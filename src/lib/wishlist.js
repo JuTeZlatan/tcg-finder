@@ -1,16 +1,13 @@
-// Liste de souhaits (cartes recherchées) et alertes de prix.
+// Liste de souhaits (cartes recherchées).
 // Rangée dans les réglages (settings.wishlist, sauvegardée avec le compte) : clé → { tcg, lang, cardId, setId, name,
-// image, number, target (€ ou null), price (dernier prix connu, €), priceAt, alertedPrice, addedAt }.
-// Les prix sont vérifiés à l'ouverture de l'appli (au plus toutes les 6 h) et en arrière-plan (tâche quotidienne) :
-// une notification part quand une carte passe sous son prix cible (puis à chaque nouvelle baisse de plus de 2 %).
+// image, number, price (dernier prix connu, €), priceAt, addedAt }. Les prix sont mis à jour à l'ouverture de l'appli
+// (au plus toutes les 6 h) et en arrière-plan. Les alertes de prix (sous un montant, hausse, baisse…) sont dans
+// src/lib/priceAlerts.js ; les anciens « prix cibles » (target) y ont été repris.
 import { useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSettings, STORAGE_KEY } from './settings';
 import { fetchCardInfo } from './collection';
-import { formatPrice, setDisplayCurrency, setPreferredSource } from './prices';
-import { notifyNow } from './notifications';
-import { getTcg } from '../api';
-import { t } from './i18n';
+import { setDisplayCurrency, setPreferredSource } from './prices';
 
 export const wishKey = (tcg, lang, cardId) => `${tcg}|${lang}|${cardId}`;
 const CHECK_EVERY = 6 * 3600 * 1000;
@@ -23,13 +20,12 @@ export function useWishlist() {
     wishlist,
     list: Object.values(wishlist).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)),
     isWished: (tcg, lang, cardId) => !!wishlist[wishKey(tcg, lang, cardId)],
-    add: (entry) => save({ ...wishlist, [wishKey(entry.tcg, entry.lang, entry.cardId)]: { target: null, addedAt: Date.now(), ...entry } }),
+    add: (entry) => save({ ...wishlist, [wishKey(entry.tcg, entry.lang, entry.cardId)]: { addedAt: Date.now(), ...entry } }),
     remove: (key) => {
       const next = { ...wishlist };
       delete next[key];
       save(next);
     },
-    setTarget: (key, target) => wishlist[key] && save({ ...wishlist, [key]: { ...wishlist[key], target, alertedPrice: null } }),
   };
 }
 
@@ -42,18 +38,7 @@ export async function checkWishlistPrices(wishlist, { force = false } = {}) {
   for (const [key, w] of due) {
     try {
       const info = await fetchCardInfo(w.tcg, w.cardId, w.setId, w.lang, null);
-      const entry = { ...w, price: info.price, priceAt: Date.now() };
-      if (w.target != null && info.price != null) {
-        if (info.price <= w.target && (w.alertedPrice == null || info.price < w.alertedPrice * 0.98)) {
-          await notifyNow(
-            t('Prix en baisse : {name}', { name: w.name }),
-            t('{price} (ton prix cible : {target}) · {game}', { price: formatPrice(info.price, 'EUR'), target: formatPrice(w.target, 'EUR'), game: getTcg(w.tcg)?.name || '' }),
-            { tcg: w.tcg, cardId: w.cardId, setId: w.setId, lang: w.lang },
-          );
-          entry.alertedPrice = info.price;
-        } else if (info.price > w.target) entry.alertedPrice = null;
-      }
-      next[key] = entry;
+      next[key] = { ...w, price: info.price, priceAt: Date.now() };
     } catch {
       // carte momentanément indisponible : nouvel essai à la prochaine vérification
     }

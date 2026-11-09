@@ -10,6 +10,16 @@ import { historyFile } from '../lib/priceHistory';
 
 const fileId = (id) => String(id).replace(/[^A-Za-z0-9._-]/g, '_');
 
+// Caractéristiques d'une carte pour les tris et filtres d'une extension (src/lib/cardFilters.js) : rareté, type et
+// couleur, sous les noms qu'emploie chaque jeu (encre Lorcana, domaine Riftbound, aspect Star Wars…).
+const FACET_KEYS = {
+  rarity: ['rarity', 'Rarity'],
+  type: ['type', 'Card Type'],
+  color: ['color', 'ink', 'Domain', 'domain', 'Aspect', 'group'],
+};
+const pickDetail = (details, keys) => keys.map((k) => details?.find(([key]) => key === k)?.[1]).find((v) => v != null && v !== '' && v !== 'None');
+export const facetsOf = (details) => Object.fromEntries(Object.entries(FACET_KEYS).map(([f, keys]) => [f, pickDetail(details, keys) ?? null]));
+
 export function createStaticTcg(meta) {
 
   const path = (lang, p) => `${meta.id}/${lang}/${p}`;
@@ -47,12 +57,14 @@ export function createStaticTcg(meta) {
     // Master set : chaque version de chaque carte de l'extension.
     getVersions: memo(async (setId, lang) =>
       (await loadSet(setId, lang)).flatMap((c) =>
-        versionsOfCard({ id: c.id, name: c.name, number: c.number, image: c.thumb || c.image }, c.prices)),
+        versionsOfCard({ id: c.id, name: c.name, number: c.number, image: c.thumb || c.image, prices: c.prices, facets: facetsOf(c.details) }, c.prices)),
     ),
 
+    // Prix et caractéristiques joints : tris et filtres de l'extension sans charger chaque fiche.
     getCards: memo(async (setId, lang) =>
       (await loadSet(setId, lang)).map((c) => ({
         id: c.id, name: c.name, number: c.number, subtitle: c.subtitle, image: c.thumb || c.image,
+        prices: c.prices, facets: facetsOf(c.details),
       })),
     ),
 

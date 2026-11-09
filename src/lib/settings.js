@@ -21,6 +21,13 @@ const DEFAULTS = {
   followed: [],
   // Cartes recherchées (liste de souhaits) : clé → { tcg, lang, cardId, setId, name, image, number, target, price… }
   wishlist: {},
+  // Alertes de prix (src/lib/priceAlerts.js) : id → { tcg, lang, cardId, setId, finish, name, image, kind, value… }
+  alerts: {},
+  // Surveillance de toute la collection : carte possédée qui monte ou baisse d'au moins `percent` %
+  // (cartes valant au moins `minPrice` €), et valeur totale de la collection.
+  collectionWatch: { enabled: false, percent: 20, minPrice: 5 },
+  // Tri des cartes d'une extension (src/lib/cardFilters.js), gardé d'une extension à l'autre
+  gridSort: 'number',
   // Date du dernier changement (sauvegarde en ligne : le plus récent l'emporte)
   updatedAt: 0,
 };

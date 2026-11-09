@@ -1,4 +1,4 @@
-// « Mes cartes recherchées » : liste de souhaits avec dernier prix connu, prix cible et alerte atteinte.
+// « Mes cartes recherchées » : liste de souhaits avec dernier prix connu et alertes de prix de chaque carte.
 // Tirer vers le bas : nouvelle vérification de tous les prix.
 import { useState } from 'react';
 import { router, Stack } from 'expo-router';
@@ -7,6 +7,7 @@ import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { getTcg } from '../../../../api';
 import { useWishlist, checkWishlistPrices } from '../../../../lib/wishlist';
+import { ruleText, useAlerts } from '../../../../lib/priceAlerts';
 import { useSettings } from '../../../../lib/settings';
 import { formatPrice } from '../../../../lib/prices';
 import { LangBadge } from '../../../../components/collection';
@@ -16,6 +17,7 @@ import { colors, radius } from '../../../../lib/theme';
 export default function WishlistScreen() {
   const { list, wishlist } = useWishlist();
   const { update } = useSettings();
+  const { list: alerts } = useAlerts();
   const [refreshing, setRefreshing] = useState(false);
 
   const refresh = async () => {
@@ -37,12 +39,13 @@ export default function WishlistScreen() {
           <View style={styles.empty}>
             <Ionicons name="heart-outline" size={56} color={colors.muted} />
             <Text style={styles.emptyText}>
-              {t('Aucune carte recherchée. Sur la fiche d’une carte, touche « Ajouter à mes recherches » et indique un prix : tu seras prévenu quand elle passe en dessous.')}
+              {t('Aucune carte recherchée. Sur la fiche d’une carte, touche « Ajouter à mes recherches », puis crée une alerte de prix : tu seras prévenu quand elle passe en dessous.')}
             </Text>
           </View>
         }
         renderItem={({ item: w }) => {
-          const reached = w.target != null && w.price != null && w.price <= w.target;
+          const mine = alerts.filter((a) => a.tcg === w.tcg && a.lang === w.lang && a.cardId === w.cardId && !a.paused);
+          const reached = mine.some((a) => a.triggered);
           return (
             <Pressable
               style={[styles.row, reached && styles.rowReached]}
@@ -56,12 +59,12 @@ export default function WishlistScreen() {
                 <Text style={styles.name} numberOfLines={2}>{w.name}</Text>
                 <Text style={styles.muted} numberOfLines={1}>{[getTcg(w.tcg)?.name, w.number && `#${w.number}`].filter(Boolean).join(' · ')}</Text>
                 <Text style={styles.muted}>
-                  {w.target != null ? t('Prix cible : {price}', { price: formatPrice(w.target, 'EUR') }) : t('Pas de prix cible')}
+                  {mine.length ? mine.map(ruleText).join(' · ') : t('Pas d’alerte de prix')}
                 </Text>
               </View>
               <View style={{ alignItems: 'flex-end', gap: 2 }}>
                 <Text style={[styles.price, reached && { color: colors.success }]}>{w.price != null ? formatPrice(w.price, 'EUR') : '—'}</Text>
-                {reached ? <Text style={styles.reached}>{t('Prix atteint')}</Text> : null}
+                {reached ? <Text style={styles.reached}>{t('Seuil atteint')}</Text> : null}
               </View>
             </Pressable>
           );

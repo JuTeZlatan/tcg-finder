@@ -87,6 +87,9 @@ function summary(c, setName, lang) {
     number: entry?.set_code,
     subtitle: entry ? entry.set_rarity : c.type,
     image: c.card_images?.[0]?.image_url_small,
+    // Prix TCGplayer de cette impression et caractéristiques : tris et filtres de l'extension.
+    prices: Number(entry?.set_price) > 0 ? [{ source: 'TCGplayer', items: [], ref: { value: Number(entry.set_price), currency: 'USD' } }] : [],
+    facets: { rarity: entry?.set_rarity || null, type: c.frameType ? c.frameType[0].toUpperCase() + c.frameType.slice(1).replace(/_/g, ' ') : c.type || null, color: c.attribute || null },
   };
 }
 
@@ -141,7 +144,7 @@ const adapter = {
     }));
     return rows
       .sort((a, b) => (a.card.number || '').localeCompare(b.card.number || '', undefined, { numeric: true }))
-      .flatMap(({ card, prices }) => versionsOfCard(card, prices));
+      .flatMap(({ card, prices }) => versionsOfCard({ ...card, prices }, prices));
   }),
 
   searchCards: memo(async (query, lang) => {

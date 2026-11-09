@@ -16,7 +16,20 @@ const imageOf = (c, size = 'normal') => c.image_uris?.[size] ?? c.card_faces?.[0
 
 function summary(c, withSet) {
   fullCards.set(c.id, c);
-  return { id: c.id, name: c.name, number: c.collector_number, image: imageOf(c), subtitle: withSet ? c.set_name : undefined };
+  return { id: c.id, name: c.name, number: c.collector_number, image: imageOf(c), subtitle: withSet ? c.set_name : undefined, prices: pricesOf(c), facets: facetsOf(c) };
+}
+
+// Rareté, type principal et couleur d'une impression : tris et filtres d'une extension (src/lib/cardFilters.js).
+const COLOR_NAMES = { W: 'Blanc', U: 'Bleu', B: 'Noir', R: 'Rouge', G: 'Vert' };
+const MAIN_TYPES = { Creature: 'Créature', Planeswalker: 'Planeswalker', Battle: 'Bataille', Instant: 'Éphémère', Sorcery: 'Rituel', Enchantment: 'Enchantement', Artifact: 'Artefact', Land: 'Terrain' };
+function facetsOf(c) {
+  const colors = c.colors ?? c.card_faces?.[0]?.colors ?? [];
+  const typeLine = c.type_line || c.card_faces?.[0]?.type_line || '';
+  return {
+    rarity: c.rarity || null, // « common », « mythic »… : traduits à l'affichage (src/lib/labels.js)
+    type: MAIN_TYPES[Object.keys(MAIN_TYPES).find((m) => typeLine.includes(m))] || typeLine.split(' — ')[0] || null,
+    color: colors.length > 1 ? 'Multicolore' : colors.length ? COLOR_NAMES[colors[0]] : 'Incolore',
+  };
 }
 
 async function fetchAllPages(url, maxPages = 20) {

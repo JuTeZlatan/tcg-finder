@@ -308,10 +308,19 @@ const adapter = {
       .sort((a, b) => b.date.localeCompare(a.date)); // de la plus récente à la plus ancienne
   }),
 
+  // Prix joints (fichiers TCGplayer / Cardmarket du jour) : tri par prix de l'extension sans charger chaque fiche.
   getCards: memo(async (setId, lang) => {
-    const set = await getJSON(`${base(lang)}/sets/${encodeURIComponent(setId)}`);
-    const collected = await tcgplayerPrices(lang);
-    return sortByNumber(await withCompletions(set, lang), (c) => c.localId, setId).map((c) => ({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected, 'low', lang) }));
+    const intl = TCGPLAYER_FILE[lang] === 'tcgplayer';
+    const [set, collected, ownCm] = await Promise.all([
+      getJSON(`${base(lang)}/sets/${encodeURIComponent(setId)}`),
+      tcgplayerPrices(lang),
+      intl ? cardmarketProducts() : {},
+    ]);
+    return sortByNumber(await withCompletions(set, lang), (c) => c.localId, setId).map((c) => ({
+      id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected, 'low', lang),
+      prices: prices(ownCm[c.id] ? { cardmarket: { unit: 'EUR', ...ownCm[c.id][1] } } : null, tcgplayerOf(c, collected)),
+      facets: { rarity: null, type: c.category || null, color: null },
+    }));
   }),
 
   // Master set : versions de chaque carte d'après les prix collectés (TCGplayer, Cardmarket, versions vendues à part),
@@ -327,7 +336,7 @@ const adapter = {
     return sortByNumber(await withCompletions(set, lang), (c) => c.localId, setId).flatMap((c) => {
       const pricing = ownCm[c.id] ? { cardmarket: { unit: 'EUR', ...ownCm[c.id][1] } } : null;
       const cardPrices = [...prices(pricing, tcgplayerOf(c, collected)), ...versionsBlock(versions[c.id])];
-      return versionsOfCard({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected, 'low', lang) }, cardPrices);
+      return versionsOfCard({ id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected, 'low', lang), prices: cardPrices }, cardPrices);
     });
   }),
 

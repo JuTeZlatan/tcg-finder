@@ -15,7 +15,7 @@ import { useSettings } from './settings';
 import { t } from './i18n';
 
 const PUSH_DELAY = 3000;
-const SYNCED_SETTINGS = ['pseudo', 'avatar', 'setView', 'priceSource', 'currency', 'scanSound', 'scanVibrate', 'followed', 'wishlist', 'updatedAt'];
+const SYNCED_SETTINGS = ['pseudo', 'avatar', 'setView', 'priceSource', 'currency', 'scanSound', 'scanVibrate', 'followed', 'wishlist', 'alerts', 'collectionWatch', 'updatedAt'];
 const PRICE_FIELDS = ['price', 'priceAt', 'divergent'];
 
 const docId = (key) => encodeURIComponent(key);

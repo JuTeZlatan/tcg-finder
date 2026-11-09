@@ -13,6 +13,7 @@ import { Loading, ErrorView } from '../../../../../components/Status';
 import { CollectionEditor, FinishPicker } from '../../../../../components/collection';
 import PriceHistory from '../../../../../components/PriceHistory';
 import WishButton from '../../../../../components/WishButton';
+import PriceAlerts from '../../../../../components/PriceAlerts';
 import GradedSection from '../../../../../components/GradedSection';
 import { useCollection } from '../../../../../lib/collection';
 import { defaultFinish, finishLabel, finishesOf, storedFinish } from '../../../../../lib/finishes';
@@ -108,6 +109,11 @@ export default function CardScreen() {
             <GradedSection tcgId={tcg.id} lang={own} setId={setId || c.setId || null} card={{ ...c, id: cardId }} finish={chosen} />
 
             <WishButton tcgId={tcg.id} lang={own} setId={setId || c.setId || null} card={{ ...c, id: cardId }} unitPrice={avg?.value ?? null} />
+
+            <PriceAlerts
+              tcgId={tcg.id} lang={own} setId={setId || c.setId || null} card={{ ...c, id: cardId }}
+              finish={chosen ?? null} finishName={chosen ? finishLabel(c.prices, chosen) : null} unitPrice={avg?.value ?? null}
+            />
 
             {c.prices.filter((p) => !p.versions && isShownSource(p, priceSource)).map((p) => (
               <View key={sourceLabel(p)} style={styles.block}>

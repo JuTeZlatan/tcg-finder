@@ -33,13 +33,14 @@ const pctText = (v) => (v > 0 && v < 0.0005
   : `${(v * 100).toLocaleString(locale(), { maximumFractionDigits: v < 0.1 ? 1 : 0 })} %`);
 
 export default function CollectionScreen() {
-  useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
   const { loaded, items, history, pricesUpdatedAt, refresh } = useCollection();
   // Toucher l'onglet « Ma collection » déjà ouvert ramène en haut de la page.
   const scrollRef = useRef(null);
   useScrollToTop(scrollRef);
   const total = useMemo(() => summarize(items), [items]);
-  const wishCount = Object.keys(useSettings().settings.wishlist || {}).length;
+  const { settings } = useSettings(); // (réaffiche aussi les prix quand la devise ou le taux du jour change)
+  const wishCount = Object.keys(settings.wishlist || {}).length;
+  const alertCount = Object.keys(settings.alerts || {}).length;
   const byTcg = useMemo(
     () => [...groupBy(items, (i) => i.tcg)]
       .map(([id, list]) => ({ tcg: getTcg(id), sets: setsSummary(list).length, owned: new Set(list.map((i) => i.cardId)).size, ...summarize(list) }))
@@ -69,6 +70,10 @@ export default function CollectionScreen() {
         <Pressable style={styles.ctaSecondary} onPress={() => router.push('/collection/wishlist')}>
           <Ionicons name="heart-outline" size={18} color={colors.accent} />
           <Text style={styles.ctaSecondaryText}>{t('Mes cartes recherchées ({n})', { n: wishCount })}</Text>
+        </Pressable>
+        <Pressable style={styles.ctaSecondary} onPress={() => router.push('/collection/alerts')}>
+          <Ionicons name="notifications-outline" size={18} color={colors.accent} />
+          <Text style={styles.ctaSecondaryText}>{t('Mes alertes de prix ({n})', { n: alertCount })}</Text>
         </Pressable>
         <Pressable style={styles.ctaSecondary} onPress={() => router.push('/collection/custom')}>
           <Ionicons name="add-circle-outline" size={18} color={colors.accent} />
@@ -170,6 +175,14 @@ export default function CollectionScreen() {
       <Pressable style={styles.allButton} onPress={() => router.push('/collection/wishlist')}>
         <Ionicons name="heart-outline" size={18} color={colors.accent} />
         <Text style={styles.allButtonText}>{t('Mes cartes recherchées ({n})', { n: wishCount })}</Text>
+        <Ionicons name="chevron-forward" size={18} color={colors.muted} />
+      </Pressable>
+      <Pressable style={styles.allButton} onPress={() => router.push('/collection/alerts')}>
+        <Ionicons name="notifications-outline" size={18} color={colors.accent} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.allButtonText}>{t('Mes alertes de prix ({n})', { n: alertCount })}</Text>
+          <Text style={styles.muted}>{settings.collectionWatch?.enabled ? t('Collection surveillée : ± {n} %', { n: settings.collectionWatch.percent }) : t('Hausses, baisses, seuils de prix et surveillance de ta collection')}</Text>
+        </View>
         <Ionicons name="chevron-forward" size={18} color={colors.muted} />
       </Pressable>
       <Pressable style={styles.allButton} onPress={() => router.push('/collection/custom')}>

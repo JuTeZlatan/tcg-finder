@@ -1,9 +1,11 @@
-// Tâche de fond (WorkManager sur Android) : vérifie les prix de la liste de souhaits même quand l'appli est fermée,
-// environ deux fois par jour (le système choisit le moment : batterie suffisante et réseau disponible).
+// Tâche de fond (WorkManager sur Android) : vérifie les prix de la liste de souhaits, les alertes de prix et la
+// surveillance de la collection même quand l'appli est fermée, environ deux fois par jour (le système choisit le
+// moment : batterie suffisante et réseau disponible).
 // Déclarée à l'import de ce fichier (portée globale, exigée par expo-task-manager) : importé par app/_layout.jsx.
 import * as TaskManager from 'expo-task-manager';
 import * as BackgroundTask from 'expo-background-task';
 import { checkWishlistInBackground } from './wishlist';
+import { checkAlertsInBackground } from './priceAlerts';
 import { loadAppLang } from './i18n';
 import { loadRates } from './prices';
 
@@ -13,6 +15,7 @@ TaskManager.defineTask(PRICE_TASK, async () => {
   try {
     await loadAppLang();
     await loadRates();
+    await checkAlertsInBackground();
     await checkWishlistInBackground();
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch {
@@ -20,7 +23,7 @@ TaskManager.defineTask(PRICE_TASK, async () => {
   }
 });
 
-// Active la tâche tant que la liste de souhaits n'est pas vide.
+// Active la tâche tant qu'il y a quelque chose à surveiller (liste de souhaits, alertes, collection).
 export async function setPriceTask(enabled) {
   try {
     const registered = await TaskManager.isTaskRegisteredAsync(PRICE_TASK);
