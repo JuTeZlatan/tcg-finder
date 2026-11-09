@@ -13,6 +13,18 @@ import {
 // Chinois : site officiel de Taïwan (chinois traditionnel, comme les cartes chinoises de Pokémon), même présentation.
 const SITES = { fr: 'https://fr.onepiece-cardgame.com', en: 'https://en.onepiece-cardgame.com', ja: 'https://www.onepiece-cardgame.com', zh: 'https://asia-tw.onepiece-cardgame.com' };
 const OPTCG = 'https://optcgapi.com/api';
+
+// Carte connue seulement de TCGplayer (caractéristiques en anglais) : couleur et type de carte repris des termes
+// employés par le site officiel français pour les autres cartes (filtres d'une extension dans l'appli).
+const FR_TERMS = {
+  color: { Red: 'Rouge', Green: 'Vert', Blue: 'Bleu', Purple: 'Violet', Black: 'Noir', Yellow: 'Jaune' },
+  type: { LEADER: 'LEADER', CHARACTER: 'PERSONNAGE', EVENT: 'ÉVÉNEMENTS', STAGE: 'LIEU', 'DON!!': 'DON!!' },
+};
+const officialTerms = (details, lang) => (lang !== 'fr' ? details : details.map(([k, v]) => {
+  const terms = FR_TERMS[k];
+  if (!terms || typeof v !== 'string') return [k, v];
+  return [k, v.split(/\s*[/,]\s*/).map((x) => terms[x] || terms[x.toUpperCase()] || x).join('/')];
+}));
 const TCGCSV_CATEGORY = 68;
 const CARDMARKET_GAME = 18;
 
@@ -225,7 +237,7 @@ function addVariants(sets, { tcg, cm, cmUsed, codeOf, fx, lang, enBases }) {
         subtitle: base?.subtitle,
         image: p.image,
         thumb: p.thumb,
-        details: [['set', g?.name], ...(base ? base.details.filter(([k]) => k !== 'set') : tcgplayerDetails(p).details)],
+        details: [['set', g?.name], ...(base ? base.details.filter(([k]) => k !== 'set') : officialTerms(tcgplayerDetails(p).details, lang))],
         texts: base?.texts || tcgplayerDetails(p).texts,
         prices: [tcgplayerBlock(p.prices, p.url)],
         links: [

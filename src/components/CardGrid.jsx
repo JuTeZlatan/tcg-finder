@@ -30,10 +30,14 @@ export default function CardGrid({ tcg, lang, load, deps, setId, headerExtra }) 
   const own = copyLang(tcg, useCardLang().cardLang);
   const [filter, setFilter] = useState('');
   const { settings, update } = useSettings();
-  const [filters, setFilters] = useState(() => ({ ...EMPTY_FILTERS, sort: settings.gridSort || 'number' }));
+  // Tri : celui des réglages (lus parfois après le premier affichage) tant qu'on n'en choisit pas un autre ici.
+  const [picked, setFilters] = useState(EMPTY_FILTERS);
+  const chosen = { ...picked, sort: picked.sortPicked ? picked.sort : settings.gridSort || 'number' };
   const changeFilters = (next) => {
-    setFilters(next);
-    if (next.sort !== (settings.gridSort || 'number')) update({ gridSort: next.sort }, { fromSync: true });
+    // Tri inchangé dans le panneau : on garde celui choisi (même s'il est impossible dans cette extension).
+    const kept = next.sort === filters.sort ? { ...next, sort: chosen.sort } : next;
+    setFilters({ ...kept, sortPicked: true });
+    if (kept.sort !== (settings.gridSort || 'number')) update({ gridSort: kept.sort }, { fromSync: true });
   };
   const [sheet, setSheet] = useState(false);
   const fx = useAsync(() => getUsdToEur(), []);
@@ -63,7 +67,11 @@ export default function CardGrid({ tcg, lang, load, deps, setId, headerExtra }) 
   const ranks = useMemo(() => rarityRanks(rows), [rows]);
   const facetOptions = useMemo(() => Object.fromEntries(FACETS.map((f) => [f, facetValues(rows, f, ranks)])), [rows, ranks]);
   const hasPrices = rows.some((r) => r.price != null);
-  const shownRows = useMemo(() => applyFilters(rows, filters, filter, ranks), [rows, filters, filter, ranks]);
+  // Tri gardé d'une autre extension mais impossible ici (pas de prix, pas de rareté) : par numéro.
+  const sortAvailable = chosen.sort.startsWith('price') ? hasPrices : chosen.sort === 'rarity' ? facetOptions.rarity.length > 0 : true;
+  const sort = sortAvailable ? chosen.sort : 'number';
+  const filters = { ...chosen, sort };
+  const shownRows = applyFilters(rows, filters, filter, ranks); // mémorisé par le React Compiler
 
   // Filtres actifs (hors « possédées / manquantes », déjà visibles) : retirables d'un toucher sous la recherche.
   const activeChips = [
@@ -161,6 +169,7 @@ export default function CardGrid({ tcg, lang, load, deps, setId, headerExtra }) 
           filters={filters}
           onChange={changeFilters}
           facetOptions={facetOptions}
+          facetNames={tcg.facetNames}
           hasPrices={hasPrices}
           hasRarity={facetOptions.rarity.length > 0}
           resultCount={shownRows.length}

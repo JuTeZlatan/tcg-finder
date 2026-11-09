@@ -36,6 +36,7 @@ const onepiece = createStaticTcg({
 });
 const riftbound = createStaticTcg({
   id: 'riftbound',
+  facetNames: { color: 'Domaine' }, // filtres d'une extension (src/components/FilterSheet.jsx)
   name: 'Riftbound',
   tagline: 'League of Legends TCG',
   color: '#0AC8B9',
@@ -58,6 +59,7 @@ const riftbound = createStaticTcg({
 });
 const lorcana = createStaticTcg({
   id: 'lorcana',
+  facetNames: { color: 'Encre' },
   name: 'Lorcana',
   tagline: 'Disney Lorcana TCG',
   color: '#3D6FD9',
@@ -88,6 +90,7 @@ const dbsmasters = createStaticTcg({
 
 const swu = createStaticTcg({
   id: 'swu',
+  facetNames: { color: 'Aspect' },
   name: 'Star Wars Unlimited',
   tagline: 'Star Wars: Unlimited TCG',
   color: '#3A5BD9',
@@ -111,6 +114,7 @@ const cyberpunk = createStaticTcg({
 });
 const naruto = createStaticTcg({
   id: 'naruto',
+  facetNames: { color: 'Groupe' },
   name: 'Naruto Mythos',
   tagline: 'Naruto Mythos TCG',
   color: '#E8590C',

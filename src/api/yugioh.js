@@ -78,7 +78,30 @@ const fullCards = new Map();
 // contrôlé chaque jour) : nom d'extension → identifiants de cartes.
 const completions = memo(async () => loadData('yugioh/completions.json', async () => ({})).catch(() => ({})));
 
-function summary(c, setName, lang) {
+// Prix d'une impression pour la liste d'une extension (tris et filtres) : Cardmarket de cette édition et TCGplayer
+// (Unlimited, sinon le premier tirage), comme la moyenne de la fiche ; fichiers collectés chaque jour.
+function editionPrices(edition, maps) {
+  if (!edition || !maps) return [];
+  const key = `${edition.set_code}|${edition.set_rarity}`;
+  const out = [];
+  const cm = maps.cm?.[key];
+  if (num(cm?.[1])) out.push({ source: 'Cardmarket', items: [], ref: { value: num(cm[1]), currency: 'EUR' } });
+  const items = maps.tp?.[key] ? printingItems(maps.tp[key][1]) : [];
+  const market = items.find((i) => i.label === 'market' && i.variant === 'unlimited') || items.find((i) => i.label === 'market');
+  const usd = market?.value || num(edition.set_price);
+  if (usd) out.push({ source: 'TCGplayer', items: [], ref: { value: usd, currency: 'USD' } });
+  return out;
+}
+
+// Type de carte et attribut en français (filtres de l'extension, traduits ensuite par t()).
+const FRAME_NAMES = {
+  normal: 'Normal', effect: 'Effet', ritual: 'Rituel', fusion: 'Fusion', synchro: 'Synchro', xyz: 'Xyz', link: 'Lien',
+  spell: 'Magie', trap: 'Piège', token: 'Jeton', skill: 'Compétence',
+};
+const frameName = (f) => (f ? f.split('_').map((x) => (x === 'pendulum' ? 'Pendule' : FRAME_NAMES[x] || x)).join(' ') : null);
+const ATTRIBUTE_NAMES = { DARK: 'Ténèbres', LIGHT: 'Lumière', EARTH: 'Terre', WATER: 'Eau', FIRE: 'Feu', WIND: 'Vent', DIVINE: 'Divin' };
+
+function summary(c, setName, lang, maps) {
   fullCards.set(`${lang}:${c.id}`, c);
   const entry = setName ? c.card_sets?.find((s) => s.set_name === setName) : null;
   return {
@@ -87,9 +110,9 @@ function summary(c, setName, lang) {
     number: entry?.set_code,
     subtitle: entry ? entry.set_rarity : c.type,
     image: c.card_images?.[0]?.image_url_small,
-    // Prix TCGplayer de cette impression et caractéristiques : tris et filtres de l'extension.
-    prices: Number(entry?.set_price) > 0 ? [{ source: 'TCGplayer', items: [], ref: { value: Number(entry.set_price), currency: 'USD' } }] : [],
-    facets: { rarity: entry?.set_rarity || null, type: c.frameType ? c.frameType[0].toUpperCase() + c.frameType.slice(1).replace(/_/g, ' ') : c.type || null, color: c.attribute || null },
+    // Prix de cette impression et caractéristiques : tris et filtres de l'extension.
+    prices: editionPrices(entry, maps),
+    facets: { rarity: entry?.set_rarity || null, type: frameName(c.frameType) || c.type || null, color: ATTRIBUTE_NAMES[c.attribute] || c.attribute || null },
   };
 }
 
@@ -104,6 +127,7 @@ const archetypeList = memo(async () => {
 
 const adapter = {
   id: 'yugioh',
+  facetNames: { color: 'Attribut' }, // filtres d'une extension
   name: 'Yu-Gi-Oh!',
   tagline: 'Yu-Gi-Oh! Trading Card Game',
   color: '#7B4FD6',
@@ -130,8 +154,9 @@ const adapter = {
     const known = new Set(cards.map((c) => c.id));
     const extra = ((await completions())?.[setName] || []).filter((id) => !known.has(id));
     const added = extra.length ? await queryCards(`id=${extra.join(',')}`, lang).catch(() => []) : [];
+    const [cm, tp] = await Promise.all([cardmarketByEdition(), tcgplayerByEdition()]);
     return [...cards, ...added]
-      .map((c) => summary(c, setName, lang))
+      .map((c) => summary(c, setName, lang, { cm, tp }))
       .sort((a, b) => (a.number || '~').localeCompare(b.number || '~', undefined, { numeric: true }));
   }),
 

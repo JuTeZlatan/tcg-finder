@@ -5,9 +5,11 @@
 // - tâche de fond activée tant qu'il y a quelque chose à surveiller ;
 // - toucher une notification ouvre la fiche de la carte (ou la page indiquée).
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
-import { useSettings } from '../lib/settings';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSettings, STORAGE_KEY } from '../lib/settings';
 import { useCollection } from '../lib/collection';
 import { checkWishlistPrices } from '../lib/wishlist';
 import { checkAlerts, checkCollection, mergeAlertResults, migrateWishlistTargets } from '../lib/priceAlerts';
@@ -69,6 +71,26 @@ export default function Watchers() {
     if (!loaded || !collectionLoaded || !watching || !pricesUpdatedAt) return;
     checkCollection(itemsRef.current, settingsRef.current.collectionWatch).catch(() => {});
   }, [loaded, collectionLoaded, watching, pricesUpdatedAt]);
+
+  // Retour au premier plan : la tâche de fond a pu vérifier les prix pendant que l'appli attendait en arrière-plan.
+  // Ses résultats (alerte envoyée, dernier prix) sont repris, sinon le prochain enregistrement des réglages les
+  // effacerait et la même alerte repartirait.
+  // Seulement une fois les réglages chargés (au démarrage, l'appli passe au premier plan avant), et seulement si un
+  // résultat a changé : les alertes de l'appli restent la référence (ajouts, suppressions, réglages).
+  useEffect(() => {
+    if (!loaded) return undefined;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state !== 'active') return;
+      AsyncStorage.getItem(STORAGE_KEY).then((raw) => {
+        const stored = raw ? JSON.parse(raw) : null;
+        const current = settingsRef.current.alerts;
+        if (!stored?.alerts || !current || !Object.keys(current).length) return;
+        const merged = mergeAlertResults(current, stored.alerts);
+        if (JSON.stringify(merged) !== JSON.stringify(current)) update({ alerts: merged }, { fromSync: true });
+      }).catch(() => {});
+    });
+    return () => sub.remove();
+  }, [loaded, update]);
 
   const response = Notifications.useLastNotificationResponse();
   useEffect(() => {

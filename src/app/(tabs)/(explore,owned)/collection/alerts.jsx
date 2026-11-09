@@ -2,7 +2,7 @@
 // l'historique des alertes envoyées. Tirer vers le bas ou « Vérifier maintenant » : nouvelle vérification des prix.
 import { useCallback, useEffect, useState } from 'react';
 import { router, Stack, useFocusEffect } from 'expo-router';
-import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import * as Notifications from 'expo-notifications';
@@ -36,6 +36,11 @@ export default function AlertsScreen() {
     Notifications.getPermissionsAsync().then(setPermission).catch(() => {});
   }, []);
   useFocusEffect(reload);
+  // Retour dans l'appli : alertes envoyées entre-temps par la tâche de fond.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (s) => s === 'active' && reload());
+    return () => sub.remove();
+  }, [reload]);
 
   const setWatch = (patch) => {
     update({ collectionWatch: { ...watch, ...patch } });

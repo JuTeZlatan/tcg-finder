@@ -1,5 +1,5 @@
 // Profil et réglages simples, mémorisés sur le téléphone : pseudo, avatar, vue des extensions par défaut, site(s) de prix.
-import { createContext, createElement, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, createElement, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loadRates, setDisplayCurrency, setPreferredSource } from './prices';
 
@@ -43,21 +43,17 @@ export function SettingsProvider({ children }) {
     loadRates().then(() => setRatesAt(Date.now()));
   }, []);
 
-  useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => {
-        if (!raw) return;
-        const saved = { ...DEFAULTS, ...JSON.parse(raw) };
-        setPreferredSource(saved.priceSource);
-        setDisplayCurrency(saved.currency);
-        setSettings(saved);
-      })
-      .catch(() => {})
-      .finally(() => setLoaded(true));
-  }, []);
+  // Changements demandés avant la lecture des réglages enregistrés : appliqués après, sur les réglages lus
+  // (sinon l'enregistrement partirait des réglages par défaut et effacerait alertes, liste de souhaits…).
+  const pending = useRef([]);
+  const loadedRef = useRef(false);
 
   // `fromSync` : réglages venus du compte en ligne, qui gardent leur date.
   const update = useCallback((patch, { fromSync } = {}) => {
+    if (!loadedRef.current) {
+      pending.current.push([patch, { fromSync }]);
+      return;
+    }
     // Source des prix appliquée tout de suite : les calculs lancés juste après (mise à jour de la collection) l'utilisent.
     if (patch.priceSource) setPreferredSource(patch.priceSource);
     if (patch.currency) setDisplayCurrency(patch.currency);
@@ -68,6 +64,25 @@ export function SettingsProvider({ children }) {
     });
   }, []);
 
+  useEffect(() => {
+    AsyncStorage.getItem(STORAGE_KEY)
+      .then((raw) => {
+        if (!raw) return;
+        const saved = { ...DEFAULTS, ...JSON.parse(raw) };
+        setPreferredSource(saved.priceSource);
+        setDisplayCurrency(saved.currency);
+        setSettings(saved);
+      })
+      .catch(() => {})
+      .finally(() => {
+        loadedRef.current = true;
+        setLoaded(true);
+        for (const [patch, opts] of pending.current.splice(0)) update(patch, opts);
+      });
+  }, [update]);
+
+  // Les refs ne sont lues que dans `update` (action), jamais pendant le rendu.
+  // eslint-disable-next-line react-hooks/refs
   return createElement(SettingsContext.Provider, { value: { settings, loaded, update, ratesAt } }, children);
 }
 

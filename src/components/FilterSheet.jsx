@@ -18,7 +18,8 @@ export const facetLabel = (facet, value) => t(fieldValue(facet, value));
 
 const toggle = (list, v) => (list.includes(v) ? list.filter((x) => x !== v) : [...list, v]);
 
-export default function FilterSheet({ visible, onClose, filters, onChange, facetOptions, hasPrices, hasRarity, resultCount }) {
+// `facetNames` : nom de la caractéristique propre au jeu (« Attribut » Yu-Gi-Oh!, « Encre » Lorcana…).
+export default function FilterSheet({ visible, onClose, filters, onChange, facetOptions, facetNames, hasPrices, hasRarity, resultCount }) {
   const set = (patch) => onChange({ ...filters, ...patch });
   const sorts = SORTS.filter((s) => (s.startsWith('price') ? hasPrices : s === 'rarity' ? hasRarity : true));
   return (
@@ -47,7 +48,7 @@ export default function FilterSheet({ visible, onClose, filters, onChange, facet
               </Section>
             ) : null}
             {FACETS.filter((f) => facetOptions[f]?.length).map((f) => (
-              <Section key={f} title={t(FACET_LABELS[f])}>
+              <Section key={f} title={t(facetNames?.[f] || FACET_LABELS[f])}>
                 {facetOptions[f].map(({ value, count }) => (
                   <Chip
                     key={value}

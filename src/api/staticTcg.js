@@ -240,6 +240,7 @@ function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadS
         .map(({ card: c, set: s, date }) => ({
           id: c.id, name: c.name, number: c.number, image: c.thumb || c.image, setId: s.id,
           subtitle: [s.name, date].filter(Boolean).join(' · '),
+          prices: c.prices, facets: facetsOf(c.details),
         }))),
   };
 }

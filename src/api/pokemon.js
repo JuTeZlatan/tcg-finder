@@ -278,6 +278,7 @@ const adapter = {
     return h?.cards?.[cardId] ? { days: h.days, points: h.cards[cardId] } : null;
   },
   id: 'pokemon',
+  facetNames: { type: 'Catégorie' }, // filtres d'une extension
   name: 'Pokémon',
   tagline: 'Pokémon Trading Card Game',
   color: '#E3350D',

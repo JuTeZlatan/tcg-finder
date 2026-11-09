@@ -12,6 +12,14 @@ export const FACETS = ['rarity', 'type', 'color'];
 
 export const EMPTY_FILTERS = { sort: 'number', show: 'all', bands: [], rarity: [], type: [], color: [] };
 
+// Valeurs d'une caractéristique : type et couleur peuvent en réunir plusieurs (« Body, Chaos », « Rouge/Bleu »,
+// « Unit, Token ») ; la carte compte alors pour chacune.
+export const valuesOf = (facets, facet) => {
+  const v = facets?.[facet];
+  if (!v) return [];
+  return facet === 'rarity' ? [v] : String(v).split(/\s*[,/]\s*/).filter(Boolean);
+};
+
 const median = (values) => {
   const v = [...values].sort((a, b) => a - b);
   return v.length % 2 ? v[(v.length - 1) / 2] : (v[v.length / 2 - 1] + v[v.length / 2]) / 2;
@@ -26,7 +34,12 @@ export function rarityRanks(rows) {
     if (!byRarity.has(k)) byRarity.set(k, []);
     if (r.price != null) byRarity.get(k).push(r.price);
   }
-  const ranked = [...byRarity].map(([k, prices]) => [k, prices.length ? median(prices) : Infinity]).sort((a, b) => a[1] - b[1]);
+  // Sans prix : la plus fréquente d'abord (les communes sont les plus nombreuses).
+  const counts = new Map();
+  for (const r of rows) if (r.facets?.rarity) counts.set(r.facets.rarity, (counts.get(r.facets.rarity) || 0) + 1);
+  const ranked = [...byRarity]
+    .map(([k, prices]) => [k, prices.length ? median(prices) : Infinity])
+    .sort((a, b) => a[1] - b[1] || (a[1] === Infinity ? counts.get(b[0]) - counts.get(a[0]) : 0));
   return new Map(ranked.map(([k], i) => [k, i]));
 }
 
@@ -34,10 +47,7 @@ export function rarityRanks(rows) {
 // sinon les plus fréquentes d'abord). Rien à proposer sous deux valeurs différentes.
 export function facetValues(rows, facet, ranks) {
   const counts = new Map();
-  for (const r of rows) {
-    const v = r.facets?.[facet];
-    if (v) counts.set(v, (counts.get(v) || 0) + 1);
-  }
+  for (const r of rows) for (const v of valuesOf(r.facets, facet)) counts.set(v, (counts.get(v) || 0) + 1);
   if (counts.size < 2) return [];
   const list = [...counts].map(([value, count]) => ({ value, count }));
   return facet === 'rarity' && ranks
@@ -59,7 +69,7 @@ export function applyFilters(rows, f, text, ranks) {
       const [, min, max] = PRICE_BANDS.find(([key]) => key === k);
       return r.price >= min && r.price < max;
     }))) return false;
-    for (const facet of FACETS) if (f[facet].length && !f[facet].includes(r.facets?.[facet])) return false;
+    for (const facet of FACETS) if (f[facet].length && !valuesOf(r.facets, facet).some((v) => f[facet].includes(v))) return false;
     return true;
   });
   // Cartes sans prix toujours en fin de liste quand on trie par prix.
