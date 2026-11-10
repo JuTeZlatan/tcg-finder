@@ -547,4 +547,5 @@ export default {
   "Aspect": "面向",
   "Début 2027": "2027 年初",
   "Date annoncée : {when}": "预计发售：{when}",
+  "Japon": "日本",
 };

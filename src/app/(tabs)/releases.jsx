@@ -146,7 +146,7 @@ function ReleaseRow({ release: r, followed, expanded, onToggle, onFollow }) {
         <View style={{ flex: 1, gap: 2 }}>
           <View style={styles.gameLine}>
             <Image source={GAME_ICONS[r.tcg]} cachePolicy="memory" style={styles.gameIcon} contentFit="contain" />
-            <Text style={styles.game}>{tcg?.name}{r.code ? ` · ${r.code}` : ''}</Text>
+            <Text style={styles.game}>{tcg?.name}{r.code ? ` · ${r.code}` : ''}{r.region === 'JP' ? ` · ${t('Japon')}` : ''}</Text>
           </View>
           <Text style={styles.name} numberOfLines={2}>{r.name}</Text>
           <Text style={[styles.when, isSoon && styles.whenSoon]}>

@@ -547,4 +547,5 @@ export default {
   "Aspect": "Aspekt",
   "Début 2027": "Anfang 2027",
   "Date annoncée : {when}": "Angekündigt für {when}",
+  "Japon": "Japan",
 };

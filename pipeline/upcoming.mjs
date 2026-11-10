@@ -45,6 +45,20 @@ export async function build(outDir) {
       out.push({ tcg: 'magic', name: s.name, date: s.released_at, code: s.code.toUpperCase(), image: s.icon_svg_uri, imageTint: true });
     }
   }
+  // Pokémon : extensions japonaises annoncées sur le site officiel japonais (elles sortent 2 à 3 mois avant les
+  // internationales, que TCGplayer ne liste qu'au dernier moment). Marquées « Japon » dans l'appli.
+  const jp = await getJSON('https://www.pokemon-card.com/products/topList.php').catch(() => null);
+  for (const p of jp?.products || []) {
+    if (p.productType !== '拡張パック') continue;
+    const m = String(p.releaseDate).match(/(\d{4})年\s*(\d{1,2})月\s*(\d{1,2})日/);
+    if (!m) continue;
+    const date = `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+    if (!inRange(date)) continue;
+    const name = p.productTitle.match(/「(.+)」/)?.[1] || p.productTitle;
+    const code = p.link_detailPage?.match(/\/ex\/([a-z0-9]+)\/?$/i)?.[1]?.toUpperCase() || null;
+    if (out.some((u) => u.tcg === 'pokemon' && u.region === 'JP' && u.name === name)) continue;
+    out.push({ tcg: 'pokemon', name, date, code, region: 'JP', image: p.tumbsImg ? `https://www.pokemon-card.com${p.tumbsImg}` : null });
+  }
   // Annonces officielles, tant qu'elles ne sont pas passées depuis plus de 30 jours.
   for (const r of OFFICIAL_ANNOUNCED) if (r.date >= from) out.push(r);
   out.sort((a, b) => a.date.localeCompare(b.date) || a.tcg.localeCompare(b.tcg));
