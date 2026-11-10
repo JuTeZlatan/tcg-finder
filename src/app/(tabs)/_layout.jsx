@@ -5,8 +5,8 @@ import { colors } from '../../lib/theme';
 import SideMenu from '../../components/SideMenu';
 import { useSettings } from '../../lib/settings';
 import { useAsync } from '../../lib/useAsync';
-import { daysUntil, loadReleases } from '../../lib/releases';
-import { t, takeReopenMenu } from '../../lib/i18n';
+import { daysUntil, loadReleases, releaseIn } from '../../lib/releases';
+import { getAppLang, t, takeReopenMenu } from '../../lib/i18n';
 import { scheduleReleaseReminders } from '../../lib/notifications';
 import { getTcg } from '../../api';
 
@@ -23,7 +23,9 @@ export default function TabsLayout() {
   // Rappel à 9 h le jour de sortie de chaque extension suivie (reprogrammé quand la liste change).
   const followedKey = [...followed].sort().join(',');
   useEffect(() => {
-    const list = (releases.data || []).filter((r) => followedKey.split(',').includes(r.key) && !r.approx && daysUntil(r.date) >= 0); // date précise seulement
+    // Nom et date de sortie dans la langue de l'appli (date européenne pour le français…) ; date précise seulement.
+    const local = (releases.data || []).map((r) => ({ ...r, ...releaseIn(r, [getAppLang(), 'en']) }));
+    const list = local.filter((r) => followedKey.split(',').includes(r.key) && !r.approx && daysUntil(r.date) >= 0);
     scheduleReleaseReminders(list.map((r) => ({ key: r.key, date: r.date, name: r.name, tcgName: getTcg(r.tcg)?.name || '' }))).catch(() => {});
   }, [releases.data, followedKey]);
   const dueSoon = (releases.data || []).filter((r) => followed.has(r.key) && daysUntil(r.date) >= 0 && daysUntil(r.date) <= 7).length;

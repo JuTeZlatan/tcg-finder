@@ -13,9 +13,9 @@ import { useCollection } from '../../lib/collection';
 import { useSettings } from '../../lib/settings';
 import { useCardLang } from '../../lib/cardLang';
 import { askNotificationPermission } from '../../lib/notifications';
-import { SOON_DAYS, countdown, daysUntil, findSetForRelease, loadReleases, localizedReleaseNames, releaseLinks } from '../../lib/releases';
+import { SOON_DAYS, countdown, daysUntil, findSetForRelease, loadReleases, localizedReleaseNames, releaseIn, releaseLinks } from '../../lib/releases';
 import { colors, radius } from '../../lib/theme';
-import { locale, t } from '../../lib/i18n';
+import { getAppLang, locale, t } from '../../lib/i18n';
 
 const MONTH = (date) => new Date(`${date}T12:00:00`).toLocaleDateString(locale(), { month: 'long', year: 'numeric' });
 const FULL_DATE = (date) => new Date(`${date}T12:00:00`).toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' });
@@ -35,9 +35,17 @@ export default function ReleasesScreen() {
   // Nom dans la langue des cartes quand l'extension existe dans cette langue, sinon nom anglais.
   const { cardLang } = useCardLang();
   const names = useAsync(() => localizedReleaseNames(data.data || [], cardLang), [data.data, cardLang]);
+  // Nom officiel et date dans la langue de l'appli (sinon des cartes, sinon anglais) ; à défaut de nom officiel
+  // collecté, celui de l'extension déjà dans l'appli.
+  const appLang = getAppLang();
   const all = useMemo(
-    () => (data.data || []).map((r) => ({ ...r, name: names.data?.get(r.key) || r.name, days: daysUntil(r.date) })),
-    [data.data, names.data],
+    () => (data.data || [])
+      .map((r) => {
+        const own = releaseIn(r, [appLang, cardLang, 'en']);
+        return { ...r, name: (own.translated ? own.name : names.data?.get(r.key)) || own.name, date: own.date, days: daysUntil(own.date) };
+      })
+      .sort((a, b) => a.date.localeCompare(b.date)),
+    [data.data, names.data, appLang, cardLang],
   );
   const visible = all.filter((r) => (filter === 'all' ? true : filter === 'mine' ? myGames.has(r.tcg) : r.tcg === filter));
   const upcoming = visible.filter((r) => r.days >= 0);

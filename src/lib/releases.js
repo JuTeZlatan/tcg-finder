@@ -20,6 +20,13 @@ export const loadReleases = memo(async () => {
   return list.map((r) => ({ ...r, key: `${r.tcg}|${r.code || r.name}|${r.date}` }));
 });
 
+// Nom officiel et date de sortie d'une sortie dans une langue (collectés sur les sites officiels : `names`, `dates`),
+// d'après la première langue connue parmi `langs` (langue de l'appli, puis des cartes, puis l'anglais).
+export function releaseIn(r, langs) {
+  const pick = (map) => (map ? langs.map((l) => map[l]).find(Boolean) : null);
+  return { name: pick(r.names) || r.name, date: pick(r.dates) || r.date, translated: !!pick(r.names) };
+}
+
 // Jours avant la sortie (0 = aujourd'hui, négatif = déjà sortie). Calcul en dates locales.
 export function daysUntil(date) {
   const today = new Date();
