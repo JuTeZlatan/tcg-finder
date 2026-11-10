@@ -43,14 +43,14 @@ export default function ReleasesScreen() {
   const upcoming = visible.filter((r) => r.days >= 0);
   const recent = visible.filter((r) => r.days < 0).reverse();
   const mine = upcoming.filter((r) => followed.has(r.key));
-  const soon = upcoming.filter((r) => r.days <= SOON_DAYS).length;
+  const soon = upcoming.filter((r) => !r.approx && r.days <= SOON_DAYS).length;
   const gamesWithReleases = TCGS.filter((tg) => all.some((r) => r.tcg === tg.id && r.days >= 0));
 
   // Frise : sorties à venir regroupées par mois (les sorties suivies sont déjà en tête de page).
   const months = [];
   for (const r of upcoming) {
     if (followed.has(r.key)) continue;
-    const m = MONTH(r.date);
+    const m = r.approx ? t(r.approx) : MONTH(r.date); // date encore approximative (« Début 2027 ») : rubrique à part
     if (!months.length || months[months.length - 1].month !== m) months.push({ month: m, list: [] });
     months[months.length - 1].list.push(r);
   }
@@ -128,7 +128,7 @@ export default function ReleasesScreen() {
 function ReleaseRow({ release: r, followed, expanded, onToggle, onFollow }) {
   const tcg = getTcg(r.tcg);
   const { cardLang } = useCardLang();
-  const isSoon = r.days >= 0 && r.days <= SOON_DAYS;
+  const isSoon = !r.approx && r.days >= 0 && r.days <= SOON_DAYS;
   const [imageFailed, setImageFailed] = useState(false); // visuel introuvable : icône du jeu
   // Extension déjà dans l'appli ? (cherchée seulement quand la sortie est dépliée)
   const set = useAsync(() => (expanded ? findSetForRelease(r, cardLang) : Promise.resolve(null)), [r.key, expanded, cardLang]);
@@ -149,7 +149,9 @@ function ReleaseRow({ release: r, followed, expanded, onToggle, onFollow }) {
             <Text style={styles.game}>{tcg?.name}{r.code ? ` · ${r.code}` : ''}</Text>
           </View>
           <Text style={styles.name} numberOfLines={2}>{r.name}</Text>
-          <Text style={[styles.when, isSoon && styles.whenSoon]}>{countdown(r.days)} · {FULL_DATE(r.date)}</Text>
+          <Text style={[styles.when, isSoon && styles.whenSoon]}>
+            {r.approx ? t('Date annoncée : {when}', { when: t(r.approx).toLowerCase() }) : `${countdown(r.days)} · ${FULL_DATE(r.date)}`}
+          </Text>
         </View>
         <Pressable onPress={onFollow} hitSlop={10} accessibilityLabel={followed ? t('Ne plus suivre') : t('Suivre cette sortie')}>
           <Ionicons name={followed ? 'star' : 'star-outline'} size={22} color={followed ? colors.accent : colors.muted} />

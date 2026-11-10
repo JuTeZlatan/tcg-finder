@@ -23,7 +23,7 @@ export default function TabsLayout() {
   // Rappel à 9 h le jour de sortie de chaque extension suivie (reprogrammé quand la liste change).
   const followedKey = [...followed].sort().join(',');
   useEffect(() => {
-    const list = (releases.data || []).filter((r) => followedKey.split(',').includes(r.key) && daysUntil(r.date) >= 0);
+    const list = (releases.data || []).filter((r) => followedKey.split(',').includes(r.key) && !r.approx && daysUntil(r.date) >= 0); // date précise seulement
     scheduleReleaseReminders(list.map((r) => ({ key: r.key, date: r.date, name: r.name, tcgName: getTcg(r.tcg)?.name || '' }))).catch(() => {});
   }, [releases.data, followedKey]);
   const dueSoon = (releases.data || []).filter((r) => followed.has(r.key) && daysUntil(r.date) >= 0 && daysUntil(r.date) <= 7).length;

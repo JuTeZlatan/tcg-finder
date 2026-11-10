@@ -3,7 +3,15 @@
 // Sortie : pipeline/out/upcoming.json = [{ tcg, name, date, code, image }], de la plus ancienne à la plus lointaine.
 import { getJSON, groupImage, tcgcsvGroups, writeJSON } from './lib.mjs';
 
-const CATEGORIES = { pokemon: 3, yugioh: 2, onepiece: 68, lorcana: 71, riftbound: 89, dbsfw: 80, dbsmasters: 27, swu: 79, cyberpunk: 92, naruto: 93 };
+// Naruto Mythos : absent de TCGplayer (sa catégorie « Naruto Card Game » est un autre jeu) → annonces officielles ci-dessous.
+const CATEGORIES = { pokemon: 3, yugioh: 2, onepiece: 68, lorcana: 71, riftbound: 89, dbsfw: 80, dbsmasters: 27, swu: 79, cyberpunk: 92 };
+// Sorties annoncées sur le site officiel d'un jeu absent de TCGplayer. Date précise inconnue : `approx` (texte affiché
+// à la place de la date, ex. « Début 2027 ») et `date` = début de la période, pour le classement. À mettre à jour à
+// chaque annonce (source : actualités du site officiel).
+const OFFICIAL_ANNOUNCED = [
+  // https://www.narutotcgmythos.com/news — « Set 3 Akatsuki », sortie mondiale « Early 2027 » (annonce du 27 mai 2026)
+  { tcg: 'naruto', name: 'Set 3 – Akatsuki', date: '2027-01-01', approx: 'Début 2027', code: 'S3', image: null },
+];
 // Magic : vraies extensions seulement (pas les cartes d'art, jetons, promos…).
 const MAGIC_TYPES = new Set(['expansion', 'core', 'masters', 'commander', 'draft_innovation', 'starter', 'duel_deck', 'from_the_vault', 'premium_deck', 'spellbook', 'arsenal', 'box']);
 const PAST_DAYS = 30;
@@ -37,6 +45,8 @@ export async function build(outDir) {
       out.push({ tcg: 'magic', name: s.name, date: s.released_at, code: s.code.toUpperCase(), image: s.icon_svg_uri, imageTint: true });
     }
   }
+  // Annonces officielles, tant qu'elles ne sont pas passées depuis plus de 30 jours.
+  for (const r of OFFICIAL_ANNOUNCED) if (r.date >= from) out.push(r);
   out.sort((a, b) => a.date.localeCompare(b.date) || a.tcg.localeCompare(b.tcg));
   await writeJSON(`${outDir}/upcoming.json`, out);
   console.log(`  ${out.filter((u) => u.date > day(0)).length} sorties annoncées, ${out.filter((u) => u.date <= day(0)).length} sorties récentes`);

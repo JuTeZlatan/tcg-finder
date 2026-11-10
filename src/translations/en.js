@@ -545,4 +545,6 @@ export default {
   "Vent": "Wind",
   "Divin": "Divine",
   "Aspect": "Aspect",
+  "Début 2027": "Early 2027",
+  "Date annoncée : {when}": "Announced for {when}",
 };

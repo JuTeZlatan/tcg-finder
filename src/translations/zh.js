@@ -545,4 +545,6 @@ export default {
   "Vent": "风",
   "Divin": "神",
   "Aspect": "面向",
+  "Début 2027": "2027 年初",
+  "Date annoncée : {when}": "预计发售：{when}",
 };
