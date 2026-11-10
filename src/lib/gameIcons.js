@@ -15,7 +15,7 @@ export const GAME_ICONS = {
   naruto: require('../../assets/games/naruto.png'),
 };
 
-// Logo officiel (écriture du nom) de chaque jeu, sous son icône sur l'accueil « Explorer » : sites officiels
+// Logo officiel (écriture du nom) de chaque jeu, seul sur sa tuile de l'accueil « Explorer » : sites officiels
 // (Pokémon : logo officiel du JCC sur Wikimedia Commons), marges transparentes rognées.
 export const GAME_WORDMARKS = {
   pokemon: require('../../assets/games/wordmarks/pokemon.png'),
@@ -32,5 +32,3 @@ export const GAME_WORDMARKS = {
 };
 // Logo noir sur fond clair (One Piece) : affiché en blanc sur les tuiles sombres.
 export const WORDMARK_TINT = { onepiece: '#FFFFFF' };
-// Jeux dont l'icône est déjà leur logo écrit (Star Wars Unlimited, Naruto, Dragon Ball) : logo seul, plus grand.
-export const WORDMARK_ONLY = new Set(['swu', 'naruto', 'dbsfw', 'dbsmasters']);

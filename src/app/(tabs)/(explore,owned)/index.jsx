@@ -1,5 +1,5 @@
 // Accueil « Explorer », sur un seul écran sans défilement : en-tête (salutation, avatar), recherche dans tous les jeux,
-// langue des cartes (drapeaux sur une ligne), puis les jeux en tuiles à dégradé aux couleurs de chacun (icône et logo officiels), dont la taille
+// langue des cartes (drapeaux sur une ligne), puis les jeux en tuiles à dégradé aux couleurs de chacun (logo officiel), dont la taille
 // s'adapte à la hauteur disponible. Un jeu sans cartes dans la langue choisie est grisé avec un cadenas (sauf les jeux
 // affichés en anglais en attendant une version officielle).
 import { router } from 'expo-router';
@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TCGS, dataLang } from '../../../api';
 import { CARD_LANGS, LANG_NAMES, useCardLang } from '../../../lib/cardLang';
 import { colors } from '../../../lib/theme';
-import { GAME_ICONS, GAME_WORDMARKS, WORDMARK_ONLY, WORDMARK_TINT } from '../../../lib/gameIcons';
+import { GAME_WORDMARKS, WORDMARK_TINT } from '../../../lib/gameIcons';
 import { useSettings } from '../../../lib/settings';
 import { Avatar } from '../../../components/SideMenu';
 import { t } from '../../../lib/i18n';
@@ -107,11 +107,6 @@ export default function Home() {
           <View style={styles.grid}>
             {TCGS.map((g) => {
               const on = available(g);
-              // Icône officielle centrée en haut, logo officiel (écriture du nom) en dessous, sur toute la largeur.
-              const ring = Math.max(36, Math.min(tileWidth * 0.5, tileHeight * 0.5));
-              const icon = ring * 0.8;
-              const markOnly = WORDMARK_ONLY.has(g.id); // icône = logo écrit : logo seul, sur toute la tuile
-              const markHeight = markOnly ? tileHeight - 24 : Math.max(24, tileHeight - ring - 16 - 6);
               return (
                 <Pressable
                   key={g.id}
@@ -131,15 +126,11 @@ export default function Home() {
                   ]}
                 >
                   {!on ? <Ionicons name="lock-closed" size={15} color={colors.text} style={styles.lock} /> : null}
-                  {markOnly ? null : (
-                    <View style={[styles.iconRing, { width: ring, height: ring, borderRadius: ring / 3.2 }]}>
-                      <Image source={GAME_ICONS[g.id]} cachePolicy="memory" style={{ width: icon, height: icon, borderRadius: icon / 5 }} contentFit="contain" />
-                    </View>
-                  )}
+                  {/* Logo officiel du jeu (écriture du nom), centré sur toute la tuile. */}
                   <Image
                     source={GAME_WORDMARKS[g.id]}
                     cachePolicy="memory"
-                    style={{ width: tileWidth - 16, height: markHeight }}
+                    style={{ width: tileWidth - 20, height: tileHeight - 28 }}
                     contentFit="contain"
                     tintColor={WORDMARK_TINT[g.id]}
                     accessible={false}
@@ -183,5 +174,4 @@ const styles = StyleSheet.create({
   tile: { borderRadius: 18, padding: 8, borderWidth: 1, alignItems: 'center', justifyContent: 'center', gap: 6, overflow: 'hidden' },
   off: { opacity: 0.38 },
   lock: { position: 'absolute', top: 8, right: 8 },
-  iconRing: { backgroundColor: 'rgba(15,17,21,0.55)', alignItems: 'center', justifyContent: 'center' },
 });
