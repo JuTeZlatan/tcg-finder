@@ -14,3 +14,23 @@ export const GAME_ICONS = {
   cyberpunk: require('../../assets/games/cyberpunk.png'),
   naruto: require('../../assets/games/naruto.png'),
 };
+
+// Logo officiel (écriture du nom) de chaque jeu, sous son icône sur l'accueil « Explorer » : sites officiels
+// (Pokémon : logo officiel du JCC sur Wikimedia Commons), marges transparentes rognées.
+export const GAME_WORDMARKS = {
+  pokemon: require('../../assets/games/wordmarks/pokemon.png'),
+  magic: require('../../assets/games/wordmarks/magic.png'),
+  yugioh: require('../../assets/games/wordmarks/yugioh.png'),
+  onepiece: require('../../assets/games/wordmarks/onepiece.png'),
+  lorcana: require('../../assets/games/wordmarks/lorcana.png'),
+  riftbound: require('../../assets/games/wordmarks/riftbound.png'),
+  dbsfw: require('../../assets/games/wordmarks/dbsfw.png'),
+  dbsmasters: require('../../assets/games/wordmarks/dbsmasters.png'),
+  swu: require('../../assets/games/wordmarks/swu.png'),
+  cyberpunk: require('../../assets/games/wordmarks/cyberpunk.webp'),
+  naruto: require('../../assets/games/wordmarks/naruto.png'),
+};
+// Logo noir sur fond clair (One Piece) : affiché en blanc sur les tuiles sombres.
+export const WORDMARK_TINT = { onepiece: '#FFFFFF' };
+// Jeux dont l'icône est déjà leur logo écrit (Star Wars Unlimited, Naruto, Dragon Ball) : logo seul, plus grand.
+export const WORDMARK_ONLY = new Set(['swu', 'naruto', 'dbsfw', 'dbsmasters']);
