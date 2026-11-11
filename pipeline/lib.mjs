@@ -128,7 +128,9 @@ function useFoil(guide, foil) {
   return hasFoil && (foil || guide.avg == null);
 }
 
-export function cardmarketRef(guide, { foil = false } = {}) {
+// `noFoil` : la foil est vendue comme une carte à part (Star Wars « (Foil) », « (Hyperspace Foil) ») ; les champs foil
+// de Cardmarket lui reviennent, jamais à la version normale.
+export function cardmarketRef(guide, { foil = false, noFoil = false } = {}) {
   if (!guide) return null;
   const fs = foilSuffix(guide);
   const read = (suffix) => {
@@ -147,10 +149,11 @@ export function cardmarketRef(guide, { foil = false } = {}) {
     if (low && low > ref && low < ref * 10) ref = low;
     return Math.round(ref * 100) / 100;
   };
+  if (noFoil) return read('');
   return useFoil(guide, foil) ? read(fs) ?? read('') : read('') ?? read(fs);
 }
 
-export function cardmarketBlock(guide, url, { foil = false } = {}) {
+export function cardmarketBlock(guide, url, { foil = false, noFoil = false } = {}) {
   if (!guide) return null;
   const fs = foilSuffix(guide);
   const items = [
@@ -159,9 +162,9 @@ export function cardmarketBlock(guide, url, { foil = false } = {}) {
     .map(([label, variant, key]) => ({ label, variant, value: num(guide[key || label]), currency: 'EUR' }))
     .filter((i) => i.value)
     // Carte foil uniquement : les champs « normaux » ne reflètent aucune vente (souvent bloqués à 0,15 €).
-    .filter((i) => i.variant || !useFoil(guide, foil));
+    .filter((i) => (noFoil ? !i.variant : i.variant || !useFoil(guide, foil)));
   if (!items.length) return null;
-  const ref = cardmarketRef(guide, { foil });
+  const ref = cardmarketRef(guide, { foil, noFoil });
   return { source: 'Cardmarket', items, ref: ref && { value: ref, currency: 'EUR' }, url };
 }
 

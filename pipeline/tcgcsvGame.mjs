@@ -32,6 +32,11 @@ export async function buildTcgcsvGame(outDir, { id, label, categoryId, cardmarke
       minRatio: 0.3,
     });
 
+    // Foils vendues comme cartes à part (« X (Foil) », « X (Hyperspace Foil) ») : nom de la version normale
+    // correspondante (« X », « X (Hyperspace) »), qui ne doit pas reprendre les prix foil de Cardmarket.
+    const foilTwins = new Set(products.map((p) => p.name.match(/^(.*?)\s*\((?:(.*?)\s+)?Foil\)\s*$/i))
+      .filter(Boolean).map(([, n, tag]) => (tag ? `${n} (${tag})` : n)));
+
     const cards = products.map((p) => {
       const ext = Object.fromEntries((p.extendedData || []).map((e) => [e.name, htmlToText(e.value)]));
       const extra = (p.extendedData || [])
@@ -39,7 +44,7 @@ export async function buildTcgcsvGame(outDir, { id, label, categoryId, cardmarke
         .map((e) => [FIELD_KEYS[e.name] || e.displayName || e.name, htmlToText(e.value).replace(/;/g, ', ')]);
       const cmProduct = cmMatch.get(p);
       const prices = [
-        cmProduct && cardmarketBlock(cm.prices.get(cmProduct.idProduct), null, { foil: isFoilOnly(p.prices) }),
+        cmProduct && cardmarketBlock(cm.prices.get(cmProduct.idProduct), null, { foil: isFoilOnly(p.prices), noFoil: foilTwins.has(p.name.trim()) }),
         tcgplayerBlock(p.prices, p.url),
       ].filter(Boolean);
       // « Son Gohan : Future - FB11-032 (Alternate Art) » → « Son Gohan : Future (Alternate Art) »

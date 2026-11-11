@@ -40,14 +40,22 @@ const itemsOf = (p, finish) => {
 const mainSources = (prices) => (prices || []).filter((p) => !p.versions);
 const versionItems = (prices) => (prices || []).filter((p) => p.versions).flatMap((p) => p.items || []);
 
-// Versions proposées. Un site qui ne cote qu'une version la nomme parfois autrement (One Piece : « normale » chez
-// l'un, « foil » chez l'autre pour la même carte) : à lui seul, il ne crée pas de choix.
+// Site qui nomme chacun de ses prix (« normal », « foil »…) : on sait de quelle version il parle. Sans nom de version
+// (Cardmarket en One Piece, ou carte vendue comme produit à part), c'est simplement le prix de la carte.
+const named = (p) => (p.items || []).filter(isPhysical).every((i) => i.variant);
+
+// Versions proposées. Un site qui ne cote qu'une version sans la nommer ne crée pas de choix (One Piece : prix sans
+// version chez l'un, « foil » chez l'autre pour la même carte). Mais deux sites qui nomment chacun une version
+// différente (Star Wars, Dragon Ball Masters : « foil » chez l'un, « normal » chez l'autre) cotent deux cartes.
 export function finishesOf(prices) {
   const set = new Set();
+  const single = new Set();
   for (const p of mainSources(prices)) {
     const own = finishesOfSource(p);
     if (own.size > 1) for (const f of own) set.add(f);
+    else if (own.size === 1 && named(p)) single.add([...own][0]);
   }
+  if (single.size > 1 || (set.size && single.size)) for (const f of single) set.add(f);
   const rank = (f) => (ORDER.includes(f) ? ORDER.indexOf(f) : ORDER.length);
   const list = [...set].sort((a, b) => rank(a) - rank(b));
   const extra = versionItems(prices).map((i) => i.variant);
@@ -120,8 +128,10 @@ export function pricesForFinish(prices, finish) {
   }
   return main
     .map((p) => {
-      // Site qui ne cote qu'une version : on ne sait pas laquelle au juste, il n'entre que dans le prix de référence.
-      if (finishesOfSource(p).size < 2) return null;
+      // Site qui ne cote qu'une version sans la nommer : on ne sait pas laquelle, il n'entre que dans le prix de
+      // référence. S'il la nomme, il n'entre que dans le prix de cette version.
+      const own = finishesOfSource(p);
+      if (own.size < 2 && !(own.has(finish) && named(p))) return null;
       const items = itemsOf(p, finish);
       // Prix de marché s'il existe, sinon médiane des statistiques de ventes (une tendance isolée peut être aberrante),
       // sinon le premier prix disponible (ex. 1re édition sans vente récente : l'annonce la moins chère).
