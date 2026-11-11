@@ -98,7 +98,7 @@ async function staticCards(outDir) {
       const [sets, rows] = await Promise.all([localOrPublished(outDir, `${tcg}/${lang}/sets.json`), localOrPublished(outDir, `${tcg}/${lang}/search.json`)]);
       const dates = new Map((sets || []).map((s) => [String(s.id), s.date || s.releaseDate || '']));
       // Lignes de recherche : [id, nom, extension, numéro, image] — l'image est celle que le scan compare.
-      for (const [, , setId, , image] of rows || []) if (image) out.push({ tcg, lang, setId: String(setId), date: dates.get(String(setId)) || '', url: image, dl: image });
+      for (const [id, name, setId, number, image] of rows || []) if (image) out.push({ tcg, lang, id: String(id), name, number: String(number ?? ''), setId: String(setId), date: dates.get(String(setId)) || '', url: image, dl: image });
     }
   }
   return out;
@@ -112,7 +112,7 @@ async function pokemonCards() {
       const full = await getJSON(`${TCGDEX}/${api}/sets/${encodeURIComponent(s.id)}`).catch(() => null);
       for (const c of full?.cards || []) {
         // L'appli affiche « <image>/low.webp » (src/api/pokemon.js › img).
-        if (c.image) out.push({ tcg: 'pokemon', lang, setId: full.id, date: full.releaseDate || '', url: `${c.image}/low.webp`, dl: `${c.image}/low.webp` });
+        if (c.image) out.push({ tcg: 'pokemon', lang, id: c.id, name: c.name, number: String(c.localId ?? ''), setId: full.id, date: full.releaseDate || '', url: `${c.image}/low.webp`, dl: `${c.image}/low.webp` });
       }
       await sleep(30);
     }
@@ -129,7 +129,7 @@ async function magicCards() {
     if (c.digital || c.lang !== 'en') return;
     const uris = c.image_uris || c.card_faces?.[0]?.image_uris;
     // Clé : l'image « normal » que compare l'appli ; téléchargement : la « small », bien plus légère (même empreinte).
-    if (uris?.normal) out.push({ tcg: 'magic', lang: 'en', setId: c.set, date: c.released_at || '', url: uris.normal, dl: uris.small || uris.normal });
+    if (uris?.normal) out.push({ tcg: 'magic', lang: 'en', id: c.id, name: c.name, number: c.collector_number, setId: c.set, date: c.released_at || '', url: uris.normal, dl: uris.small || uris.normal });
   };
   const res = await fetch(bulk.jsonl_download_uri, { headers: { 'User-Agent': UA } });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -144,7 +144,7 @@ async function yugiohCards() {
   const out = [];
   for (const c of all?.data || []) {
     const url = `https://images.ygoprodeck.com/images/cards_small/${c.id}.jpg`;
-    for (const s of c.card_sets || []) out.push({ tcg: 'yugioh', lang: 'en', setId: s.set_name, date: dates.get(s.set_name) || '', url, dl: url });
+    for (const s of c.card_sets || []) out.push({ tcg: 'yugioh', lang: 'en', id: String(c.id), name: c.name, number: s.set_code, setId: s.set_name, date: dates.get(s.set_name) || '', url, dl: url });
   }
   return out;
 }
@@ -214,4 +214,50 @@ export async function build(outDir) {
   for (const [path, c] of files) await writeJSON(`${outDir}/${path}`, { s: SCALE, c });
   const total = [...files.values()].reduce((n, c) => n + Object.keys(c).length, 0);
   console.log(`  empreintes : ${files.size} fichiers d'extensions publiés (${total} cartes), sur ${new Set(cards.map((c) => c.url)).size} images`);
+  await writeIndexes(outDir, cards, cache);
+}
+
+// ---------- Index par jeu et par langue : reconnaissance par l'image seule (module natif card-vision) ----------
+// fpi/<jeu>/<langue>.bin : une empreinte allégée par image (288 octets signés : luminosité 12 × 16, et les deux
+// couleurs réduites à 6 × 8 par moyenne de 2 × 2 cases — CardIndex.kt fait la même réduction sur l'image filmée).
+// fpi/<jeu>/<langue>.json : { n, dim, s, cards: [[[id, extension, nom, numéro], …], …] } — cartes de chaque image,
+// dans le même ordre (une même illustration peut servir à plusieurs cartes : rééditions).
+export const INDEX_DIM = 192 + 48 + 48;
+export function reduce(fp) {
+  const out = new Int8Array(INDEX_DIM);
+  out.set(fp.subarray(0, 192), 0);
+  for (let c = 1; c < 3; c++) {
+    for (let y = 0; y < 8; y++) {
+      for (let x = 0; x < 6; x++) {
+        const at = (yy, xx) => fp[c * 192 + yy * 12 + xx];
+        const m = (at(2 * y, 2 * x) + at(2 * y, 2 * x + 1) + at(2 * y + 1, 2 * x) + at(2 * y + 1, 2 * x + 1)) / 4;
+        out[192 + (c - 1) * 48 + y * 6 + x] = Math.round(m);
+      }
+    }
+  }
+  return out;
+}
+async function writeIndexes(outDir, cards, cache) {
+  const groups = new Map();
+  for (const c of cards) {
+    const v = cache.get(c.url);
+    if (!v || v.startsWith('-')) continue;
+    const key = `${c.tcg}/${c.lang}`;
+    if (!groups.has(key)) groups.set(key, new Map());
+    const byUrl = groups.get(key);
+    if (!byUrl.has(c.url)) byUrl.set(c.url, { v, cards: [] });
+    byUrl.get(c.url).cards.push([c.id, c.setId, c.name, c.number]);
+  }
+  for (const [key, byUrl] of groups) {
+    const entries = [...byUrl.values()];
+    const bin = Buffer.alloc(entries.length * INDEX_DIM);
+    entries.forEach((e, i) => {
+      const b = Buffer.from(e.v, 'base64');
+      bin.set(new Uint8Array(reduce(new Int8Array(b.buffer, b.byteOffset, b.length)).buffer), i * INDEX_DIM);
+    });
+    await mkdir(`${outDir}/fpi/${key.split('/')[0]}`, { recursive: true });
+    await writeFile(`${outDir}/fpi/${key}.bin`, bin);
+    await writeJSON(`${outDir}/fpi/${key}.json`, { n: entries.length, dim: INDEX_DIM, s: SCALE, cards: entries.map((e) => e.cards) });
+  }
+  console.log(`  index de reconnaissance : ${[...groups].map(([k, m]) => `${k} ${m.size}`).join(', ')}`);
 }

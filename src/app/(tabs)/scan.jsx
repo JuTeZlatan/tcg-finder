@@ -5,7 +5,8 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { getTcg, dataLang } from '../../api';
-import { addLanguageScores, agreed, applyLanguage, identify, SURE, TWO_CHOICES, withVisual } from '../../lib/scan';
+import { IMAGE_MIN, addLanguageScores, agreed, applyLanguage, fromImage, identify, SURE, TWO_CHOICES, withVisual } from '../../lib/scan';
+import { prepareVisualIndex, visualCandidates, withImages } from '../../lib/visualIndex';
 import { available as LIVE, CardScannerView } from '../../../modules/card-vision';
 import { discard, readCard, readCardQuick } from '../../lib/scanImage';
 import { detectCodes, nameCandidates, pickLanguage } from '../../lib/scanDetect';
@@ -38,11 +39,26 @@ const hasCard = (cardText, hasCode) => hasCode || String(cardText || '').replace
 const codeOf = (result) => result.detections?.map((d) => d.code).join(' ') || result.candidates?.[0]?.id || null;
 // Fiabilité d'un résultat ; si ce n'est pas sûr (ou deux versions à égalité), la carte filmée est comparée aux
 // images officielles des candidates.
-async function evaluate(first, fp, text, agree) {
+// Reconnaissance par l'image seule (index de toutes les cartes, `visual`) : retenue quand le texte n'a rien donné
+// de sûr ; si les deux désignent la même carte, la fiabilité est renforcée.
+async function evaluate(first, fp, text, agree, visual) {
   const quick = first.candidates.length ? agreed(first, agree) : 0;
-  if (!fp || !first.candidates.length || (quick >= SURE && !first.tie)) return { result: first, confidence: quick };
-  const result = await withVisual(first, fp, text);
-  return { result, confidence: agreed(result, agree) };
+  let best = { result: first, confidence: quick };
+  if (fp && first.candidates.length && !(quick >= SURE && !first.tie)) {
+    const result = await withVisual(first, fp, text);
+    best = { result, confidence: agreed(result, agree) };
+  }
+  if (visual?.length && best.confidence < SURE) {
+    const byImage = fromImage(visual, text);
+    const top = best.result.candidates?.[0];
+    const same = top && byImage.candidates[0] && top.tcgId === byImage.candidates[0].tcgId && top.id === byImage.candidates[0].id;
+    if (same) best = { result: best.result, confidence: Math.min(0.995, Math.max(best.confidence, byImage.confidence) + 0.03) };
+    else if (byImage.confidence > best.confidence) {
+      await withImages(byImage.candidates);
+      best = { result: byImage, confidence: agreed(byImage, agree) };
+    }
+  }
+  return best;
 }
 const EMPTY_FRAMES = 2;
 const NAME_AFTER = 3; // rafale : carte vue sans code exploitable pendant 3 images → recherche par nom + illustration…
@@ -102,6 +118,16 @@ export default function ScanScreen() {
   const [torch, setTorch] = useState(false);
   const [state, setState] = useState({ step: 'camera' }); // camera | analyzing | result | batch
   const { cardLang } = useCardLang();
+  // Reconnaissance par l'image seule : index des jeux de la collection préparés en arrière-plan (téléchargés une fois).
+  const { items: owned } = useCollection();
+  const ownedGames = [...new Set(owned.map((i) => i.tcg))].sort().join(',');
+  const [imageSearch, setImageSearch] = useState(false);
+  useEffect(() => {
+    if (!focused) return;
+    prepareVisualIndex(new Set(ownedGames ? ownedGames.split(',') : []), cardLang).then((n) => setImageSearch(n > 0)).catch(() => {});
+  }, [focused, ownedGames, cardLang]);
+  const langRef = useRef(cardLang);
+  useEffect(() => { langRef.current = cardLang; }, [cardLang]);
   // Scan en rafale : chaque carte lue rejoint une liste, vérifiée puis ajoutée d'un coup.
   const [mode, setMode] = useState('single'); // single | batch
   const [batch, setBatch] = useState([]);
@@ -114,7 +140,7 @@ export default function ScanScreen() {
   const scanner = useRef(null);
   const waiters = useRef([]);
   const onFrame = useCallback((e) => {
-    const { codeText, cardText, fingerprint, script, box } = e.nativeEvent;
+    const { codeText, cardText, fingerprint, script, box, visual: matches } = e.nativeEvent;
     const text = [codeText, cardText].filter(Boolean).join('\n');
     // Image lue avec le lecteur japonais / chinois sur une carte latine : texte inutilisable (charabia), seule
     // image ignorée (les autres images, lues avec le lecteur latin, suffisent).
@@ -123,7 +149,10 @@ export default function ScanScreen() {
     // Code reconnu, ou au moins un numéro/total (« 030/298 », « 300*/298 » : Riftbound dont l'extension n'est pas lue).
     const hasCode = detectCodes(text).length > 0 || /\d{3}\*?\s?\/\s?\d{3}/.test(text);
     const found = box?.length === 4;
-    const frame = { text, hasCode, card: found || hasCard(cardText, hasCode), fp: found ? fingerprint : null };
+    // Cartes trouvées par l'image (index) ; une image nettement reconnue suffit à dire qu'une carte est là.
+    const visual = visualCandidates(matches, langRef.current);
+    const seenByImage = visual.length > 0 && visual[0].visual >= IMAGE_MIN;
+    const frame = { text, hasCode, card: found || hasCard(cardText, hasCode) || seenByImage, fp: found ? fingerprint : null, visual };
     const list = waiters.current;
     waiters.current = [];
     list.forEach((resolve) => resolve(frame));
@@ -158,14 +187,14 @@ export default function ScanScreen() {
       for (let i = 0; i < SINGLE_TRIES; i++) {
         const frame = await nextFrame(true);
         if (!frame) break; // caméra muette : on garde ce qui a déjà été lu
-        const { text, fp, photo } = frame;
+        const { text, fp, photo, visual } = frame;
         if (!richest || text.length > richest.text.length) richest = frame;
         votes = addLanguageScores(votes, text);
         // Codes seulement à chaque image (rapide, sans réseau pour la plupart des jeux) ; le nom en dernier recours.
         const first = await identify(text, cardLang, { codesOnly: LIVE, votes });
         const code = codeOf(first);
         last = { code, agree: code && code === last.code ? last.agree + 1 : 1 };
-        const { result, confidence } = await evaluate(first, fp, text, last.agree);
+        const { result, confidence } = await evaluate(first, fp, text, last.agree, visual);
         if (!best || confidence >= best.confidence) {
           if (best?.photo && best.photo !== photo) discard(best.photo);
           best = { photo, text, ...result, confidence };
@@ -212,7 +241,7 @@ export default function ScanScreen() {
           const frame = await nextFrame(false);
           if (stop) break;
           if (!frame) continue;
-          const { text, hasCode, card, fp } = frame;
+          const { text, hasCode, card, fp, visual } = frame;
           const m = memory.current;
           if (!card) {
             // cadre vide : après deux images, la même carte pourra être ajoutée à nouveau
@@ -234,24 +263,27 @@ export default function ScanScreen() {
               first = await identify(seen.text, cardLang, { votes: m.votes });
             }
             const code = codeOf(first);
-            const agree = m.pending?.code === code ? m.pending.agree + 1 : 1;
+            const agree = code && m.pending?.code === code ? m.pending.agree + 1 : 1;
             // Carte déjà ajoutée toujours dans le cadre : inutile de comparer les images.
             const still = m.present && first.candidates[0] && sameCard(m.present, code, first.candidates[0].name);
-            const { result, confidence } = still ? { result: first, confidence: 0 } : await evaluate(first, seen.fp, seen.text, agree);
+            const { result, confidence } = still ? { result: first, confidence: 0 } : await evaluate(first, seen.fp, seen.text, agree, visual);
             const { candidates = [] } = result;
             const best = candidates[0];
+            // Carte reconnue par l'image seule (aucun code lu) : identifiée par la carte trouvée.
+            const cardCode = code || (best ? `${best.tcgId}:${best.id}` : null);
+            const agreeCard = code ? agree : (cardCode && m.pending?.code === cardCode ? m.pending.agree + 1 : 1); // images d'accord
             if (stop) break;
             if (!best) {
               setLook(m.present ? 'added' : 'card'); // carte vue, code pas encore lisible
-            } else if (m.present && sameCard(m.present, code, best.name)) {
+            } else if (m.present && sameCard(m.present, cardCode, best.name)) {
               setLook('added'); // même carte toujours dans le cadre (ou son code relu un peu différemment)
             } else {
               // Meilleur résultat obtenu pour cette carte : si elle reste devant la caméra sans atteindre 90 %, il est
               // ajouté « à vérifier » (avec ses autres possibilités) plutôt que jamais, comme en mode une carte.
-              if (!m.best || confidence > m.best.confidence) m.best = { result, confidence, code };
-              const sure = settle(confidence, result.tie, agree);
+              if (!m.best || confidence > m.best.confidence) m.best = { result, confidence, code: cardCode };
+              const sure = settle(confidence, result.tie, agreeCard);
               if (sure || (m.frames >= GIVE_UP_FRAMES && m.best.confidence >= MIN_KEEP)) {
-                const pick = sure ? { result, confidence, code } : m.best;
+                const pick = sure ? { result, confidence, code: cardCode } : m.best;
                 const list = applyLanguage(pick.result.candidates, pickLanguage(m.votes));
                 const twoChoices = pick.confidence < SURE && list.length > 1;
                 Object.assign(m, { present: { code: pick.code, name: list[0].name }, pending: null, frames: 0, best: null, richest: null, votes: null });
@@ -260,7 +292,7 @@ export default function ScanScreen() {
                 feedback(list[0]);
                 setLook('added');
               } else {
-                m.pending = { code, agree };
+                m.pending = { code: cardCode, agree: agreeCard };
                 setLook('card'); // pas encore assez sûr : on continue à lire
               }
             }
@@ -325,6 +357,7 @@ export default function ScanScreen() {
           // Cartes japonaises / chinoises lues aussi avec le réglage en français (une image sur trois).
           scripts={['ja', 'zh', 'ko'].includes(cardLang) ? [cardLang, 'latin'] : ['latin', 'latin', 'ja']}
           onFrame={onFrame}
+          imageSearch={imageSearch}
         />
       ) : focused ? (
         <CameraView

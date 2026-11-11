@@ -334,6 +334,28 @@ export const VISUAL_SAME = 0.5; // au-dessus : même illustration
 const VISUAL_LOW = 0.3; // en dessous : illustration différente
 const VISUAL_GAP = 0.12; // écart qui départage deux versions
 
+// Carte reconnue par son image seule (index de toutes les cartes du jeu, lib/visualIndex.js) : la meilleure image doit
+// être nettement ressemblante et devancer nettement la suivante ; le nom lu sur la carte, s'il l'est, la confirme.
+// Réglé sur des cartes filmées (émulateur) : bonne carte ≥ 0,62 en général, autres ≤ 0,5.
+export const IMAGE_SURE = 0.6; // au-dessus (et assez d'avance) : carte sûre
+export const IMAGE_MIN = 0.5; // en dessous : rien de fiable (on continue à chercher)
+const IMAGE_GAP = 0.06; // avance sur l'image suivante
+export function fromImage(candidates, text) {
+  if (!candidates?.length) return { candidates: [], confidence: 0, tie: false };
+  const list = [...candidates]
+    .map((c) => ({ ...c, score: c.visual + 0.05 * nameRead(c.name, text) }))
+    .sort((a, b) => b.score - a.score);
+  const [a] = list;
+  // Image suivante (une même illustration peut servir à plusieurs cartes : rééditions, à égalité).
+  const other = list.find((c) => c.visual < a.visual - 1e-6);
+  const sameArt = list.filter((c) => Math.abs(c.visual - a.visual) < 1e-6).length > 1;
+  const gap = other ? a.visual - other.visual : 1;
+  let confidence = a.visual >= IMAGE_SURE && gap >= IMAGE_GAP ? 0.96 : a.visual >= IMAGE_MIN ? 0.9 : 0.5 + a.visual / 2;
+  if (nameRead(a.name, text)) confidence = Math.min(0.995, confidence + 0.03);
+  const tie = sameArt || (a.visual >= IMAGE_MIN && gap < IMAGE_GAP / 2);
+  return { candidates: list, confidence: tie ? Math.min(confidence, 0.94) : confidence, tie, detections: [] };
+}
+
 export async function withVisual(result, fp, text) {
   const list = result.candidates;
   if (!fp || !imageMatchAvailable || !list?.length) return result;

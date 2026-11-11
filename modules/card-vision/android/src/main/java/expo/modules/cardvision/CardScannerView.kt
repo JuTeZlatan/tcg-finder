@@ -67,6 +67,8 @@ class CardScannerView(context: Context, appContext: AppContext) : ExpoView(conte
   @Volatile var scripts: List<String> = listOf("latin")
   @Volatile var analyzing = true // aperçu seul quand faux (mode une carte avant d'appuyer)
   @Volatile var interval = 0L // délai minimum entre deux analyses (ms)
+  // Recherche de la carte par son image dans les index chargés (CardIndex), en plus de la lecture du texte.
+  @Volatile var imageSearch = false
   private var frameIndex = 0
 
   private val relayout = Runnable {
@@ -213,7 +215,11 @@ class CardScannerView(context: Context, appContext: AppContext) : ExpoView(conte
         fp = emptyList()
       }
       val where = box?.let { listOf(it.left.toDouble() / vw, it.top.toDouble() / vh, it.width().toDouble() / vw, it.height().toDouble() / vh) } ?: emptyList()
-      val event = mapOf("codeText" to codeText, "cardText" to cardText, "fingerprint" to fp, "box" to where, "script" to s, "at" to now)
+      // Image seule : plusieurs cadrages (autour de la carte repérée, sinon au centre) cherchés dans les index.
+      val visual = if (imageSearch && CardIndex.hasAny()) {
+        CardIndex.search(CardIndex.queriesOf(visible, box), 8).map { mapOf("index" to it.index, "i" to it.i, "score" to it.score.toDouble()) }
+      } else emptyList()
+      val event = mapOf("codeText" to codeText, "cardText" to cardText, "fingerprint" to fp, "box" to where, "script" to s, "at" to now, "visual" to visual)
       post { onFrame(event) }
     } catch (e: Exception) {
       Log.w(TAG, "Image non analysée : ${e.message}")

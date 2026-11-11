@@ -37,6 +37,12 @@ class CardVisionModule : Module() {
       }
     }
 
+    // Index de reconnaissance par l'image (fichier .bin téléchargé par l'appli) : nombre d'images chargées.
+    AsyncFunction("loadIndex") { name: String, uri: String, promise: Promise ->
+      run(promise) { CardIndex.load(name, uri.removePrefix("file://")) }
+    }
+    Function("unloadIndex") { name: String -> CardIndex.unload(name) }
+
     View(CardScannerView::class) {
       Events("onFrame")
       Prop("active") { view: CardScannerView, value: Boolean -> view.active = value }
@@ -44,6 +50,7 @@ class CardVisionModule : Module() {
       Prop("scripts") { view: CardScannerView, value: List<String> -> view.scripts = value }
       Prop("analyzing") { view: CardScannerView, value: Boolean -> view.analyzing = value }
       Prop("interval") { view: CardScannerView, value: Int -> view.interval = value.toLong() }
+      Prop("imageSearch") { view: CardScannerView, value: Boolean -> view.imageSearch = value }
       AsyncFunction("capture") { view: CardScannerView, promise: Promise -> view.capture(promise) }
       OnViewDestroys { view: CardScannerView -> view.release() }
     }
