@@ -5,7 +5,7 @@
 // par son nom anglais ; une annonce officielle absente de TCGplayer est ajoutée.
 // Sortie : pipeline/out/upcoming.json = [{ tcg, name (anglais), names: { langue: nom }, date, dates: { langue: date },
 // code, image, region?, approx?, sources }], de la plus ancienne à la plus lointaine.
-import { getJSON, groupImage, similarity, tcgcsvGroups, writeJSON } from './lib.mjs';
+import { getJSON, groupImage, previousJSON, similarity, tcgcsvGroups, writeJSON } from './lib.mjs';
 import { codeKey, nameKey, officialReleases } from './upcomingSources.mjs';
 
 // Naruto Mythos : absent de TCGplayer (sa catégorie « Naruto Card Game » est un autre jeu) → annonces officielles.
@@ -83,6 +83,23 @@ export async function build(outDir) {
     out.push({ tcg: o.tcg, name, names: o.names, date, dates: o.dates, code: o.code || null, image: o.image || null, region: o.region, approx: o.approx, sources: [o.source] });
     added++;
   }
+  // Source momentanément muette (page déplacée, serveur lent) : noms et dates publiés la veille pour la même sortie
+  // repris, pour qu'un nom officiel déjà connu ne disparaisse pas.
+  const previous = (await previousJSON('upcoming.json')) || [];
+  const sameRelease = (a, b) => a.tcg === b.tcg && (a.region || null) === (b.region || null)
+    && ((a.code && b.code && codeKey(a.code) === codeKey(b.code)) || nameKey(a.name) === nameKey(b.name));
+  let kept = 0;
+  for (const r of out) {
+    const old = previous.find((p) => sameRelease(p, r));
+    if (!old?.names) continue;
+    const missing = Object.keys(old.names).filter((l) => !r.names?.[l]);
+    if (!missing.length) continue;
+    r.names = { ...old.names, ...(r.names || {}) };
+    r.dates = { ...(old.dates || {}), ...(r.dates || {}) };
+    for (const s of old.sources || []) if (!r.sources.includes(s)) r.sources.push(s);
+    kept++;
+  }
+  if (kept) console.log(`  sorties : noms d'hier repris pour ${kept} sortie(s) (source muette aujourd'hui)`);
   // Date principale : celle de TCGplayer / Scryfall, sinon la date anglaise officielle.
   for (const r of out) if (!r.date) r.date = r.dates?.en || Object.values(r.dates || {}).sort()[0];
   out.sort((a, b) => a.date.localeCompare(b.date) || a.tcg.localeCompare(b.tcg));
