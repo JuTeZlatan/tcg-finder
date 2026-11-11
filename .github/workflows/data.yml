@@ -21,14 +21,23 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 150
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # Pas de `npm install` : le script de collecte n'utilise que Node.
+      # Dépendances propres à la collecte (traitement d'images des empreintes du scanner), pas celles de l'appli.
+      - run: npm ci --prefix pipeline
+      # Empreintes déjà calculées les jours précédents : seules les nouvelles cartes sont calculées.
+      - uses: actions/cache@v4
+        with:
+          path: pipeline/.fpcache
+          key: fpcache-${{ github.run_id }}
+          restore-keys: fpcache-
       - run: node pipeline/build.mjs --out=site
+        env:
+          FP_BUDGET_MIN: '45'
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site

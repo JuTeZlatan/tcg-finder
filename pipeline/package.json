@@ -1,0 +1,8 @@
+{
+  "name": "tcg-finder-pipeline",
+  "private": true,
+  "description": "Collecte quotidienne des données de TCG Finder (dépendances propres : traitement d'images des empreintes du scanner)",
+  "dependencies": {
+    "sharp": "^0.34.4"
+  }
+}

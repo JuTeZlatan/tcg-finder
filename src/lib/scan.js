@@ -328,6 +328,7 @@ export const TWO_CHOICES = 0.9; // entre 0,90 et 0,95 : deux choix proposés ; e
 // - aucune ressemblance avec la 1re : le code a sans doute été mal lu, fiabilité baissée.
 const VISUAL_MAX = 6; // cartes comparées quand le code est lu
 const VISUAL_MAX_BY_NAME = 24; // … quand seul le nom est lu (beaucoup de cartes du même nom)
+const VISUAL_PRECOMPUTED = 60; // cartes comparées avec les empreintes précalculées (sans téléchargement)
 // Réglé sur une carte filmée (émulateur, image dégradée) : bonne illustration 0,59, autres versions ≤ 0,37.
 export const VISUAL_SAME = 0.5; // au-dessus : même illustration
 const VISUAL_LOW = 0.3; // en dessous : illustration différente
@@ -336,9 +337,13 @@ const VISUAL_GAP = 0.12; // écart qui départage deux versions
 export async function withVisual(result, fp, text) {
   const list = result.candidates;
   if (!fp || !imageMatchAvailable || !list?.length) return result;
-  const max = list[0].why.startsWith('nom') ? VISUAL_MAX_BY_NAME : VISUAL_MAX;
+  // Empreintes précalculées (fichier de l'extension, sans téléchargement d'image) : jusqu'à VISUAL_PRECOMPUTED
+  // candidates comparées ; image téléchargée seulement pour les premières si la collecte ne l'a pas encore calculée.
+  const download = list[0].why.startsWith('nom') ? VISUAL_MAX_BY_NAME : VISUAL_MAX;
+  const max = Math.max(download, Math.min(list.length, VISUAL_PRECOMPUTED));
   const top = list.slice(0, max);
-  const sims = await Promise.all(top.map((c) => refFingerprint(c.image).then((r) => imageSimilarity(fp, r)).catch(() => null)));
+  const sims = await Promise.all(top.map((c, i) => refFingerprint(c.image, c, { download: i < download })
+    .then((r) => imageSimilarity(fp, r)).catch(() => null)));
   top.forEach((c, i) => {
     c.visual = sims[i];
     if (sims[i] != null) c.score += 0.4 * sims[i];

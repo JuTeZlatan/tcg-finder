@@ -5,6 +5,7 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { available, fingerprint } from '../../modules/card-vision';
+import { loadData } from '../api/dataSource';
 
 export const imageMatchAvailable = available;
 
@@ -36,9 +37,45 @@ function saveStore() {
 // Empreinte arrondie (2 décimales) : 3 × 192 nombres, ~2 ko par carte une fois enregistrée.
 const compact = (fp) => fp.map((v) => Math.round(v * 100) / 100);
 
-// Empreinte de l'image officielle d'une carte (null si l'image est introuvable).
-export function refFingerprint(url) {
-  if (!available || !url) return Promise.resolve(null);
+// Empreintes calculées chaque jour par la collecte (pipeline/fingerprints.mjs), un fichier par extension :
+// fp/<jeu>/<langue>/<extension>.json = { s: échelle, c: { adresse de l'image: octets signés en base64 } }.
+// Chargé une fois (puis gardé sur le téléphone) : toutes les versions de l'extension se comparent sans téléchargement.
+const setFiles = new Map();
+const fileId = (id) => String(id).replace(/[^A-Za-z0-9._-]/g, '_');
+const SAME_IMAGES = new Set(['magic', 'yugioh']); // une seule image (anglaise) par impression
+function setFingerprints(card) {
+  if (!card?.tcgId || !card.setId) return Promise.resolve(null);
+  const lang = SAME_IMAGES.has(card.tcgId) ? 'en' : card.dataLang || card.lang || 'en';
+  const path = `fp/${card.tcgId}/${lang}/${fileId(card.setId)}.json`;
+  if (!setFiles.has(path)) setFiles.set(path, loadData(path, async () => null).catch(() => null));
+  return setFiles.get(path);
+}
+const decode = (b64, scale) => {
+  const bin = globalThis.atob(b64);
+  const out = new Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    const v = bin.charCodeAt(i);
+    out[i] = (v > 127 ? v - 256 : v) / scale;
+  }
+  return out;
+};
+// Empreinte précalculée d'une carte trouvée par le scan (null si la collecte ne l'a pas encore calculée).
+export async function precomputedFingerprint(url, card) {
+  const f = await setFingerprints(card);
+  const v = f?.c?.[url];
+  return v ? decode(v, f.s || 25) : null;
+}
+
+// Empreinte de l'image officielle d'une carte (null si l'image est introuvable) : précalculée par la collecte si
+// possible, sinon image téléchargée et empreinte calculée sur le téléphone (`download: false` : jamais).
+export async function refFingerprint(url, card = null, { download = true } = {}) {
+  if (!available || !url) return null;
+  const ready = card ? await precomputedFingerprint(url, card).catch(() => null) : null;
+  if (ready || !download) return ready;
+  return downloadedFingerprint(url);
+}
+
+function downloadedFingerprint(url) {
   if (!pending.has(url)) {
     pending.set(url, (async () => {
       const db = await loadStore();

@@ -55,3 +55,4 @@ pipeline/riot-key.txt
 
 # Configuration Firebase (projet perso, fournie à la compilation)
 google-services.json
+pipeline/.fpcache/
