@@ -548,4 +548,6 @@ export default {
   "Début 2027": "2027 年初",
   "Date annoncée : {when}": "预计发售：{when}",
   "Japon": "日本",
+  "Incline ton téléphone ou fais glisser la carte": "倾斜手机或拖动卡牌",
+  "Fermer": "关闭",
 };

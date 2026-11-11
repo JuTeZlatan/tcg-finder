@@ -548,4 +548,6 @@ export default {
   "Début 2027": "Inizio 2027",
   "Date annoncée : {when}": "Annunciato per {when}",
   "Japon": "Giappone",
+  "Incline ton téléphone ou fais glisser la carte": "Inclina il telefono o trascina la carta",
+  "Fermer": "Chiudi",
 };

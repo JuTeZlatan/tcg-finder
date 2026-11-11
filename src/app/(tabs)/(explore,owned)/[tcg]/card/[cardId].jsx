@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Stack, useLocalSearchParams } from 'expo-router';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { getTcg, dataLang, copyLang } from '../../../../../api';
 import { useAsync } from '../../../../../lib/useAsync';
@@ -15,6 +15,7 @@ import PriceHistory from '../../../../../components/PriceHistory';
 import WishButton from '../../../../../components/WishButton';
 import PriceAlerts from '../../../../../components/PriceAlerts';
 import GradedSection from '../../../../../components/GradedSection';
+import CardViewer3D from '../../../../../components/CardViewer3D';
 import { useCollection } from '../../../../../lib/collection';
 import { defaultFinish, finishLabel, finishesOf, storedFinish } from '../../../../../lib/finishes';
 import { Ionicons } from '@expo/vector-icons';
@@ -96,11 +97,18 @@ export default function CardScreen() {
 
             <FinishPicker prices={c.prices} value={finish} onChange={setFinish} ownedFinishes={ownedFinishes} />
 
-            <Modal visible={zoom} transparent animationType="fade" onRequestClose={() => setZoom(false)}>
-              <Pressable style={styles.zoomPage} onPress={() => setZoom(false)}>
-                <Image source={c.image} style={styles.zoomImage} contentFit="contain" />
-              </Pressable>
-            </Modal>
+            {/* Carte en grand, en 3D (inclinaison au doigt et au téléphone, reflet et effet holographique de la version). */}
+            {zoom ? (
+              <CardViewer3D
+                visible
+                onClose={() => setZoom(false)}
+                image={c.image}
+                tcgId={tcg.id}
+                prices={c.prices}
+                rarity={c.details?.find(([k]) => k === 'rarity')?.[1]}
+                initialFinish={chosen || defaultFinish(finishesOf(c.prices)) || null}
+              />
+            ) : null}
 
             <PriceHistory tcg={tcg} cardId={cardId} setId={setId || c.setId} lang={lang} usdToEur={fx.data} finish={chosen} prices={c.prices} />
 
