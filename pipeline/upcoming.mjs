@@ -65,8 +65,8 @@ export async function build(outDir) {
   for (const o of official) {
     const found = out.filter((r) => matches(o, r));
     for (const r of found) {
-      r.names = { ...o.names, ...(r.names || {}) };
-      r.names.en ||= r.name;
+      // Anglais : nom de TCGplayer / Scryfall (écrit normalement, pas en capitales comme sur certains sites officiels).
+      r.names = { ...o.names, ...(r.names || {}), en: r.name.replace(/^[A-Z]{1,4}\d{1,3}[a-z]?:\s*/, '') };
       r.dates = { ...(r.dates || {}), ...o.dates };
       if (o.image && !r.image) r.image = o.image;
       if (o.approx) r.approx = o.approx;
