@@ -1,14 +1,12 @@
-// Carte en grand, en 3D : elle s'incline en suivant le doigt (glisser) et revient de face une fois lâchée, avec un
-// reflet de lumière et l'effet brillant de sa finition, qui bouge avec l'inclinaison (textures de assets/foil,
-// superposées en fondu normal : visibles sur tous les téléphones). Finitions reproduites, d'après celles des jeux :
-// - holo : illustration seulement (Pokémon holo « cosmos », Yu-Gi-Oh! Super / Ultra Rare, Dragon Ball R) ;
-// - reverse : toute la carte sauf l'illustration (Pokémon reverse) ;
-// - foil : arc-en-ciel sur toute la carte (Magic foil, One Piece SR / SEC / Leader, Lorcana foil, Star Wars foil…) ;
-// - textured : arc-en-ciel, relief et paillettes (illustrations rares Pokémon, Enchantées Lorcana, SP / Manga /
-//   Parallèles One Piece, Secret / Starlight / Quarter Century Yu-Gi-Oh!, Showcase, SCR / God Rare Dragon Ball…) ;
-// - gold : or métallisé (Hyper Rare Pokémon, Gold Rare, DON!! dorées…) ; etched : argent mat (Magic etched) ;
-// - galaxy : étoiles (Magic galaxy foil) ; none : reflet seul (version normale).
-// Les versions de la carte (normale, reverse, holo…) se choisissent en bas pour comparer leur rendu.
+// Carte en grand, en 3D : elle s'incline en suivant le doigt (glisser) et revient de face une fois lâchée.
+// Rendu des finitions au plus près d'une vraie carte : la brillance n'est pas une couche uniforme, c'est la lumière
+// qui « accroche » une zone de la surface brillante et se déplace avec l'inclinaison. Chaque effet est donc :
+// - limité à la zone brillante de la carte : l'illustration (holo), tout sauf l'illustration (reverse) ou toute la
+//   carte, avec des bords fondus (plusieurs découpes emboîtées, chacune à une fraction de l'intensité) ;
+// - visible seulement dans des taches de lumière aux bords très doux (textures « *-spot », générées par
+//   scripts/make-foil-textures.mjs) qui traversent la carte à l'opposé de l'inclinaison, chacune à sa vitesse :
+//   de face, presque rien ; inclinée, la lumière accroche la surface et glisse dessus. Aucun bord net.
+// Finitions de chaque jeu : voir finishEffect. Les versions de la carte se choisissent en bas pour comparer.
 import { useMemo, useState } from 'react';
 import { Animated, Image as RNImage, Modal, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
@@ -19,62 +17,143 @@ import { colors } from '../lib/theme';
 
 const MAX_TILT = 22; // degrés
 const RATIO = 88 / 63;
-const TEX = {
-  rainbow: require('../../assets/foil/rainbow.png'),
-  sparkle: require('../../assets/foil/sparkle.png'),
-  stars: require('../../assets/foil/stars.png'),
-  cosmos: require('../../assets/foil/cosmos.png'),
-  lines: require('../../assets/foil/lines.png'),
-  gold: require('../../assets/foil/gold.png'),
-  silver: require('../../assets/foil/silver.png'),
-  glare: require('../../assets/foil/glare.png'),
+// Taches de lumière texturées (texture × fondu rond, transparentes sur les bords).
+const SPOT = {
+  rainbow: require('../../assets/foil/rainbow-spot.png'),
+  sparkle: require('../../assets/foil/sparkle-spot.png'),
+  stars: require('../../assets/foil/stars-spot.png'),
+  cosmos: require('../../assets/foil/cosmos-spot.png'),
+  lines: require('../../assets/foil/lines-spot.png'),
+  gold: require('../../assets/foil/gold-spot.png'),
+  silver: require('../../assets/foil/silver-spot.png'),
+  glare: require('../../assets/foil/spot.png'),
 };
-// Zone de l'illustration (fractions de la carte) : effet « holo » dedans, « reverse » autour.
-const ART = {
-  pokemon: { x: 0.08, y: 0.11, w: 0.84, h: 0.42 },
-  yugioh: { x: 0.12, y: 0.18, w: 0.76, h: 0.55 },
-  magic: { x: 0.08, y: 0.11, w: 0.84, h: 0.45 },
-  default: { x: 0.07, y: 0.1, w: 0.86, h: 0.45 },
+// Fenêtre de l'illustration selon le cadre de la carte (fractions) : holo dedans, reverse autour.
+const ART_WINDOWS = {
+  pokemon: { x: 0.085, y: 0.105, w: 0.83, h: 0.415 },
+  yugioh: { x: 0.123, y: 0.185, w: 0.754, h: 0.54 },
+  magic: { x: 0.08, y: 0.115, w: 0.84, h: 0.44 },
+};
+const STEPS = 3; // découpes emboîtées : bord fondu de la zone brillante (0,6 → 0,84 → 0,94 vers l'intérieur)
+const STEP_OPACITY = 0.6;
+const FEATHER = 0.012; // écart entre deux découpes (fraction de la largeur de la carte)
+
+// Effets : zone brillante et couches [tache texturée, opacité, vitesse et sens du déplacement, taille].
+// Intensités retenues : discrètes de face, nettes seulement là où la lumière accroche, comme une vraie carte.
+const EFFECTS = {
+  holo: { zone: 'art', layers: [['cosmos', 0.91, 1, 1.1], ['rainbow', 0.82, 1.5, 1.3], ['sparkle', 0.82, -0.7, 1]] },
+  secret: { zone: 'art', layers: [['rainbow', 0.91, 1.6, 1.3], ['lines', 0.55, 0.4, 1.2], ['sparkle', 0.95, -0.8, 1]] },
+  reverse: { zone: 'reverse', layers: [['sparkle', 0.95, -0.8, 1.1], ['rainbow', 0.64, 1.4, 1.3]] },
+  foil: { zone: 'full', layers: [['rainbow', 0.82, 1.4, 1.3], ['sparkle', 0.55, -0.6, 1.1]] },
+  textured: { zone: 'full', layers: [['rainbow', 0.91, 1.6, 1.3], ['lines', 0.55, 0.4, 1.2], ['sparkle', 0.91, -0.8, 1]] },
+  gold: { zone: 'full', layers: [['gold', 0.91, 1.2, 1.4], ['sparkle', 0.73, -0.6, 1.1]] },
+  etched: { zone: 'full', layers: [['silver', 0.73, 1.2, 1.4], ['lines', 0.45, 0.4, 1.2]] },
+  galaxy: { zone: 'full', layers: [['stars', 0.95, -0.7, 1.2], ['rainbow', 0.55, 1.4, 1.3]] },
+  none: { zone: null, layers: [] },
 };
 
-// Couches de chaque finition : [texture, répétée (tuiles) ?, opacité de face, opacité inclinée, vitesse de défilement].
-const LAYERS = {
-  holo: [['cosmos', true, 0.35, 0.8, 1], ['rainbow', false, 0.2, 0.55, 1.6], ['sparkle', true, 0.3, 0.75, -0.6]],
-  reverse: [['sparkle', true, 0.45, 0.95, -0.8], ['rainbow', false, 0.15, 0.45, 1.4]],
-  foil: [['rainbow', false, 0.16, 0.48, 1.4], ['sparkle', true, 0.2, 0.55, -0.6]],
-  textured: [['rainbow', false, 0.3, 0.7, 1.6], ['lines', true, 0.25, 0.5, 0.3], ['sparkle', true, 0.35, 0.9, -0.8]],
-  gold: [['gold', false, 0.3, 0.6, 1.2], ['sparkle', true, 0.25, 0.7, -0.6]],
-  etched: [['silver', false, 0.2, 0.45, 1.2], ['lines', true, 0.2, 0.4, 0.3], ['sparkle', true, 0.15, 0.45, -0.5]],
-  galaxy: [['stars', true, 0.5, 1, -0.7], ['rainbow', false, 0.15, 0.45, 1.4]],
-  none: [],
-};
-
-// Finition à afficher pour une version (identifiant + libellé) et la rareté de la carte.
-export function finishEffect(tcgId, finish, label, rarity) {
+// Finition d'une version, d'après la version choisie (identifiant + libellé), la rareté et le traitement spécial.
+// Règles tirées des finitions réelles de chaque jeu (raretés présentes dans les données de l'appli).
+export function finishEffect(tcgId, finish, label, rarity, treatment = '') {
   const v = `${finish || ''} ${label || ''}`.toLowerCase();
-  const r = String(rarity || '').toLowerCase();
-  const all = `${v} ${r}`;
+  const r = String(rarity || '').toLowerCase().trim();
+  const tr = String(treatment || '').toLowerCase();
+  const foilVersion = /foil|holo/.test(v); // version brillante d'une carte qui existe aussi en normale
   if (/reverse/.test(v)) return 'reverse';
-  if (/etched|silver foil/.test(v)) return 'etched';
-  if (/galaxy/.test(v)) return 'galaxy';
-  if (/gold|hyper rare/.test(all) && !/golden ?age/.test(all)) return 'gold';
-  if (/surge|textured|enchant|showcase|starlight|quarter century|illustration|ultra secret|secret|manga|sp card|\bsp\b|\bspr\b|parallel|alternat|alt art|god rare|\bgdr\b|\bscr\b|full art|rainbow|prestige|serialized|overnumber|signature|iconic|shiny|ghost|collector/.test(all)
-    && !(tcgId === 'pokemon' && /^holo/.test(finish || '') && !/illustration|ultra|secret|shiny/.test(r))) return 'textured';
-  if (tcgId === 'pokemon' && /holo/.test(all)) return /ultra|full/.test(r) ? 'textured' : /double|ex\b|gx|vmax|vstar|\bv\b/.test(r) ? 'foil' : 'holo';
-  if (tcgId === 'yugioh' && /super rare|ultra rare|ultimate/.test(all)) return 'holo';
-  if (tcgId === 'dbsfw' || tcgId === 'dbsmasters') { if (/^r$|\brare\b/.test(r) && !/super/.test(r)) return 'holo'; }
-  if (/foil|holo|\bsr\b|\bsec\b|^l$|leader|legendary|super rare|epic|hyperspace/.test(all)) return 'foil';
-  return 'none';
+  switch (tcgId) {
+    case 'pokemon':
+      // Holo : illustration ; ex / V / Radiant / ACE SPEC : toute la carte ; illustrations rares, Ultra, Secrètes,
+      // Shiny : texturées ; Hyper Rare (dorées) : or.
+      if (/hyper|gold/.test(r)) return 'gold';
+      if (/illustration|ultra|secret|shiny|full|black white|amazing|classic/.test(r)) return 'textured';
+      if (/double|holo rare v|vmax|vstar|\bex\b|gx|radiant|ace spec|break|prime|lv\.x/.test(r)) return 'foil';
+      if (/holo/.test(`${v} ${r}`)) return 'holo';
+      return 'none';
+    case 'yugioh':
+      // Super / Ultra Rare : illustration en holo ; Secret / Prismatic / Platinum : illustration en paillettes ;
+      // Starlight, Quarter Century, Collector's, Ghost : toute la carte ; Ultimate : relief argenté ; Gold : or.
+      if (/gold/.test(`${v} ${r}`)) return 'gold';
+      if (/starlight|quarter century|collector|ghost/.test(`${v} ${r}`)) return 'textured';
+      if (/secret|prismatic|platinum/.test(`${v} ${r}`)) return 'secret';
+      if (/ultimate/.test(`${v} ${r}`)) return 'etched';
+      if (/starfoil/.test(`${v} ${r}`)) return 'galaxy';
+      if (/mosaic|shatterfoil/.test(`${v} ${r}`)) return 'foil';
+      if (/super rare|ultra rare/.test(`${v} ${r}`)) return 'holo';
+      return 'none';
+    case 'magic':
+      // Version choisie (foil / etched), puis traitement de l'impression.
+      if (/etched/.test(v)) return 'etched';
+      if (!/foil/.test(v)) return 'none';
+      if (/galaxy|confetti|stars/.test(tr)) return 'galaxy';
+      if (/gilded|gold/.test(tr)) return 'gold';
+      if (/surge|textured|neon|raised|halo|rainbow|ripple|double ?rainbow|step/.test(tr)) return 'textured';
+      if (/silver/.test(tr)) return 'etched';
+      return 'foil';
+    case 'onepiece':
+      // SEC / SP / Manga / Parallèles : texturées ; TR (Treasure Rare) : or ; R, SR, Leader : brillantes.
+      if (r === 'tr' || /treasure|gold/.test(v)) return 'gold';
+      if (r === 'sec' || /sp card|manga|parallel|alternat/.test(`${r} ${v}`)) return 'textured';
+      if (/^(r|sr|l)$|leader/.test(r) || foilVersion) return 'foil';
+      return 'none';
+    case 'lorcana':
+      // Enchantées et Iconiques : texturées ; Épiques : arc-en-ciel ; versions foil / cold foil : brillantes.
+      if (/enchant|iconic/.test(r)) return 'textured';
+      if (/epic/.test(r) || foilVersion) return 'foil';
+      return 'none';
+    case 'riftbound':
+      // Rares et Épiques toujours brillantes ; Showcase (alternative, hors série, signature) : texturées.
+      if (/showcase|overnumber|signature|alternat|ultimate/.test(`${r} ${v}`)) return 'textured';
+      if (/^(rare|epic)$/.test(r) || foilVersion) return 'foil';
+      return 'none';
+    case 'swu':
+      // Showcase : finition spéciale ; versions foil et Hyperspace foil : arc-en-ciel.
+      if (/showcase|prestige/.test(`${r} ${v}`)) return 'textured';
+      if (foilVersion) return 'foil';
+      return 'none';
+    case 'dbsfw':
+    case 'dbsmasters':
+      // SCR, SPR, God Rare, Concept Rare… : texturées ; SR, Leader : brillantes ; versions foil : brillantes.
+      if (/god|gdr/.test(r)) return 'gold';
+      if (/secret|scr|special|spr|concept|expansion|dragon ball rare|giant force|son gohan/.test(r)) return 'textured';
+      if (/super rare|^sr$|^l$|leader|^r$/.test(r) || foilVersion) return 'foil';
+      return 'none';
+    case 'cyberpunk':
+      // Secret (S) et Iconic (IL, IO, IS) : relief qui suit le dessin et nom argenté ; Nova (NR) : brillante.
+      if (/^(s|il|io|is)$/.test(r)) return 'textured';
+      if (/^nr$/.test(r) || foilVersion) return 'foil';
+      return 'none';
+    case 'naruto':
+      // Legendary « Gold 22K », Chibi, POP, variante Gold : or ; Rare Art, Secret, Secret V, Special, Shinobi, Full Art :
+      // texturées ; variante Holo : brillante (la rareté seule ne l'est pas).
+      if (/legendary|chibi|pop|gold/.test(`${r} ${v} ${tr}`)) return 'gold';
+      if (/rare art|secret|special|shinobi|full art/.test(`${r} ${v} ${tr}`)) return 'textured';
+      if (/holo/.test(`${v} ${tr}`) || foilVersion) return 'foil';
+      return 'none';
+    default:
+      return foilVersion ? 'foil' : 'none';
+  }
 }
 
-export default function CardViewer3D({ visible, onClose, image, tcgId, prices, rarity, initialFinish }) {
+// Finition d'une carte qui n'a qu'une version : la seule vendue, ou « foil » quand toutes ses versions sont
+// brillantes (un site dit « foil », l'autre « holofoil »), sinon rien.
+function soleFinish(prices) {
+  const variants = [...new Set((prices || []).flatMap((p) => (p.items || []).map((i) => i.variant)).filter(Boolean))];
+  if (variants.length === 1) return variants[0];
+  return variants.length && variants.every((v) => /foil|holo/i.test(v)) ? 'foil' : null;
+}
+
+export default function CardViewer3D({ visible, onClose, image, tcgId, prices, rarity, treatment, initialFinish }) {
   const { width, height } = useWindowDimensions();
-  const cardW = Math.min(width * 0.86, (height * 0.66) / RATIO);
-  const cardH = cardW * RATIO;
+  // Proportions de l'image (hauteur / largeur) : cartes en hauteur, ou en largeur (Leaders et Bases de Star Wars).
+  const [ratio, setRatio] = useState(RATIO);
+  const cardW = Math.min(width * (ratio < 1 ? 0.94 : 0.86), (height * 0.66) / ratio);
+  const cardH = cardW * ratio;
   // Versions proposées : celles de la carte (prix), sinon une seule.
   const finishes = useMemo(() => finishesOf(prices || []), [prices]);
   const [finish, setFinish] = useState(initialFinish || defaultFinish(finishes) || null);
-  const effect = finishEffect(tcgId, finish, finish ? finishLabel(prices, finish) : '', rarity);
+  // Une seule version vendue (aucun choix proposé) : c'est la finition de la carte, ex. une rare qui n'existe qu'en foil.
+  const shown = finish || soleFinish(prices);
+  const effect = EFFECTS[finishEffect(tcgId, shown, shown ? finishLabel(prices, shown) : '', rarity, treatment)];
 
   // Inclinaison en degrés (x : haut / bas, y : gauche / droite), pilotée par le doigt.
   const [tilt] = useState(() => new Animated.ValueXY({ x: 0, y: 0 }));
@@ -93,40 +172,58 @@ export default function CardViewer3D({ visible, onClose, image, tcgId, prices, r
 
   const rotateX = tilt.x.interpolate({ inputRange: [-MAX_TILT, MAX_TILT], outputRange: [`${-MAX_TILT}deg`, `${MAX_TILT}deg`] });
   const rotateY = tilt.y.interpolate({ inputRange: [-MAX_TILT, MAX_TILT], outputRange: [`${-MAX_TILT}deg`, `${MAX_TILT}deg`] });
-  // Part d'inclinaison (0 de face → 1 au maximum) : l'effet s'intensifie quand la carte penche.
+  // Part d'inclinaison (0 de face → 1 au maximum).
   const amount = Animated.add(
     tilt.x.interpolate({ inputRange: [-MAX_TILT, 0, MAX_TILT], outputRange: [0.5, 0, 0.5] }),
     tilt.y.interpolate({ inputRange: [-MAX_TILT, 0, MAX_TILT], outputRange: [0.5, 0, 0.5] }),
   );
-  // Reflet : tache de lumière qui traverse la carte à l'opposé de l'inclinaison.
-  const glareX = tilt.y.interpolate({ inputRange: [-MAX_TILT, MAX_TILT], outputRange: [cardW * 0.55, -cardW * 0.55] });
-  const glareY = tilt.x.interpolate({ inputRange: [-MAX_TILT, MAX_TILT], outputRange: [-cardH * 0.45, cardH * 0.45] });
+  // Intensité de la brillance : faible de face, pleine une fois la carte inclinée.
+  const shine = amount.interpolate({ inputRange: [0, 0.6], outputRange: [0.5, 1], extrapolate: 'clamp' });
 
-  // Une couche de texture : plus grande que sa zone, elle glisse avec l'inclinaison (vitesse propre à chaque couche).
-  const layer = ([tex, tiled, low, high, speed], w, h, key) => {
-    const tx = tilt.y.interpolate({ inputRange: [-MAX_TILT, MAX_TILT], outputRange: [-w * 0.35 * speed, w * 0.35 * speed] });
-    const ty = tilt.x.interpolate({ inputRange: [-MAX_TILT, MAX_TILT], outputRange: [h * 0.25 * speed, -h * 0.25 * speed] });
-    const opacity = amount.interpolate({ inputRange: [0, 1], outputRange: [low, high], extrapolate: 'clamp' });
-    const size = Math.max(w, h) * 1.9;
+  // Une tache texturée, centrée sur la carte, qui glisse à l'opposé de l'inclinaison (vitesse propre à la couche).
+  // (ox, oy) : coin de la découpe qui la contient, pour garder la même position quelle que soit la découpe.
+  const move = (speed) => [
+    { translateX: tilt.y.interpolate({ inputRange: [-MAX_TILT, MAX_TILT], outputRange: [cardW * 0.32 * speed, -cardW * 0.32 * speed] }) },
+    { translateY: tilt.x.interpolate({ inputRange: [-MAX_TILT, MAX_TILT], outputRange: [-cardH * 0.24 * speed, cardH * 0.24 * speed] }) },
+  ];
+  const spot = (tex, opacity, speed, scale, ox, oy, key) => {
+    const s = cardW * 1.4 * scale;
     return (
-      <Animated.View key={key} pointerEvents="none" style={{ position: 'absolute', left: (w - size) / 2, top: (h - size) / 2, width: size, height: size, opacity, transform: [{ translateX: tx }, { translateY: ty }] }}>
-        <RNImage source={TEX[tex]} resizeMode={tiled ? 'repeat' : 'stretch'} style={{ width: size, height: size }} />
+      <Animated.View key={key} style={{ position: 'absolute', left: (cardW - s) / 2 - ox, top: (cardH - s) / 2 - oy, width: s, height: s, opacity, transform: move(speed) }}>
+        <RNImage source={SPOT[tex]} resizeMode="stretch" style={styles.fill} />
       </Animated.View>
     );
   };
-  const zone = (rect, key) => (
-    <View key={key} pointerEvents="none" style={[styles.zone, rect]}>
-      {LAYERS[effect].map((l, i) => layer(l, rect.width, rect.height, i))}
+  // Une découpe de la carte (rectangle en pixels) avec toutes les couches de l'effet dedans.
+  const clip = (r, opacity, key) => (r.w > 0 && r.h > 0 ? (
+    <View key={key} style={{ position: 'absolute', left: r.x, top: r.y, width: r.w, height: r.h, overflow: 'hidden', opacity }}>
+      {effect.layers.map(([tex, o, speed, scale], i) => spot(tex, o, speed, scale, r.x, r.y, i))}
     </View>
-  );
-  const art = ART[tcgId] || ART.default;
-  const artRect = { left: art.x * cardW, top: art.y * cardH, width: art.w * cardW, height: art.h * cardH };
-  const zones = effect === 'none' ? [] : effect === 'holo' ? [artRect] : effect === 'reverse' ? [
-    { left: 0, top: 0, width: cardW, height: art.y * cardH },
-    { left: 0, top: (art.y + art.h) * cardH, width: cardW, height: cardH * (1 - art.y - art.h) },
-    { left: 0, top: art.y * cardH, width: art.x * cardW, height: art.h * cardH },
-    { left: (art.x + art.w) * cardW, top: art.y * cardH, width: cardW * (1 - art.x - art.w), height: art.h * cardH },
-  ] : [{ left: 0, top: 0, width: cardW, height: cardH }];
+  ) : null);
+
+  // Zone brillante, bords fondus : STEPS découpes emboîtées, chacune à STEP_OPACITY.
+  const frame = ART_WINDOWS[tcgId] || ART_WINDOWS.pokemon;
+  const art = { x: frame.x * cardW, y: frame.y * cardH, w: frame.w * cardW, h: frame.h * cardH };
+  const zone = [];
+  for (let k = 0; k < STEPS && effect.zone; k++) {
+    const e = k * FEATHER * cardW;
+    if (effect.zone === 'full') {
+      if (k === 0) zone.push(clip({ x: 0, y: 0, w: cardW, h: cardH }, 1, 'full'));
+    } else if (effect.zone === 'art') {
+      zone.push(clip({ x: art.x + e, y: art.y + e, w: art.w - 2 * e, h: art.h - 2 * e }, STEP_OPACITY, `a${k}`));
+    } else {
+      // Reverse : tout autour de l'illustration (bandes haut, bas, gauche, droite), qui s'en écartent un peu plus à chaque pas.
+      const top = art.y - e;
+      const bottom = art.y + art.h + e;
+      zone.push(
+        clip({ x: 0, y: 0, w: cardW, h: top }, STEP_OPACITY, `t${k}`),
+        clip({ x: 0, y: bottom, w: cardW, h: cardH - bottom }, STEP_OPACITY, `b${k}`),
+        clip({ x: 0, y: top, w: art.x - e, h: bottom - top }, STEP_OPACITY, `l${k}`),
+        clip({ x: art.x + art.w + e, y: top, w: cardW - art.x - art.w - e, h: bottom - top }, STEP_OPACITY, `r${k}`),
+      );
+    }
+  }
+  const glare = amount.interpolate({ inputRange: [0, 1], outputRange: [0.06, 0.22], extrapolate: 'clamp' });
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
@@ -138,19 +235,23 @@ export default function CardViewer3D({ visible, onClose, image, tcgId, prices, r
           {...pan.panHandlers}
           style={[styles.card, { width: cardW, height: cardH, transform: [{ perspective: 900 }, { rotateX }, { rotateY }] }]}
         >
-          <Image source={image} style={StyleSheet.absoluteFill} contentFit="cover" />
-          {zones.map((z, i) => zone(z, i))}
-          {/* Reflet de lumière (toutes les cartes). */}
-          <View style={styles.zoneFull} pointerEvents="none">
-            <Animated.View
-              style={{
-                position: 'absolute', left: cardW * 0.5 - cardW * 0.55, top: cardH * 0.5 - cardW * 0.55, width: cardW * 1.1, height: cardW * 1.1,
-                opacity: amount.interpolate({ inputRange: [0, 1], outputRange: [0.18, 0.55], extrapolate: 'clamp' }),
-                transform: [{ translateX: glareX }, { translateY: glareY }],
-              }}
-            >
-              <RNImage source={TEX.glare} resizeMode="stretch" style={{ width: '100%', height: '100%' }} />
-            </Animated.View>
+          <Image
+            source={image}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            onLoad={(e) => {
+              const { width: w, height: h } = e.source || {};
+              // Carte en largeur : le cadre prend sa forme (une carte en hauteur garde le format standard).
+              if (w && h) setRatio(w > h ? h / w : RATIO);
+            }}
+          />
+          {/* Finition : taches de lumière texturées, limitées à la zone brillante de la carte. */}
+          {zone.length ? (
+            <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: shine }]}>{zone}</Animated.View>
+          ) : null}
+          {/* Reflet de lumière sur la surface (toutes les cartes, discret). */}
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            {spot('glare', glare, 1.2, 1.1, 0, 0, 'glare')}
           </View>
         </Animated.View>
 
@@ -173,8 +274,7 @@ const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: 'rgba(5,6,10,0.96)', alignItems: 'center', justifyContent: 'center', gap: 22, padding: 16 },
   close: { position: 'absolute', top: 48, right: 20, zIndex: 2 },
   card: { borderRadius: 16, overflow: 'hidden', backgroundColor: '#111', shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 24, shadowOffset: { width: 0, height: 18 }, elevation: 18 },
-  zone: { position: 'absolute', overflow: 'hidden' },
-  zoneFull: { ...StyleSheet.absoluteFillObject, overflow: 'hidden' },
+  fill: { width: '100%', height: '100%' },
   hint: { color: colors.muted, fontSize: 13 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, maxWidth: 560 },
   chip: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },

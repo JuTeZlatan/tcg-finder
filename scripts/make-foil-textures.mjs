@@ -83,8 +83,9 @@ await save('stars', 256, 256, dots(256, 256, 500, { stars: 40 }));
 await save('rainbow', 512, 512, (x, y) => {
   const t = (x + y * 0.75) / 512;
   const [r, g, b] = hsv((t * 2) % 1, 0.72, 1);
-  const band = 0.5 + 0.5 * Math.sin(t * Math.PI * 10);
-  return [r, g, b, 120 + 135 * band];
+  // Bandes de lumière irisée (comme sur un film holographique) : vives au centre, presque transparentes entre elles.
+  const band = Math.max(0, Math.sin(t * Math.PI * 10)) ** 2.2;
+  return [r, g, b, 70 + 185 * band];
 });
 // « Cosmos » (holo du Set de base Pokémon) : taches rondes irisées qui se chevauchent.
 {
@@ -119,9 +120,42 @@ for (const [name, light, dark] of [['gold', [255, 226, 130], [176, 120, 30]], ['
     return [0, 1, 2].map((c) => dark[c] + (light[c] - dark[c]) * t).concat(150 + 90 * t);
   });
 }
-// Reflet de lumière : tache blanche ronde au bord adouci.
-await save('glare', 256, 256, (x, y) => {
-  const d = Math.hypot(x - 128, y - 128) / 128;
-  return [255, 255, 255, Math.max(0, 1 - d) ** 1.6 * 235];
-});
 console.log('textures écrites dans', OUT);
+
+const smooth = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+
+// ---------- Reflet de lumière (blanc, très doux, sans bord) ----------
+// Tache de lumière : là où la carte « accroche » la lumière (très douce, sans bord).
+await save('spot', 256, 256, (x, y) => {
+  const d = Math.hypot(x - 128, y - 128) / 128;
+  return [255, 255, 255, 255 * smooth(1 - d) ** 1.3];
+});
+console.log('reflet écrit dans', OUT);
+
+// ---------- Versions « tache de lumière » : texture × tache ronde aux bords très doux ----------
+// La brillance n'apparaît que là où la carte accroche la lumière ; la tache traverse la carte avec l'inclinaison.
+{
+  const SIZE = 768;
+  const falloff = Buffer.alloc(SIZE * SIZE * 4);
+  for (let y = 0; y < SIZE; y++) for (let x = 0; x < SIZE; x++) {
+    const d = Math.hypot(x - SIZE / 2, y - SIZE / 2) / (SIZE / 2);
+    const i = (y * SIZE + x) * 4;
+    falloff[i] = falloff[i + 1] = falloff[i + 2] = 255;
+    falloff[i + 3] = 255 * smooth(1 - d) ** 0.7;
+  }
+  const mask = await sharp(falloff, { raw: { width: SIZE, height: SIZE, channels: 4 } }).png().toBuffer();
+  for (const [name, tiled] of [['rainbow', false], ['sparkle', true], ['stars', true], ['cosmos', true], ['lines', true], ['gold', false], ['silver', false]]) {
+    let base = sharp(`${OUT}/${name}.png`);
+    if (tiled) {
+      const tile = await base.png().toBuffer();
+      const { width } = await sharp(tile).metadata();
+      const n = Math.ceil(SIZE / width);
+      const tiles = [];
+      for (let ty = 0; ty < n; ty++) for (let tx = 0; tx < n; tx++) tiles.push({ input: tile, left: tx * width, top: ty * width });
+      base = sharp({ create: { width: n * width, height: n * width, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite(tiles);
+      base = sharp(await base.png().toBuffer()).extract({ left: 0, top: 0, width: SIZE, height: SIZE });
+    } else base = base.resize(SIZE, SIZE);
+    await sharp(await base.png().toBuffer()).composite([{ input: mask, blend: 'dest-in' }]).png({ compressionLevel: 9 }).toFile(`${OUT}/${name}-spot.png`);
+  }
+  console.log('textures « tache de lumière » écrites');
+}

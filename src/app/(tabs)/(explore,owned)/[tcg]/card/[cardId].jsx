@@ -105,7 +105,9 @@ export default function CardScreen() {
                 image={c.image}
                 tcgId={tcg.id}
                 prices={c.prices}
-                rarity={c.details?.find(([k]) => k === 'rarity')?.[1]}
+                // Rareté : « rarity » (Pokémon, Magic, Yu-Gi-Oh!) ou « Rarity » (jeux collectés).
+                rarity={c.details?.find(([k]) => /^rarity$/i.test(k))?.[1]}
+                treatment={c.treatment || c.details?.filter(([k]) => /^(variant|artwork)$/i.test(k)).map(([, v]) => v).join(' ')}
                 initialFinish={chosen || defaultFinish(finishesOf(c.prices)) || null}
               />
             ) : null}

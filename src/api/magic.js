@@ -143,6 +143,8 @@ const adapter = {
         ['legalFormats', Object.entries(c.legalities || {}).filter(([, v]) => v === 'legal').map(([k]) => k).join(', ')],
       ]),
       translateValues: ['rarity'],
+      // Traitement spécial de l'impression (galaxy, surge, textured, gilded, etched…) : rendu de la carte en 3D.
+      treatment: [...(c.promo_types || []), ...(c.frame_effects || []), ...(c.finishes || [])].join(' '),
       texts: faces
         .map((f) => ({
           title: faces.length > 1 ? f.printed_name || f.name : null,
