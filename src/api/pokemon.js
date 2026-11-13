@@ -254,6 +254,31 @@ const CATEGORY_NAMES = {
   energy: { en: 'Energy', fr: 'Énergie', de: 'Energie', it: 'Energia', es: 'Energía', ja: 'Energy', zh: 'Energy' },
 };
 
+// Cartes d'une espèce que TCGdex n'a pas encore rattachées à leur n° de Pokédex (souvent la dernière extension) :
+// recherche par nom (« Raikou » trouve « Raikou-ex », « Raikou de … »), puis fiche complète pour s'assurer que c'est
+// bien un Pokémon sans n° (ou de ce n°) : « Mew » ne ramène pas « Mewtwo », une carte Dresseur n'entre pas.
+async function withoutDexId(dexId, lang, already) {
+  const row = (await speciesList()).find((r) => String(r[0]) === String(dexId));
+  const name = row?.[SPECIES_LANG[lang] ?? 2] || row?.[2];
+  if (!name) return [];
+  const list = (await getJSON(`${base(lang)}/cards?name=${encodeURIComponent(name)}`, { allowMissing: true }).catch(() => null)) || [];
+  // Nom entier (pas collé à une autre lettre latine : « Mew » ≠ « Mewtwo ») ; les noms japonais ou chinois sont vérifiés par la fiche.
+  const esc = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const whole = new RegExp(`(^|[^A-Za-zÀ-ÿ])${esc}($|[^A-Za-zà-ÿ])`, 'i');
+  const candidates = list.filter((c) => !already.has(c.id) && whole.test(c.name || ''));
+  const out = [];
+  for (let i = 0; i < candidates.length; i += 8) {
+    const full = await Promise.all(candidates.slice(i, i + 8).map((c) =>
+      getJSON(`${base(lang)}/cards/${encodeURIComponent(c.id)}`, { allowMissing: true }).catch(() => null)));
+    full.forEach((f, k) => {
+      if (!f || f.category === CATEGORY_NAMES.trainer[lang] || f.category === CATEGORY_NAMES.energy[lang]) return;
+      if (f.dexId?.length && !f.dexId.map(String).includes(String(dexId))) return;
+      out.push(candidates[i + k]);
+    });
+  }
+  return out;
+}
+
 // Promos « Black Star » (SVP, SWSH…) : une seule extension datée de son début, numérotée au fil des sorties sur
 // plusieurs années. Date estimée d'une carte : sa place dans la numérotation, entre le début de cette série
 // et celui de la suivante (ou aujourd'hui pour la série en cours).
@@ -424,18 +449,21 @@ const adapter = {
   getCharacterCards: memo(async (dexId, lang) => {
     const category = CATEGORY_NAMES[dexId]?.[lang] ?? CATEGORY_NAMES[dexId]?.en;
     const query = category ? `category=${encodeURIComponent(category)}` : `dexId=eq:${encodeURIComponent(dexId)}`;
-    const [found, sets, collected, extra] = await Promise.all([
+    const [byDex, sets, collected, extra] = await Promise.all([
       getJSON(`${base(lang)}/cards?${query}`, { allowMissing: true }),
       adapter.getSets(lang),
       tcgplayerPrices(lang),
       completions(),
     ]);
+    // Cartes récentes dont TCGdex n'a pas encore renseigné le n° de Pokédex (Raikou-ex de Règne Delta) : par leur nom.
+    const dexIds = new Set((byDex || []).map((c) => c.id));
+    const found = [...(byDex || []), ...(category ? [] : await withoutDexId(dexId, lang, dexIds))];
     // Cartes reprises d'une autre langue (extension complétée) du même Pokémon ou de la même catégorie.
-    const known = new Set((found || []).map((c) => c.id));
+    const known = new Set(found.map((c) => c.id));
     const added = Object.values(extra?.[lang] || {}).flat().filter((c) => !known.has(c.id) && (category
       ? c.category && CATEGORY_NAMES[dexId] && Object.values(CATEGORY_NAMES[dexId]).includes(c.category)
       : (c.dexId || []).map(String).includes(String(dexId))));
-    const cards = [...(found || []), ...added];
+    const cards = [...found, ...added];
     const setById = new Map(sets.map((s) => [s.id, s]));
     return (cards || [])
       .map((c) => ({ c, set: setById.get(c.set || c.id.slice(0, c.id.lastIndexOf('-'))) }))
