@@ -8,6 +8,8 @@ import pokemon from './pokemon';
 import magic from './magic';
 import yugioh from './yugioh';
 import { createStaticTcg } from './staticTcg';
+import { memo } from './http';
+import { versionsOfCard } from '../lib/masterSet';
 
 // Personnage d'une carte des jeux collectés (null : action, lieu, objet… qui ne représentent pas un personnage).
 const typeOf = (c) => String(c.details?.find(([k]) => k === 'type' || k === 'Card Type')?.[1] || '');
@@ -135,6 +137,14 @@ magic.note = {
 };
 
 export const TCGS = [pokemon, magic, yugioh, onepiece, lorcana, riftbound, dbsfw, dbsmasters, swu, cyberpunk, naruto];
+
+// Master set d'un personnage (Pokémon, héros, planeswalker…) : chaque version (normale, reverse, foil, motifs…) de
+// chacune de ses cartes, les mêmes que dans le master set des extensions. Les cartes portent leurs prix.
+for (const tcg of TCGS) {
+  if (!tcg.getCharacterCards || tcg.getCharacterVersions) continue;
+  tcg.getCharacterVersions = memo(async (id, lang) =>
+    (await tcg.getCharacterCards(id, lang)).flatMap((c) => versionsOfCard(c, c.prices || [])));
+}
 // « Autres » : cartes hors catalogue saisies à la main, présentes seulement dans la collection.
 export const CUSTOM_TCG = { id: 'custom', name: 'Autres', tagline: 'Cartes saisies à la main', color: '#9B8AFB', languages: ['en'] };
 export const getTcg = (id) => (id === 'custom' ? CUSTOM_TCG : TCGS.find((t) => t.id === id));

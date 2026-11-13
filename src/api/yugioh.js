@@ -285,6 +285,22 @@ const adapter = {
       })
       .sort((a, b) => b.date.localeCompare(a.date));
   }),
+  // Master set de l'archétype : pour chaque carte et chaque extension, chaque rareté et chaque tirage (1re édition,
+  // Unlimited…), exactement comme dans le master set de l'extension (mêmes versions, même collection).
+  getCharacterVersions: memo(async (archetype, lang) => {
+    const entries = await adapter.getCharacterCards(archetype, lang);
+    const seen = new Set();
+    const groups = entries.filter((e) => !seen.has(`${e.id}|${e.setId}`) && seen.add(`${e.id}|${e.setId}`));
+    const rows = await Promise.all(groups.map(async (e) => {
+      const c = fullCards.get(`${lang}:${e.id}`);
+      if (!c) return [];
+      const { items } = await printingsBlock((c?.card_sets || []).filter((s) => s.set_name === e.setId));
+      const prices = items.length ? [{ source: 'TCGplayer', items }] : [];
+      const card = { ...summary(c, e.setId, lang), setId: e.setId, subtitle: e.setId, date: e.date, prices };
+      return versionsOfCard(card, prices);
+    }));
+    return rows.flat();
+  }),
 };
 
 export default adapter;

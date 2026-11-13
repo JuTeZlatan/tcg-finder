@@ -449,12 +449,20 @@ const adapter = {
   getCharacterCards: memo(async (dexId, lang) => {
     const category = CATEGORY_NAMES[dexId]?.[lang] ?? CATEGORY_NAMES[dexId]?.en;
     const query = category ? `category=${encodeURIComponent(category)}` : `dexId=eq:${encodeURIComponent(dexId)}`;
-    const [byDex, sets, collected, extra] = await Promise.all([
+    const intl = TCGPLAYER_FILE[lang] === 'tcgplayer';
+    const [byDex, sets, collected, extra, versions, ownCm] = await Promise.all([
       getJSON(`${base(lang)}/cards?${query}`, { allowMissing: true }),
       adapter.getSets(lang),
       tcgplayerPrices(lang),
       completions(),
+      intl ? tcgplayerVersions() : {},
+      intl ? cardmarketProducts() : {},
     ]);
+    // Prix de chaque carte (comme le master set d'une extension) : ses versions (normale, reverse, motifs…).
+    const pricesOfCard = (c) => [
+      ...prices(ownCm[c.id] ? { cardmarket: { unit: 'EUR', ...ownCm[c.id][1] } } : null, tcgplayerOf(c, collected)),
+      ...versionsBlock(versions[c.id]),
+    ];
     // Cartes récentes dont TCGdex n'a pas encore renseigné le n° de Pokédex (Raikou-ex de Règne Delta) : par leur nom.
     const dexIds = new Set((byDex || []).map((c) => c.id));
     const found = [...(byDex || []), ...(category ? [] : await withoutDexId(dexId, lang, dexIds))];
@@ -472,7 +480,7 @@ const adapter = {
       .sort((a, b) => b.date.localeCompare(a.date))
       .map(({ c, set, date }) => ({
         id: c.id, name: c.name, number: c.localId, image: imageOf(c, collected, 'low', lang), setId: set.id,
-        subtitle: [set.name, date].filter(Boolean).join(' · '),
+        subtitle: [set.name, date].filter(Boolean).join(' · '), prices: pricesOfCard(c),
       }));
   }),
 };
