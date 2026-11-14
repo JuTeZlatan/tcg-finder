@@ -1,8 +1,9 @@
-// Évolution du prix d'une carte (version de base) : courbe en barres et variations sur 7 j, 30 j, 90 j, 1 an et depuis
+// Évolution du prix d'une carte (version de base) : courbe à parcourir au doigt et variations sur 7 j, 30 j, 90 j, 1 an et depuis
 // le premier prix connu, d'après l'historique collecté chaque jour (même source de prix que le prix affiché).
 // Tant que cet historique est trop court : évolution récente d'après les moyennes Cardmarket (30 j, 7 j, 1 j, tendance).
 import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
 import { useAsync } from '../lib/useAsync';
 import { useSettings } from '../lib/settings';
 import { changeOver, historyValues } from '../lib/priceHistory';
@@ -61,13 +62,7 @@ export default function PriceHistory({ tcg, cardId, setId, lang, usdToEur, finis
               );
             })}
           </View>
-          <View style={styles.chart}>
-            {shown.map((p) => (
-              <View key={p.date} style={styles.barSlot}>
-                <View style={[styles.bar, { height: `${Math.max(4, ((p.value - min * 0.9) / (max - min * 0.9 || 1)) * 100)}%` }]} />
-              </View>
-            ))}
-          </View>
+          <PriceCurve key={range} points={shown} />
           <View style={styles.axis}>
             <Text style={styles.axisText}>{fmtDate(shown[0].date)}</Text>
             <Text style={styles.axisText}>{t('min {amount}', { amount: formatPrice(min, 'EUR') })} · {t('max {amount}', { amount: formatPrice(max, 'EUR') })}</Text>
@@ -75,6 +70,82 @@ export default function PriceHistory({ tcg, cardId, setId, lang, usdToEur, finis
           </View>
         </>
       )}
+    </View>
+  );
+}
+
+// Courbe du prix : on glisse le doigt tout le long, le prix et la date du jour touché s'affichent au-dessus
+// (sans toucher : le dernier prix connu).
+const CHART_H = 140;
+const PAD = 10;
+function PriceCurve({ points }) {
+  const [width, setWidth] = useState(0);
+  const [index, setIndex] = useState(null);
+  const n = points.length;
+  const values = points.map((p) => p.value);
+  // Échelle verticale d'au moins ±20 % autour du prix moyen : 0,12 → 0,14 € reste une petite variation à l'écran,
+  // pas une flambée sur toute la hauteur.
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const mid = (min + max) / 2;
+  const span = Math.max(max - min, mid * 0.4, 0.01);
+  const lo = mid - span / 2;
+  const x = (i) => PAD + (n > 1 ? (i / (n - 1)) * (width - PAD * 2) : (width - PAD * 2) / 2);
+  const y = (v) => PAD + (1 - (v - lo) / span) * (CHART_H - PAD * 2);
+  const coords = points.map((p, i) => [x(i), y(p.value)]);
+  // Courbe lissée (segments de Bézier entre les points, sans dépasser les vrais prix).
+  const line = coords.reduce((d, [px, py], i) => {
+    if (!i) return `M${px},${py}`;
+    const [qx, qy] = coords[i - 1];
+    const mx = (qx + px) / 2;
+    return `${d} C${mx},${qy} ${mx},${py} ${px},${py}`;
+  }, '');
+  const area = n ? `${line} L${coords[n - 1][0]},${CHART_H} L${coords[0][0]},${CHART_H} Z` : '';
+
+  // Index du point sous le doigt (le plus proche horizontalement).
+  const pick = (px) => setIndex(Math.max(0, Math.min(n - 1, Math.round(((px - PAD) / Math.max(1, width - PAD * 2)) * (n - 1)))));
+  const pan = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderTerminationRequest: () => false, // le défilement de la page ne reprend pas le geste
+    onPanResponderGrant: (e) => pick(e.nativeEvent.locationX),
+    onPanResponderMove: (e) => pick(e.nativeEvent.locationX),
+    onPanResponderRelease: () => setIndex(null),
+    onPanResponderTerminate: () => setIndex(null),
+  }), [width, n]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sel = index ?? n - 1;
+  const p = points[sel];
+  const first = points[0]?.value;
+  const diff = first ? ((p.value - first) / first) * 100 : null;
+  const [cx, cy] = coords[sel] || [0, 0];
+  return (
+    <View style={{ gap: 6 }}>
+      <View style={styles.readout}>
+        <Text style={styles.readoutPrice}>{formatPrice(p.value, 'EUR')}</Text>
+        {diff != null && sel > 0 ? (
+          <Text style={[styles.readoutDiff, { color: diff >= 0 ? colors.success : colors.danger }]}>
+            {diff >= 0 ? '+' : ''}{diff.toLocaleString(locale(), { maximumFractionDigits: 1 })} %
+          </Text>
+        ) : null}
+        <Text style={styles.readoutDate}>{new Date(p.date).toLocaleDateString(locale(), { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+      </View>
+      <View style={{ height: CHART_H }} onLayout={(e) => setWidth(e.nativeEvent.layout.width)} {...pan.panHandlers}>
+        {width ? (
+          <Svg width={width} height={CHART_H} pointerEvents="none">
+            <Defs>
+              <LinearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={colors.accent} stopOpacity={0.35} />
+                <Stop offset="1" stopColor={colors.accent} stopOpacity={0} />
+              </LinearGradient>
+            </Defs>
+            <Path d={area} fill="url(#fill)" />
+            <Path d={line} stroke={colors.accent} strokeWidth={2.5} fill="none" strokeLinejoin="round" strokeLinecap="round" />
+            {index != null ? <Line x1={cx} y1={0} x2={cx} y2={CHART_H} stroke={colors.muted} strokeWidth={1} strokeDasharray="4 4" /> : null}
+            <Circle cx={cx} cy={cy} r={index != null ? 6 : 4} fill={colors.accent} stroke={colors.surface} strokeWidth={2} />
+          </Svg>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -127,8 +198,10 @@ const styles = StyleSheet.create({
   changeLabel: { color: colors.muted, fontSize: 12, fontWeight: '600' },
   changeLabelActive: { color: colors.accent },
   changeValue: { fontWeight: '800', fontSize: 14 },
-  chart: { flexDirection: 'row', alignItems: 'flex-end', height: 90, gap: 2 },
-  barSlot: { flex: 1, height: '100%', justifyContent: 'flex-end' },
+  readout: { flexDirection: 'row', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' },
+  readoutPrice: { color: colors.text, fontWeight: '800', fontSize: 20 },
+  readoutDiff: { fontWeight: '700', fontSize: 13 },
+  readoutDate: { color: colors.muted, fontSize: 12, marginLeft: 'auto' },
   bar: { backgroundColor: colors.accent, borderRadius: 2, opacity: 0.85 },
   axis: { flexDirection: 'row', justifyContent: 'space-between', gap: 6 },
   axisText: { color: colors.muted, fontSize: 11 },
