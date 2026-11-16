@@ -17,20 +17,40 @@ const normNum = (s) => String(s).toUpperCase().replace(/^([A-Z]*)0*(\d)/, '$1$2'
 const normCode = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/([a-z])0+(\d)/g, '$1$2');
 
 async function internationalSets() {
-  // Réessayée en cas de panne passagère de TCGdex (réponse « no available server » au lieu du JSON, le 16/11/2026).
-  const data = await attempts(`${TCGDEX}/graphql`, 4, async () => {
-    const res = await fetch(`${TCGDEX}/graphql`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: '{ sets { id name serie { id } cardCount { official } cards { id localId name image } } }' }),
+  let sets;
+  try {
+    // Une seule requête GraphQL pour toutes les extensions, réessayée en cas de panne passagère.
+    const data = await attempts(`${TCGDEX}/graphql`, 4, async () => {
+      const res = await fetch(`${TCGDEX}/graphql`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: '{ sets { id name serie { id } cardCount { official } cards { id localId name image } } }' }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (!Array.isArray(json?.data?.sets)) throw new Error('réponse sans liste d’extensions');
+      return json.data;
     });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = await res.json();
-    if (!Array.isArray(json?.data?.sets)) throw new Error('réponse sans liste d’extensions');
-    return json.data;
-  });
+    sets = data.sets;
+  } catch (e) {
+    // Secours (GraphQL de TCGdex en panne les 16/11/2026 : « no available server », puis connexion coupée) :
+    // mêmes informations par l'API classique, extension par extension.
+    console.log(`  GraphQL TCGdex indisponible (${e.message}) : extensions lues une par une`);
+    sets = [];
+    const list = (await getJSON(`${TCGDEX}/en/sets`)) || [];
+    let next = 0;
+    await Promise.all(Array.from({ length: 6 }, async () => {
+      while (next < list.length) {
+        const id = list[next++].id;
+        const full = await getJSON(`${TCGDEX}/en/sets/${encodeURIComponent(id)}`);
+        if (full) sets.push({ id: full.id, name: full.name, serie: full.serie, cardCount: { official: full.cardCount?.official }, cards: (full.cards || []).map((c) => ({ id: c.id, localId: c.localId, name: c.name, image: c.image ?? null })) });
+      }
+    }));
+    const order = new Map(list.map((x, i) => [x.id, i]));
+    sets.sort((x, y) => order.get(x.id) - order.get(y.id));
+  }
   // Sans les extensions de Pokémon TCG Pocket (jeu mobile, cartes numériques sans prix).
-  return data.sets.filter((s) => s.serie?.id !== 'tcgp');
+  return sets.filter((s) => s.serie?.id !== 'tcgp');
 }
 
 async function japaneseSets() {
