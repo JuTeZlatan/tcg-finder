@@ -1,6 +1,6 @@
 // Script de collecte quotidien : node pipeline/build.mjs [--only=onepiece,lorcana,riftbound,pokemon,yugioh,dragonball,magic,swu,cyberpunk,naruto,upcoming,fingerprints] [--out=dossier]
 // Produit des fichiers JSON statiques lus par l'appli (publiés sur GitHub Pages par .github/workflows/data.yml).
-import { writeJSON, keepPrevious } from './lib.mjs';
+import { writeJSON, keepPrevious, restorePrevious, writeManifest } from './lib.mjs';
 import * as onepiece from './onepiece.mjs';
 import * as riftbound from './riftbound.mjs';
 import * as lorcana from './lorcana.mjs';
@@ -21,8 +21,12 @@ const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.spli
 const outDir = arg('out') || 'pipeline/out';
 const only = arg('only')?.split(',') || [...Object.keys(BUILDERS), 'fingerprints'];
 
-// Jeux entièrement publiés en fichiers (extensions, cartes, recherche) : en cas d'échec, la version de la veille est
-// republiée et la collecte des autres jeux continue (une source en panne ne bloque plus la mise à jour de tout le site).
+// Fichiers de chaque collecte (dossiers des jeux et de leurs historiques de prix). En cas d'échec d'une source,
+// la version de la veille de ces fichiers est republiée et la collecte des autres jeux continue : une source en panne
+// (TCGdex, OPTCG API…) ne bloque plus la mise à jour de tout le site.
+const GAMES_OF = { dragonball: ['dbsfw', 'dbsmasters'] };
+const prefixesOf = (id) => (id === 'upcoming' ? ['upcoming.json'] : (GAMES_OF[id] || [id]).flatMap((g) => [`${g}/`, `history/${g}/`]));
+// Ancienne reprise (sans files.json, seulement les extensions des jeux entièrement publiés en fichiers).
 const STATIC_GAMES = {
   onepiece: ['onepiece'], riftbound: ['riftbound'], lorcana: ['lorcana'], dragonball: ['dbsfw', 'dbsmasters'],
   swu: ['swu'], cyberpunk: ['cyberpunk'], naruto: ['naruto'],
@@ -36,16 +40,23 @@ for (const id of only.filter((x) => BUILDERS[x])) {
     await BUILDERS[id].build(outDir);
   } catch (e) {
     console.error(`✗ ${id} : ${e.stack || e.message}`);
-    if (STATIC_GAMES[id]) {
-      let any = false;
+    let any = false;
+    try {
+      const n = await restorePrevious(outDir, prefixesOf(id));
+      if (n) console.log(`  ${id} : ${n} fichiers de la veille republiés`);
+      any = n > 0;
+    } catch (err) {
+      console.error(`✗ ${id} : reprise de la veille incomplète (${err.message})`);
+    }
+    if (!any && STATIC_GAMES[id]) {
       for (const tcg of STATIC_GAMES[id]) {
         for (const lang of LANGS) any = (await keepPrevious(outDir, tcg, lang).catch(() => false)) || any;
       }
-      if (any) {
-        console.log(`::warning::${id} : source indisponible aujourd'hui, version de la veille republiée`);
-        kept.push(id);
-        continue;
-      }
+    }
+    if (any) {
+      console.log(`::warning::${id} : source indisponible aujourd'hui, version de la veille republiée`);
+      kept.push(id);
+      continue;
     }
     failures.push(id);
   }
@@ -66,4 +77,5 @@ if (only.includes('fingerprints')) {
   }
 }
 await writeJSON(`${outDir}/meta.json`, { generatedAt: new Date().toISOString(), tcgs: only.filter((id) => !failures.includes(id)), kept });
+console.log(`liste des fichiers publiés : ${await writeManifest(outDir)}`);
 if (failures.length) process.exit(1);

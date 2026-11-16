@@ -6,7 +6,7 @@
 // Format : { [id]: [productId, [[finition, marché, plus bas], …]] }
 import {
   getJSON, getText, sleep, writeJSON, similarity, normName, tcgcsvGroups, tcgcsvGroupProducts, productTag, groupImage,
-  loadCardmarket, cardmarketRef, buildProductIndex, matchByPrice, getUsdToEur, previousJSON, updateHistory, fileId,
+  loadCardmarket, cardmarketRef, buildProductIndex, matchByPrice, getUsdToEur, previousJSON, updateHistory, fileId, attempts,
 } from './lib.mjs';
 import { officialImages } from './pokemonOfficial.mjs';
 
@@ -17,13 +17,20 @@ const normNum = (s) => String(s).toUpperCase().replace(/^([A-Z]*)0*(\d)/, '$1$2'
 const normCode = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '').replace(/([a-z])0+(\d)/g, '$1$2');
 
 async function internationalSets() {
-  const res = await fetch(`${TCGDEX}/graphql`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: '{ sets { id name serie { id } cardCount { official } cards { id localId name image } } }' }),
+  // Réessayée en cas de panne passagère de TCGdex (réponse « no available server » au lieu du JSON, le 16/11/2026).
+  const data = await attempts(`${TCGDEX}/graphql`, 4, async () => {
+    const res = await fetch(`${TCGDEX}/graphql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: '{ sets { id name serie { id } cardCount { official } cards { id localId name image } } }' }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const json = await res.json();
+    if (!Array.isArray(json?.data?.sets)) throw new Error('réponse sans liste d’extensions');
+    return json.data;
   });
   // Sans les extensions de Pokémon TCG Pocket (jeu mobile, cartes numériques sans prix).
-  return (await res.json()).data.sets.filter((s) => s.serie?.id !== 'tcgp');
+  return data.sets.filter((s) => s.serie?.id !== 'tcgp');
 }
 
 async function japaneseSets() {
@@ -176,6 +183,7 @@ function matchCardmarket(sets, tcgOut, cm, fx) {
     });
     for (const [c, p] of match) {
       const g = cm.prices.get(p.idProduct);
+      if (!g) continue; // produit sans ligne dans le guide des prix Cardmarket du jour (plantage du 14/11/2026)
       out[c.id] = [p.idProduct, Object.fromEntries(CM_FIELDS.map((k) => [k, g[k] ?? null]).filter(([, v]) => v))];
     }
   }

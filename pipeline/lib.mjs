@@ -5,24 +5,48 @@ import { dirname } from 'node:path';
 const UA = 'TCGFinder-data/1.0 (+https://github.com)';
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function request(url, { retries = 3, accept = 'application/json' } = {}) {
+// Pannes passagères des sources (serveur surchargé, coupure réseau, page d'erreur à la place du JSON) :
+// jusqu'à 4 essais, espacés de 2 s, 8 s puis 18 s. Une page absente (404) n'est pas réessayée.
+// Coupe-circuit : un site qui a échoué 5 fois de suite (tous essais épuisés) est tenu pour en panne jusqu'à la fin
+// de la collecte — ses requêtes suivantes échouent tout de suite au lieu d'attendre chacune ~30 s.
+const RETRIES = 4;
+export const backoff = (attempt) => sleep(2000 * attempt * attempt);
+const downStreak = new Map();
+const hostOf = (url) => { try { return new URL(url).host; } catch { return url; } };
+
+export async function attempts(url, retries, once) {
+  const host = hostOf(url);
+  if ((downStreak.get(host) || 0) >= 5) throw new Error(`${url} : ${host} en panne pendant cette collecte`);
   for (let attempt = 1; ; attempt++) {
     try {
-      const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: accept } });
-      if (res.status === 404) return null;
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return res;
+      const out = await once();
+      downStreak.set(host, 0);
+      return out;
     } catch (e) {
-      if (attempt >= retries) throw new Error(`${url} : ${e.message}`);
-      await sleep(1000 * attempt);
+      if (attempt >= retries) {
+        downStreak.set(host, (downStreak.get(host) || 0) + 1);
+        throw new Error(`${url} : ${e.message}`);
+      }
+      await backoff(attempt);
     }
   }
 }
 
-export async function getJSON(url, opts) {
-  const res = await request(url, opts);
-  return res ? res.json() : null;
+async function fetchOnce(url, accept) {
+  const res = await fetch(url, { headers: { 'User-Agent': UA, Accept: accept } });
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res;
 }
+
+const request = (url, { retries = RETRIES, accept = 'application/json' } = {}) => attempts(url, retries, () => fetchOnce(url, accept));
+
+// JSON lu dans la même boucle d'essais : une réponse 200 qui n'est pas du JSON (« no available server ») est réessayée.
+export const getJSON = (url, { retries = RETRIES, accept = 'application/json' } = {}) =>
+  attempts(url, retries, async () => {
+    const res = await fetchOnce(url, accept);
+    return res ? res.json() : null;
+  });
 
 export async function getText(url, opts) {
   const res = await request(url, { accept: 'text/html', ...opts });
@@ -616,4 +640,43 @@ export async function writeTcg(outDir, tcgId, lang, sets) {
   const priced = sets.reduce((n, s) => n + s.cards.filter((c) => c.prices.length).length, 0);
   const total = sets.reduce((n, s) => n + s.cards.length, 0);
   console.log(`  ${tcgId}/${lang} : ${sets.length} extensions, ${total} cartes, ${priced} avec prix`);
+}
+
+// Liste de tous les fichiers publiés (files.json) : sert le lendemain à reprendre ceux d'un jeu dont la collecte échoue.
+export async function writeManifest(outDir) {
+  const { readdir } = await import('node:fs/promises');
+  const files = [];
+  const walk = async (dir, rel) => {
+    for (const e of await readdir(dir, { withFileTypes: true })) {
+      const path = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) await walk(`${dir}/${e.name}`, path);
+      else if (path !== 'files.json') files.push(path);
+    }
+  };
+  await walk(outDir, '');
+  await writeJSON(`${outDir}/files.json`, files.sort());
+  return files.length;
+}
+
+// Collecte d'un jeu en échec : tous ses fichiers de la veille (catalogue, prix, historiques…) sont republiés tels quels,
+// d'après files.json, pour que la panne d'une source ne bloque pas la mise à jour des autres jeux.
+// Renvoie le nombre de fichiers repris (0 : pas de liste de la veille, ou rien pour ce jeu).
+export async function restorePrevious(outDir, prefixes) {
+  const list = await previousJSON('files.json');
+  if (!Array.isArray(list)) return 0;
+  const wanted = list.filter((p) => prefixes.some((x) => p === x || p.startsWith(x)));
+  let next = 0;
+  let done = 0;
+  await Promise.all(Array.from({ length: 16 }, async () => {
+    while (next < wanted.length) {
+      const path = wanted[next++];
+      const res = await request(`${PUBLISHED_URL}/${path}`, { accept: '*/*' });
+      if (!res) continue;
+      await mkdir(dirname(`${outDir}/${path}`), { recursive: true });
+      await writeFile(`${outDir}/${path}`, Buffer.from(await res.arrayBuffer()));
+      done++;
+    }
+  }));
+  if (done < wanted.length) throw new Error(`${wanted.length - done} fichier(s) de la veille introuvable(s)`);
+  return done;
 }
