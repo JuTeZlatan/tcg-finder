@@ -114,12 +114,12 @@ const productId = (c) => {
 // Type d'une carte (« Event », « LIEU », « Objet »…) → groupe de cartes non-personnages, pour qu'aucune carte ne manque
 // à l'onglet des personnages. Libellés en français (traduits à l'affichage).
 const TYPE_GROUPS = [
-  [/event|évén|evén|événement|イベント/i, 'Événements'],
-  [/stage|location|lieu|battlefield|ステージ/i, 'Lieux et terrains'],
-  [/item|objet|gear|attachment|upgrade|equipment/i, 'Objets et équipements'],
-  [/action|spell|program|sort/i, 'Actions et sorts'],
+  [/event|évén|evén|événement|イベント|ereignis|evento/i, 'Événements'],
+  [/stage|location|lieu|battlefield|ステージ|^ort$|luogo/i, 'Lieux et terrains'],
+  [/item|objet|gear|attachment|upgrade|equipment|gegenstand|oggetto/i, 'Objets et équipements'],
+  [/action|spell|program|sort|aktion|azione/i, 'Actions et sorts'],
   [/^base$/i, 'Bases'],
-  [/rune/i, 'Runes'],
+  [/\brunes?\b/i, 'Runes'],
   [/mission/i, 'Missions'],
   [/extra/i, 'Cartes Extra'],
   [/token|jeton/i, 'Jetons'],

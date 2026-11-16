@@ -16,7 +16,8 @@ const typeOf = (c) => String(c.details?.find(([k]) => k === 'type' || k === 'Car
 // Retire les mentions entre parenthèses, même imbriquées (« Goku Black (Gold Stamped (01)) » → « Goku Black »).
 const withoutTags = (name) => String(name).replace(/\s*\(.*$/, '').trim();
 const ONE_PIECE_CHARACTER = /^(leader|personnage|character|リーダー|キャラクター)$/i;
-const LORCANA_CHARACTER = /^(personnage|character)/i;
+// Type « personnage » dans chaque langue des cartes (Charakter en allemand, Personaggio en italien).
+const LORCANA_CHARACTER = /^(personnage|character|charakter|personaggio)/i;
 const DBS_CHARACTER = /^(z-)?(leader|battle|unison)$/i;
 // « SS4 Son Goku, Cross Dimensional… » → « Son Goku » ; « Son Gohan : Future » → « Son Gohan »
 const dbsName = (name) => withoutTags(name).split(/\s*(?:[,:]|\/\/)\s*/)[0].replace(/^(SS\d|SSB|SSG|SSR|SS|Super Saiyan( God)?( Blue)?( \d)?)\s+/i, '').trim();
@@ -68,7 +69,8 @@ const lorcana = createStaticTcg({
   // LorcanaJSON : anglais, français, allemand, italien (pas d'espagnol, de japonais ni de chinois).
   languages: ['fr', 'en', 'de', 'it'],
   source: { name: 'LorcanaJSON, Cardmarket, TCGplayer' },
-  characters: { label: 'Personnages', of: (c) => (LORCANA_CHARACTER.test(typeOf(c)) ? withoutTags(c.name.split(' - ')[0]) : null) },
+  // Sans type (cartes reprises de TCGplayer, noms anglais) : un personnage s'écrit toujours « Nom - Titre ».
+  characters: { label: 'Personnages', of: (c) => (LORCANA_CHARACTER.test(typeOf(c)) || (!typeOf(c) && / - /.test(c.name)) ? withoutTags(c.name.split(' - ')[0]) : null) },
 });
 const dbsfw = createStaticTcg({
   id: 'dbsfw',
