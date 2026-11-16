@@ -68,7 +68,8 @@
           "recordAudioAndroid": false,
           "enableBackgroundPlayback": false
         }
-      ]
+      ],
+      "expo-font"
     ],
     "scheme": "tcgfinder",
     "backgroundColor": "#0F1115"

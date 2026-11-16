@@ -67,7 +67,7 @@ export async function build(outDir) {
           const [nb, tb] = numberKey(b);
           return ta - tb || na - nb || a.SKU.localeCompare(b.SKU);
         });
-        return { id: s.id, name: s.name, subtitle: `${s.cards.length} cartes`, date: '', cards: s.cards.map(toCard) };
+        return { id: s.id, name: s.name, date: '', cards: s.cards.map(toCard) };
       });
     await writeTcg(outDir, 'naruto', lang, sets);
     await sleep(500);

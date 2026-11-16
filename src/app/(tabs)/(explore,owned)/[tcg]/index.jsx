@@ -8,7 +8,7 @@ import { CARD_LANGS, useCardLang } from '../../../../lib/cardLang';
 import { colors, radius } from '../../../../lib/theme';
 import LangToggle from '../../../../components/LangToggle';
 import { Loading, ErrorView } from '../../../../components/Status';
-import { t } from '../../../../lib/i18n';
+import { plural, t } from '../../../../lib/i18n';
 
 const GAP = 10;
 
@@ -165,7 +165,7 @@ export default function TcgScreen() {
               <SetLogo uri={s.logo} tint={s.logoTint} owner={`${tcg.id}|s|${s.id}`} lang={lang} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.setName} numberOfLines={2}>{s.name}</Text>
-                <Text style={styles.meta}>{s.subtitle}{s.count ? ` · ${s.count} cartes` : ''}</Text>
+                <Text style={styles.meta}>{[s.subtitle && !/^\d+ cartes$/.test(s.subtitle) ? s.subtitle : null, s.count ? plural(s.count, '{n} carte', '{n} cartes') : null].filter(Boolean).join(' · ')}</Text>
               </View>
             </Pressable>
           )}

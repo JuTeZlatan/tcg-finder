@@ -37,6 +37,10 @@ if ($Full -or -not (Test-Path "$dst\android")) {
 # Réécrit à chaque compilation : un `expo prebuild` peut effacer ce fichier.
 Set-Content -Path "$dst\android\local.properties" -Encoding ascii -Value "sdk.dir=C\:\\Android\\Sdk`ncmake.dir=C\:\\Android\\Sdk\\cmake\\3.31.6"
 
+# Mémoire de Gradle : avec les nombreux modules, R8 dépasse les 512 Mo de « Metaspace » par défaut et Gradle se bloque.
+$props = "$dst\android\gradle.properties"
+(Get-Content $props) -replace '^org\.gradle\.jvmargs=.*', 'org.gradle.jvmargs=-Xmx4096m -XX:MaxMetaspaceSize=1536m' | Set-Content $props -Encoding ascii
+
 $t = Get-Date
 Push-Location "$dst\android"
 # arm64 : téléphones ; x86_64 : émulateur. (Les vieux téléphones 32 bits ne sont pas couverts.)
