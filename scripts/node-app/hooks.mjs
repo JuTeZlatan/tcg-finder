@@ -8,6 +8,14 @@ export async function resolve(specifier, context, next) {
   if (/^(expo-|react-native|@react-native|@expo\/)/.test(specifier)) {
     return { url: new URL('native.mjs', STUBS).href, shortCircuit: true };
   }
+  // Modules de l'appli non installés (collecte sur GitHub, sans les dépendances de l'appli) : remplaçants vides.
+  if (/^(react$|firebase\/|@infinitered\/)/.test(specifier)) {
+    try {
+      return await next(specifier, context);
+    } catch {
+      return { url: new URL('missing.mjs', STUBS).href, shortCircuit: true };
+    }
+  }
   if (/bundledData$/.test(specifier)) return { url: new URL('bundledData.mjs', STUBS).href, shortCircuit: true };
   if (specifier.startsWith('.') && context.parentURL?.includes('/src/')) {
     const base = fileURLToPath(new URL(specifier, context.parentURL));

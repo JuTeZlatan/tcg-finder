@@ -10,6 +10,7 @@ import { useAsync } from '../lib/useAsync';
 import { colors, radius } from '../lib/theme';
 import { useSettings } from '../lib/settings';
 import { locale, t } from '../lib/i18n';
+import { ValueCurve } from './PriceHistory';
 
 // Badge de langue posé sur l'image d'une carte de la collection (chaque langue est un exemplaire distinct).
 export function LangBadge({ lang }) {
@@ -35,39 +36,17 @@ export function ProgressBar({ value, color = colors.accent, height = 6 }) {
   );
 }
 
-// Évolution de la valeur totale (un point par jour, 30 derniers jours affichés).
+// Évolution de la valeur totale (un point par jour, sur un an) : même courbe que le prix d'une carte, à parcourir au
+// doigt, avec les variations sur 7 j, 30 j, 90 j, 1 an et depuis le début.
 export function ValueChart({ history }) {
   useSettings(); // réaffiche les prix quand la devise (ou le taux du jour) change
-  const points = history.slice(-30);
-  if (points.length < 2) {
+  if (history.length < 2) {
     return <Text style={styles.chartEmpty}>{t('L’évolution de la valeur s’affichera ici au fil des jours.')}</Text>;
   }
-  const max = Math.max(...points.map((p) => p.value), 0.01);
-  const min = Math.min(...points.map((p) => p.value));
-  const first = points[0].value;
-  const last = points[points.length - 1].value;
-  const diff = last - first;
-  const fmtDate = (d) => new Date(d).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
   return (
-    <View style={{ gap: 8 }}>
-      <View style={styles.chartHead}>
-        <Text style={styles.chartTitle}>{t('Évolution')}</Text>
-        <Text style={[styles.chartDiff, { color: diff >= 0 ? colors.success : colors.danger }]}>
-          {diff >= 0 ? '+' : ''}{t('{amount} depuis le {date}', { amount: formatPrice(diff, 'EUR'), date: fmtDate(points[0].date) })}
-        </Text>
-      </View>
-      <View style={styles.chart}>
-        {points.map((p) => (
-          <View key={p.date} style={styles.barSlot}>
-            <View style={[styles.bar, { height: `${Math.max(4, ((p.value - min * 0.9) / (max - min * 0.9 || 1)) * 100)}%` }]} />
-          </View>
-        ))}
-      </View>
-      <View style={styles.chartHead}>
-        <Text style={styles.chartAxis}>{fmtDate(points[0].date)}</Text>
-        <Text style={styles.chartAxis}>{t('max {amount}', { amount: formatPrice(max, 'EUR') })}</Text>
-        <Text style={styles.chartAxis}>{fmtDate(points[points.length - 1].date)}</Text>
-      </View>
+    <View style={{ gap: 10 }}>
+      <Text style={styles.chartTitle}>{t('Évolution')}</Text>
+      <ValueCurve values={history} />
     </View>
   );
 }
@@ -292,13 +271,7 @@ const styles = StyleSheet.create({
   track: { backgroundColor: colors.border, borderRadius: 999, overflow: 'hidden', width: '100%' },
   fill: { borderRadius: 999 },
   chartEmpty: { color: colors.muted, fontSize: 13 },
-  chartHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   chartTitle: { color: colors.text, fontWeight: '700', fontSize: 15 },
-  chartDiff: { fontWeight: '700', fontSize: 13 },
-  chart: { flexDirection: 'row', alignItems: 'flex-end', height: 90, gap: 3 },
-  barSlot: { flex: 1, height: '100%', justifyContent: 'flex-end' },
-  bar: { backgroundColor: colors.accent, borderRadius: 3, opacity: 0.85 },
-  chartAxis: { color: colors.muted, fontSize: 11 },
   quick: {
     position: 'absolute', top: 6, right: 6, minWidth: 28, height: 28, borderRadius: 14, paddingHorizontal: 6,
     backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center',

@@ -30,47 +30,50 @@ export default function PriceHistory({ tcg, cardId, setId, lang, usdToEur, finis
     [tcg.id, cardId, setId, lang],
   );
   const values = useMemo(() => (usdToEur ? historyValues(history.data, usdToEur, settings.priceSource) : []), [history.data, usdToEur, settings.priceSource]);
-  const [range, setRange] = useState(Infinity);
   if (history.loading || !usdToEur) return null;
   const recent = recentCardmarket(prices, finish);
   if (values.length < 2 && recent.length < 2) return null;
-
-  const shown = range === Infinity ? values : values.filter((p) => Date.parse(p.date) >= Date.parse(values[values.length - 1]?.date) - range * 86400000);
-  const fmtDate = (d) => new Date(d).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
-  const max = Math.max(...shown.map((p) => p.value), 0.01);
-  const min = Math.min(...shown.map((p) => p.value));
 
   return (
     <View style={styles.box}>
       <Text style={styles.title}>{t('Évolution du prix')}</Text>
       {finish ? <Text style={styles.muted}>{t('Historique de la version de base de la carte.')}</Text> : null}
-      {values.length < 2 ? (
-        <RecentTrend recent={recent} since={values[0]?.date} />
-      ) : (
-        <>
-          <View style={styles.changes}>
-            {RANGES.map(([days, label]) => {
-              const ch = changeOver(values, days);
-              const active = range === days;
-              return (
-                <Pressable key={days} style={[styles.change, active && styles.changeActive]} onPress={() => setRange(days)}>
-                  <Text style={[styles.changeLabel, active && styles.changeLabelActive]}>{t(label)}</Text>
-                  <Text style={[styles.changeValue, { color: !ch ? colors.muted : ch.diff >= 0 ? colors.success : colors.danger }]} numberOfLines={1} adjustsFontSizeToFit>
-                    {ch?.pct != null ? `${ch.pct >= 0 ? '+' : ''}${ch.pct.toLocaleString(locale(), { maximumFractionDigits: 1 })} %` : '—'}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <PriceCurve key={range} points={shown} />
-          <View style={styles.axis}>
-            <Text style={styles.axisText}>{fmtDate(shown[0].date)}</Text>
-            <Text style={styles.axisText}>{t('min {amount}', { amount: formatPrice(min, 'EUR') })} · {t('max {amount}', { amount: formatPrice(max, 'EUR') })}</Text>
-            <Text style={styles.axisText}>{fmtDate(shown[shown.length - 1].date)}</Text>
-          </View>
-        </>
-      )}
+      {values.length < 2 ? <RecentTrend recent={recent} since={values[0]?.date} /> : <ValueCurve values={values} />}
     </View>
+  );
+}
+
+// Variations (7 j, 30 j, 90 j, 1 an, tout) qui choisissent la période, courbe à parcourir au doigt et axe des dates.
+// `values` : [{ date, value }] du plus ancien au plus récent (prix d'une carte, valeur de la collection…).
+export function ValueCurve({ values }) {
+  const [range, setRange] = useState(Infinity);
+  const shown = range === Infinity ? values : values.filter((p) => Date.parse(p.date) >= Date.parse(values[values.length - 1]?.date) - range * 86400000);
+  const fmtDate = (d) => new Date(d).toLocaleDateString(locale(), { day: 'numeric', month: 'short' });
+  const max = Math.max(...shown.map((p) => p.value), 0.01);
+  const min = Math.min(...shown.map((p) => p.value));
+  return (
+    <>
+      <View style={styles.changes}>
+        {RANGES.map(([days, label]) => {
+          const ch = changeOver(values, days);
+          const active = range === days;
+          return (
+            <Pressable key={days} style={[styles.change, active && styles.changeActive]} onPress={() => setRange(days)}>
+              <Text style={[styles.changeLabel, active && styles.changeLabelActive]}>{t(label)}</Text>
+              <Text style={[styles.changeValue, { color: !ch ? colors.muted : ch.diff >= 0 ? colors.success : colors.danger }]} numberOfLines={1} adjustsFontSizeToFit>
+                {ch?.pct != null ? `${ch.pct >= 0 ? '+' : ''}${ch.pct.toLocaleString(locale(), { maximumFractionDigits: 1 })} %` : '—'}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <PriceCurve key={range} points={shown} />
+      <View style={styles.axis}>
+        <Text style={styles.axisText}>{fmtDate(shown[0].date)}</Text>
+        <Text style={styles.axisText}>{t('min {amount}', { amount: formatPrice(min, 'EUR') })} · {t('max {amount}', { amount: formatPrice(max, 'EUR') })}</Text>
+        <Text style={styles.axisText}>{fmtDate(shown[shown.length - 1].date)}</Text>
+      </View>
+    </>
   );
 }
 

@@ -7,6 +7,7 @@ import { loadData } from './dataSource';
 import { versionsOfCard } from '../lib/masterSet';
 import { mainPrefix, parseNumber, sortByNumber } from '../lib/cardOrder';
 import { historyFile } from '../lib/priceHistory';
+import { iconKey } from '../lib/iconKey';
 
 const fileId = (id) => String(id).replace(/[^A-Za-z0-9._-]/g, '_');
 
@@ -90,7 +91,7 @@ export function createStaticTcg(meta) {
       return { ...card, setId, setName: set?.name };
     }),
 
-    ...(meta.characters ? characterMethods(meta.characters, loadSets, loadSet) : {}),
+    ...(meta.characters ? characterMethods(meta.characters, loadSets, loadSet, (p, compute) => loadData(path(...p), compute)) : {}),
   };
 }
 
@@ -129,7 +130,26 @@ const withoutTag = (name) => String(name).replace(/\s*\(.*$/, '').trim();
 const typeOfCard = (c) => String(c.details?.find(([k]) => k === 'type' || k === 'Card Type')?.[1] || '');
 const typeGroup = (type) => (type && TYPE_GROUPS.find(([re]) => re.test(type))?.[1]) || OTHER_GROUP;
 
-function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadSet) {
+// Fichier d'un personnage préparé par la collecte : nom court et stable (les ids peuvent être en japonais, en chinois…).
+export const characterFile = (id) => `characters/${iconKey(id)}.json`;
+
+// Lecture de toutes les extensions, 8 à la fois (une à une, l'ouverture d'un personnage attendait chaque fichier).
+async function loadAll(sets, lang, loadSet) {
+  const out = new Array(sets.length);
+  let next = 0;
+  await Promise.all(Array.from({ length: Math.min(8, sets.length) }, async () => {
+    while (next < sets.length) {
+      const i = next++;
+      out[i] = await loadSet(sets[i].id, lang);
+    }
+  }));
+  return out;
+}
+
+// `loadPublished([lang, fichier], calcul)` : liste des personnages et cartes de chacun, préparées chaque jour par la
+// collecte (pipeline/characters.mjs, avec ce même code) : un seul petit fichier à lire au lieu de toutes les
+// extensions. Fichier absent ou hors ligne : calcul sur l'appareil, comme avant.
+function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadSet, loadPublished) {
   // Toutes les cartes de toutes les extensions, avec leur personnage, de la plus récente à la plus ancienne.
   const allCards = memo(async (lang) => {
     const sets = [...(await loadSets(lang))].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
@@ -146,8 +166,9 @@ function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadS
     const productStarts = [];
     const totalDates = new Map(); // nombre de cartes → dates des extensions de cette taille
     const pending = []; // cartes non rattachées à un personnage au premier passage
-    for (const s of sets) {
-      const cards = await loadSet(s.id, lang);
+    const bySet = await loadAll(sets, lang, loadSet);
+    for (const [si, s] of sets.entries()) {
+      const cards = bySet[si];
       // Cartes sans type (ajoutées depuis TCGplayer, versions alternatives) : type de la carte de même numéro.
       const typed = new Map();
       for (const c of cards) if (typeOfCard(c) && !typed.has(c.number)) typed.set(c.number, c);
@@ -215,32 +236,52 @@ function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadS
     return out;
   });
 
+  const allCharacterCards = memo((lang) => computeCharacterCards(lang));
+
   return {
     charactersLabel: label,
     // [{ id, name, image, count }] par ordre alphabétique ; image : carte la plus récente du personnage.
-    getCharacters: memo(async (lang) => {
-      const groups = new Map();
-      for (const { key, card, group } of await allCards(lang)) {
-        const id = group ? `group-${groupKey(key)}` : groupKey(key);
-        if (!groups.has(id)) groups.set(id, { id, image: card.thumb || card.image, count: 0, spellings: new Map(), group: !!group });
-        const g = groups.get(id);
-        g.count++;
-        g.spellings.set(key, (g.spellings.get(key) || 0) + 1);
-      }
-      // Nom affiché : l'orthographe la plus fréquente (« Monkey D. Luffy » plutôt que « Monkey.D.Luffy »).
-      // Groupes de types (Événements, Lieux…) : après les personnages.
-      return [...groups.values()]
-        .map(({ spellings, ...g }) => ({ ...g, name: [...spellings].sort((a, b) => b[1] - a[1])[0][0] }))
-        .sort((a, b) => (a.group - b.group) || a.name.localeCompare(b.name, 'fr'));
-    }),
+    precomputedCharacters: true,
+    getCharacters: memo((lang) => loadPublished([lang, 'characters.json'], () => computeCharacters(lang))),
     // Toutes les cartes d'un personnage, de la plus récente à la plus ancienne.
-    getCharacterCards: memo(async (id, lang) =>
-      (await allCards(lang))
-        .filter((x) => (x.group ? `group-${groupKey(x.key)}` : groupKey(x.key)) === id)
-        .map(({ card: c, set: s, date }) => ({
-          id: c.id, name: c.name, number: c.number, image: c.thumb || c.image, setId: s.id,
-          subtitle: [s.name, date].filter(Boolean).join(' · '),
-          prices: c.prices, facets: facetsOf(c.details),
-        }))),
+    getCharacterCards: memo(async (id, lang) => {
+      const file = await loadPublished([lang, characterFile(id)], async () => null).catch(() => null);
+      return file?.id === id && Array.isArray(file.cards) ? file.cards : (await allCharacterCards(lang)).get(id) || [];
+    }),
+    computeCharacters,
+    computeCharacterCards: allCharacterCards,
   };
+
+  async function computeCharacters(lang) {
+    const groups = new Map();
+    for (const { key, card, group } of await allCards(lang)) {
+      const id = charIdOf(key, group);
+      if (!groups.has(id)) groups.set(id, { id, image: card.thumb || card.image, count: 0, spellings: new Map(), group: !!group });
+      const g = groups.get(id);
+      g.count++;
+      g.spellings.set(key, (g.spellings.get(key) || 0) + 1);
+    }
+    // Nom affiché : l'orthographe la plus fréquente (« Monkey D. Luffy » plutôt que « Monkey.D.Luffy »).
+    // Groupes de types (Événements, Lieux…) : après les personnages.
+    return [...groups.values()]
+      .map(({ spellings, ...g }) => ({ ...g, name: [...spellings].sort((a, b) => b[1] - a[1])[0][0] }))
+      .sort((a, b) => (a.group - b.group) || a.name.localeCompare(b.name, 'fr'));
+  }
+
+  // Cartes de chaque personnage (id → cartes, de la plus récente à la plus ancienne), en un seul passage.
+  async function computeCharacterCards(lang) {
+    const byChar = new Map();
+    for (const { key, group, card: c, set: s, date } of await allCards(lang)) {
+      const id = charIdOf(key, group);
+      if (!byChar.has(id)) byChar.set(id, []);
+      byChar.get(id).push({
+        id: c.id, name: c.name, number: c.number, image: c.thumb || c.image, setId: s.id,
+        subtitle: [s.name, date].filter(Boolean).join(' · '),
+        prices: c.prices, facets: facetsOf(c.details),
+      });
+    }
+    return byChar;
+  }
 }
+
+const charIdOf = (key, group) => (group ? `group-${groupKey(key)}` : groupKey(key));

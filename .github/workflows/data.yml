@@ -38,6 +38,10 @@ jobs:
       - run: node pipeline/build.mjs --out=site
         env:
           FP_BUDGET_MIN: '45'
+      # Personnages préparés (pages « personnage » instantanées dans l'appli), calculés par le code de l'appli.
+      # Un échec n'empêche pas la publication : l'appli les calcule alors elle-même.
+      - run: node --import ./scripts/node-app/register.mjs pipeline/characters.mjs site
+        continue-on-error: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
