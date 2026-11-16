@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
-import { Image } from 'expo-image';
+import QuickImage from '../../../../components/QuickImage';
 import { getTcg, dataLang, langNote } from '../../../../api';
 import { useAsync } from '../../../../lib/useAsync';
 import { CARD_LANGS, useCardLang } from '../../../../lib/cardLang';
@@ -141,7 +141,7 @@ export default function TcgScreen() {
               onPress={() => router.push({ pathname: '/[tcg]/character/[charId]', params: { tcg: tcg.id, charId: c.id, name: c.group ? t(c.name) : c.name } })}
             >
               <View style={styles.charImg}>
-                {c.image ? <Image source={c.image} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" recyclingKey={String(c.id)} /> : null}
+                {c.image ? <QuickImage uri={c.image} owner={`${tcg.id}|c|${c.id}`} lang={lang} style={{ width: '100%', height: '100%' }} contentFit="cover" contentPosition="top" /> : null}
                 {c.number && tcg.characterOrder ? <Text style={styles.charNumber}>#{c.number}</Text> : null}
               </View>
               <Text style={[styles.charName, c.group && styles.groupName]} numberOfLines={2}>{c.group ? `${t(c.name)} (${c.count})` : c.name}</Text>
@@ -162,7 +162,7 @@ export default function TcgScreen() {
               style={({ pressed }) => [styles.row, pressed && { opacity: 0.7 }]}
               onPress={() => router.push({ pathname: '/[tcg]/set/[setId]', params: { tcg: tcg.id, setId: s.id, name: s.name } })}
             >
-              <SetLogo uri={s.logo} tint={s.logoTint} />
+              <SetLogo uri={s.logo} tint={s.logoTint} owner={`${tcg.id}|s|${s.id}`} lang={lang} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.setName} numberOfLines={2}>{s.name}</Text>
                 <Text style={styles.meta}>{s.subtitle}{s.count ? ` · ${s.count} cartes` : ''}</Text>
@@ -177,12 +177,12 @@ export default function TcgScreen() {
 
 // Logo d'extension (ou symbole, ou image du booster selon le jeu) ; masqué s'il ne se charge pas.
 // `tint` : symbole monochrome (Magic) recoloré pour rester lisible sur fond sombre.
-function SetLogo({ uri, tint }) {
+function SetLogo({ uri, tint, owner, lang }) {
   const [failed, setFailed] = useState(false);
   if (!uri || failed) return null;
   return (
     <View style={styles.logo}>
-      <Image source={uri} style={styles.logoImg} contentFit="contain" tintColor={tint ? colors.text : undefined} onError={() => setFailed(true)} />
+      <QuickImage uri={uri} owner={owner} lang={lang} style={styles.logoImg} contentFit="contain" tintColor={tint ? colors.text : undefined} onError={() => setFailed(true)} />
     </View>
   );
 }

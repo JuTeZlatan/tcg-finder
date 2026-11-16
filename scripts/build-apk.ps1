@@ -1,11 +1,22 @@
 # Compile l'APK Android depuis la copie C:\tcgb (le chemin « Desktop\App TCG » est trop long pour le code natif).
 # Usage : powershell -File scripts\build-apk.ps1 [-Full]
 #   -Full : régénère le projet Android (à faire après l'ajout d'un module natif) ; sinon compilation rapide (~1-2 min).
-param([switch]$Full)
+#   -Icons : refait les planches d'icônes intégrées (sinon, refaites seulement si elles ont plus de 7 jours).
+param([switch]$Full, [switch]$Icons)
 $ErrorActionPreference = 'Stop'
 $src = Split-Path $PSScriptRoot -Parent
 $dst = 'C:\tcgb'
 $env:ANDROID_HOME = 'C:\Android\Sdk'
+
+# Icônes des personnages et logos des extensions intégrés à l'appli (affichage instantané) : scripts/make-icons.mjs.
+$index = "$src\src\generated\icons.js"
+if ($Icons -or -not (Test-Path $index) -or ((Get-Date) - (Get-Item $index).LastWriteTime).TotalDays -gt 7) {
+  Push-Location $src
+  node --import ./scripts/node-app/register.mjs scripts/make-icons.mjs
+  $iconsCode = $LASTEXITCODE
+  Pop-Location
+  if ($iconsCode -ne 0) { exit $iconsCode }
+}
 
 if ($Full -or -not (Test-Path "$dst\android")) {
   robocopy $src $dst /MIR /XD "$src\android" "$src\.expo" "$src\pipeline\out" "$dst\android" /XF *.apk *.log /NFL /NDL /NJH /NJS /NP | Out-Null
