@@ -9,12 +9,13 @@
 //   scripts/make-foil-textures.mjs) qui traversent la carte à l'opposé de l'inclinaison, chacune à sa vitesse :
 //   de face, presque rien ; inclinée, la lumière accroche la surface et glisse dessus. Aucun bord net.
 // Finitions de chaque jeu : voir finishEffect. Les versions de la carte se choisissent en bas pour comparer.
-import { useEffect, useMemo, useState } from 'react';
-import { Animated, Image as RNImage, Modal, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Animated, Image as RNImage, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { finishesOf, finishLabel, defaultFinish } from '../lib/finishes';
 import { backOf } from '../lib/cardBacks';
+import FoilCard from './FoilCard';
 import { t } from '../lib/i18n';
 import { colors } from '../lib/theme';
 
@@ -67,8 +68,15 @@ const EFFECTS = {
   gold: { zone: 'full', layers: [['gold', 0.91, 1.2, 1.4], ['sparkle', 0.73, -0.6, 1.1]] },
   etched: { zone: 'full', layers: [['silver', 0.73, 1.2, 1.4], ['lines', 0.45, 0.4, 1.2]] },
   galaxy: { zone: 'full', layers: [['stars', 0.95, -0.7, 1.2], ['rainbow', 0.55, 1.4, 1.3]] },
+  // Rendu par le shader de FoilCard (zone seulement) :
+  cosmos: { zone: 'art', layers: [] },
+  lines: { zone: 'full', layers: [] },
+  coldfoil: { zone: 'full', layers: [] },
+  starlight: { zone: 'full', layers: [] },
   none: { zone: null, layers: [] },
 };
+// Motif du shader (src/components/FoilCard.jsx) de chaque finition.
+const SHADER_KIND = { coldfoil: 'holo', holo: 'holo', cosmos: 'cosmos', secret: 'secret', lines: 'secret', reverse: 'reverse', foil: 'foil', textured: 'textured', gold: 'gold', etched: 'etched', galaxy: 'galaxy', starlight: 'starlight', none: 'none' };
 
 // Finition d'une version, d'après la version choisie (identifiant + libellé), la rareté et le traitement spécial.
 // Règles tirées des finitions réelles de chaque jeu (raretés présentes dans les données de l'appli).
@@ -84,19 +92,22 @@ export function finishEffect(tcgId, finish, label, rarity, treatment = '') {
       // Shiny : texturées ; Hyper Rare (dorées) : or.
       if (/hyper|gold/.test(r)) return 'gold';
       if (/illustration|ultra|secret|shiny|full|black white|amazing|classic/.test(r)) return 'textured';
-      if (/double|holo rare v|vmax|vstar|\bex\b|gx|radiant|ace spec|break|prime|lv\.x/.test(r)) return 'foil';
-      if (/holo/.test(`${v} ${r}`)) return 'holo';
+      if (/double|holo rare v|vmax|vstar|\bex\b|gx|radiant|ace spec|break|prime|lv\.x/.test(r)) return 'lines';
+      if (/holo/.test(`${v} ${r}`)) return 'cosmos';
       return 'none';
     case 'yugioh':
       // Super / Ultra Rare : illustration en holo ; Secret / Prismatic / Platinum : illustration en paillettes ;
       // Starlight, Quarter Century, Collector's, Ghost : toute la carte ; Ultimate : relief argenté ; Gold : or.
-      if (/gold/.test(`${v} ${r}`)) return 'gold';
-      if (/starlight|quarter century|collector|ghost/.test(`${v} ${r}`)) return 'textured';
-      if (/secret|prismatic|platinum/.test(`${v} ${r}`)) return 'secret';
-      if (/ultimate/.test(`${v} ${r}`)) return 'etched';
-      if (/starfoil/.test(`${v} ${r}`)) return 'galaxy';
-      if (/mosaic|shatterfoil/.test(`${v} ${r}`)) return 'foil';
-      if (/super rare|ultra rare/.test(`${v} ${r}`)) return 'holo';
+      // Version choisie (« Super Rare (RA05-EN037) ») ; sans choix, la rareté de l'impression affichée.
+      const ygo = v.trim() ? v : r;
+      if (/gold/.test(ygo)) return 'gold';
+      if (/starlight|quarter century|collector/.test(ygo)) return 'starlight';
+      if (/ghost/.test(ygo)) return 'etched';
+      if (/secret|prismatic|platinum/.test(ygo)) return 'secret';
+      if (/ultimate/.test(ygo)) return 'etched';
+      if (/starfoil/.test(ygo)) return 'galaxy';
+      if (/mosaic|shatterfoil/.test(ygo)) return 'foil';
+      if (/super rare|ultra rare/.test(ygo)) return 'holo';
       return 'none';
     case 'magic':
       // Version choisie (foil / etched), puis traitement de l'impression.
@@ -114,8 +125,10 @@ export function finishEffect(tcgId, finish, label, rarity, treatment = '') {
       if (/^(r|sr|l)$|leader/.test(r) || foilVersion) return 'foil';
       return 'none';
     case 'lorcana':
-      // Enchantées et Iconiques : texturées ; Épiques : arc-en-ciel ; versions foil / cold foil : brillantes.
+      // Enchantées et Iconiques : texturées ; « cold foil » : seules les zones claires de l'illustration brillent ;
+      // Épiques et versions foil : voile arc-en-ciel sur toute la carte.
       if (/enchant|iconic/.test(r)) return 'textured';
+      if (/cold/.test(v)) return 'coldfoil';
       if (/epic/.test(r) || foilVersion) return 'foil';
       return 'none';
     case 'riftbound':
@@ -171,7 +184,13 @@ export default function CardViewer3D({ visible, onClose, image, tcgId, prices, r
   const [finish, setFinish] = useState(initialFinish || defaultFinish(finishes) || null);
   // Une seule version vendue (aucun choix proposé) : c'est la finition de la carte, ex. une rare qui n'existe qu'en foil.
   const shown = finish || soleFinish(prices);
-  const effect = EFFECTS[finishEffect(tcgId, shown, shown ? finishLabel(prices, shown) : '', rarity, treatment)];
+  const effectName = finishEffect(tcgId, shown, shown ? finishLabel(prices, shown) : '', rarity, treatment);
+  const effect = EFFECTS[effectName] || EFFECTS.none;
+  // Inclinaison transmise au shader de la finition (sinus des angles), sans rendu React à chaque image.
+  const foilTilt = useRef(null);
+  const [foilReady, setFoilReady] = useState(false);
+  const setFoilTilt = useCallback((set) => { foilTilt.current = set; }, []);
+  const onFoilLoad = useCallback(() => setFoilReady(true), []);
 
   // Dos : image intégrée du jeu, ou seconde face (adresse) ; repli sur le dos du jeu si elle ne se charge pas.
   const back = useMemo(() => backOf(tcgId, card, { lang, setDate }), [tcgId, card, lang, setDate]);
@@ -231,11 +250,14 @@ export default function CardViewer3D({ visible, onClose, image, tcgId, prices, r
   const [showBack, setShowBack] = useState(false);
   useEffect(() => {
     const angle = { x: 0, y: 0 };
-    const update = () => setShowBack(Math.cos((angle.x * Math.PI) / 180) * Math.cos((angle.y * Math.PI) / 180) < 0);
+    const update = () => {
+      setShowBack(Math.cos((angle.x * Math.PI) / 180) * Math.cos((angle.y * Math.PI) / 180) < 0);
+      foilTilt.current?.(Math.sin((angle.x * Math.PI) / 180), Math.sin((angle.y * Math.PI) / 180));
+    };
     const ix = rot.x.addListener(({ value }) => { angle.x = value; update(); });
     const iy = rot.y.addListener(({ value }) => { angle.y = value; update(); });
     return () => { rot.x.removeListener(ix); rot.y.removeListener(iy); };
-  }, [rot]);
+  }, [rot, foilTilt]);
   // Part d'inclinaison (0 de face → 1 au maximum).
   const amount = Animated.add(
     tilt.x.interpolate({ inputRange: [-MAX_TILT, 0, MAX_TILT], outputRange: [0.5, 0, 0.5] }),
@@ -322,14 +344,26 @@ export default function CardViewer3D({ visible, onClose, image, tcgId, prices, r
               if (w && h) setRatio(w > h ? h / w : RATIO);
             }}
           />
-          {/* Finition : taches de lumière texturées, limitées à la zone brillante de la carte. */}
-          {zone.length ? (
+          {/* Finition et reflet calculés pixel par pixel (shader) à partir de l'image de la carte. */}
+          <FoilCard
+            uri={frontFailed || !back.front ? image : back.front}
+            width={cardW}
+            height={cardH}
+            kind={SHADER_KIND[effectName] || 'none'}
+            zone={effect.zone || 'none'}
+            art={frame}
+            onTilt={setFoilTilt}
+            onLoad={onFoilLoad}
+          />
+          {/* Avant que le shader soit prêt (ou s'il n'est pas disponible) : anciennes taches de lumière. */}
+          {!foilReady && zone.length ? (
             <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { opacity: shine }]}>{zone}</Animated.View>
           ) : null}
-          {/* Reflet de lumière sur la surface (toutes les cartes, discret). */}
-          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
-            {spot('glare', glare, 1.2, 1.1, 0, 0, 'glare')}
-          </View>
+          {!foilReady ? (
+            <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+              {spot('glare', glare, 1.2, 1.1, 0, 0, 'glare')}
+            </View>
+          ) : null}
         </View>
         </Animated.View>
 
@@ -343,13 +377,14 @@ export default function CardViewer3D({ visible, onClose, image, tcgId, prices, r
           </Pressable>
         </View>
         {finishes.length > 1 ? (
-          <View style={styles.chips}>
+          // Versions sur une ligne qui défile : une carte peut en avoir plus de dix (Yu-Gi-Oh!), elles restaient hors de l'écran.
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.versionRow} contentContainerStyle={styles.versionList}>
             {finishes.map((f) => (
               <Pressable key={f} onPress={() => setFinish(f)} style={[styles.chip, f === finish && styles.chipActive]}>
                 <Text style={[styles.chipText, f === finish && styles.chipTextActive]} numberOfLines={1}>{finishLabel(prices, f)}</Text>
               </Pressable>
             ))}
-          </View>
+          </ScrollView>
         ) : null}
       </View>
     </Modal>
@@ -365,6 +400,8 @@ const styles = StyleSheet.create({
   fill: { width: '100%', height: '100%' },
   hint: { color: colors.muted, fontSize: 13 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, maxWidth: 560 },
+  versionRow: { flexGrow: 0, alignSelf: 'stretch' },
+  versionList: { gap: 8, paddingHorizontal: 4, flexGrow: 1, justifyContent: 'center' },
   chip: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.15)' },
   chipActive: { backgroundColor: colors.accent, borderColor: colors.accent },
   chipText: { color: '#fff', fontWeight: '600', fontSize: 13 },
