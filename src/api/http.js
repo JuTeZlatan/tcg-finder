@@ -85,15 +85,36 @@ export async function getJSON(url, { allowMissing = false, fresh = false } = {})
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Mémorise le résultat d'une fonction asynchrone (par arguments) pour éviter les appels répétés.
+// Une fois résolue, la promesse porte sa valeur (`settled`, `value`) : un écran peut l'afficher sans attendre
+// (src/lib/useAsync.js), par exemple en passant à une langue déjà préchargée.
 export function memo(fn) {
   const cache = new Map();
   return (...args) => {
     const key = JSON.stringify(args);
     if (!cache.has(key)) {
-      cache.set(key, fn(...args).catch((e) => { cache.delete(key); throw e; }));
+      const p = fn(...args).catch((e) => { cache.delete(key); throw e; });
+      p.then((value) => { p.settled = true; p.value = value; }, () => {});
+      cache.set(key, p);
     }
     return cache.get(key);
   };
+}
+
+// Donnée quelconque (requête POST…) gardée sur le téléphone comme celles de getJSON : copie servie tout de suite,
+// rafraîchie en arrière-plan au-delà de 12 h ; sans copie, `load()` est attendu.
+export async function cachedJSON(name, load) {
+  const id = `cached:${name}`;
+  const copy = await readCopy(id);
+  if (copy) {
+    if (Date.now() - copy.at > FRESH_FOR && !refreshing.has(id)) {
+      refreshing.add(id);
+      load().then((data) => saveCopy(id, data)).catch(() => {}).finally(() => refreshing.delete(id));
+    }
+    return copy.data;
+  }
+  const data = await load();
+  saveCopy(id, data);
+  return data;
 }
 
 export const num = (v) => {

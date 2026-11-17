@@ -5,6 +5,7 @@ import { finishName } from '../lib/finishes';
 import { getJSON, memo, num, clean } from './http';
 import { loadBundledFile } from './bundledData';
 import { loadData } from './dataSource';
+import { compareNumber } from '../lib/compare';
 
 const BASE = 'https://db.ygoprodeck.com/api/v7';
 
@@ -157,7 +158,7 @@ const adapter = {
     const [cm, tp] = await Promise.all([cardmarketByEdition(), tcgplayerByEdition()]);
     return [...cards, ...added]
       .map((c) => summary(c, setName, lang, { cm, tp }))
-      .sort((a, b) => (a.number || '~').localeCompare(b.number || '~', undefined, { numeric: true }));
+      .sort((a, b) => compareNumber(a.number || '~', b.number || '~'));
   }),
 
   // Master set : chaque rareté et chaque tirage (1re édition, Unlimited, Limited) des cartes de l’extension.
@@ -168,7 +169,7 @@ const adapter = {
       return { card: summary(c, setName, lang), prices: items.length ? [{ source: 'TCGplayer', items }] : [] };
     }));
     return rows
-      .sort((a, b) => (a.card.number || '').localeCompare(b.card.number || '', undefined, { numeric: true }))
+      .sort((a, b) => compareNumber(a.card.number, b.card.number))
       .flatMap(({ card, prices }) => versionsOfCard({ ...card, prices }, prices));
   }),
 

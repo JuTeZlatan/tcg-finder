@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { FlatList, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import QuickImage from '../../../../components/QuickImage';
@@ -9,6 +9,7 @@ import { colors, radius } from '../../../../lib/theme';
 import LangToggle from '../../../../components/LangToggle';
 import { Loading, ErrorView } from '../../../../components/Status';
 import { plural, t } from '../../../../lib/i18n';
+import { compareText } from '../../../../lib/compare';
 
 const GAP = 10;
 
@@ -31,6 +32,21 @@ export default function TcgScreen() {
     () => (showCharacters ? tcg.getCharacters(lang) : Promise.resolve(null)),
     [tcg.id, lang, showCharacters],
   );
+  // Autres langues proposées préchargées en arrière-plan, une fois l'écran affiché : passer de l'une à l'autre
+  // est alors instantané (listes déjà en mémoire, voir useAsync).
+  const loaded = !!sets.data;
+  const langsKey = toggleLangs.join(',');
+  useEffect(() => {
+    if (!loaded) return undefined;
+    const timer = setTimeout(() => {
+      for (const l of new Set(langsKey.split(',').map((x) => dataLang(tcg, x)))) {
+        if (l === lang) continue;
+        tcg.getSets(l).catch(() => {});
+        if (showCharacters) tcg.getCharacters(l).catch(() => {});
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [tcg, lang, langsKey, loaded, showCharacters]);
   const [filter, setFilter] = useState('');
   const [query, setQuery] = useState('');
   // Personnages : ordre alphabétique, ou numéro (Pokédex) quand le jeu en a un.
@@ -50,7 +66,7 @@ export default function TcgScreen() {
     const groupsLast = (a, b) => (!!a.group - !!b.group);
     return order === 'number' && tcg.characterOrder
       ? [...list].sort((a, b) => groupsLast(a, b) || a.number - b.number)
-      : [...list].sort((a, b) => groupsLast(a, b) || a.name.localeCompare(b.name, 'fr'));
+      : [...list].sort((a, b) => groupsLast(a, b) || compareText(a.name, b.name));
   }, [characters.data, filter, order, tcg.characterOrder]);
 
   const search = () => {

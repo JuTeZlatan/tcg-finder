@@ -1,3 +1,4 @@
+import { compareText } from './compare';
 // Tris et filtres des cartes d'une extension (grille de src/components/CardGrid.jsx).
 // Chaque carte de la liste porte, quand le jeu les fournit, ses prix (`prices`, mêmes blocs que la fiche) et ses
 // caractéristiques (`facets` : rareté, type, couleur) ; la grille y ajoute le prix moyen et ce que l'on possède.
@@ -52,7 +53,7 @@ export function facetValues(rows, facet, ranks) {
   const list = [...counts].map(([value, count]) => ({ value, count }));
   return facet === 'rarity' && ranks
     ? list.sort((a, b) => (ranks.get(a.value) ?? 99) - (ranks.get(b.value) ?? 99))
-    : list.sort((a, b) => b.count - a.count || String(a.value).localeCompare(String(b.value)));
+    : list.sort((a, b) => b.count - a.count || compareText(String(a.value), String(b.value)));
 }
 
 export const activeCount = (f) => (f.show !== 'all' ? 1 : 0) + f.bands.length + f.rarity.length + f.type.length + f.color.length;
@@ -76,7 +77,7 @@ export function applyFilters(rows, f, text, ranks) {
   const byPrice = (dir) => (a, b) => (a.price == null) - (b.price == null) || dir * ((a.price ?? 0) - (b.price ?? 0));
   if (f.sort === 'priceDesc') out.sort(byPrice(-1));
   else if (f.sort === 'priceAsc') out.sort(byPrice(1));
-  else if (f.sort === 'name') out.sort((a, b) => a.card.name.localeCompare(b.card.name));
+  else if (f.sort === 'name') out.sort((a, b) => compareText(a.card.name, b.card.name));
   else if (f.sort === 'rarity') {
     out.sort((a, b) => (ranks.get(b.facets?.rarity) ?? -1) - (ranks.get(a.facets?.rarity) ?? -1) || (b.price ?? -1) - (a.price ?? -1));
   }

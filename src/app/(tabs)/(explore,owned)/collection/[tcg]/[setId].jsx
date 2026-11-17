@@ -15,6 +15,7 @@ import { openItem } from '../../../../../lib/openItem';
 import { versionKey } from '../../../../../lib/masterSet';
 import { useSettings } from '../../../../../lib/settings';
 import { plural, t } from '../../../../../lib/i18n';
+import { compareNumber } from '../../../../../lib/compare';
 
 const FILTERS = [
   ['owned', 'Possédées'],
@@ -69,7 +70,7 @@ export default function CollectionSetScreen() {
       id: i.cardId, key: i.key, name: i.name, number: i.number, image: i.image, qty: i.qty, price: i.price,
       lang: i.lang, finish: i.finish, label: i.finishName || (i.finish ? finishName(i.finish) : null),
     }));
-    if (filter === 'owned' || !fullList.length) return ownedCards.sort((a, b) => String(a.number ?? '').localeCompare(String(b.number ?? ''), undefined, { numeric: true }));
+    if (filter === 'owned' || !fullList.length) return ownedCards.sort((a, b) => compareNumber(a.number, b.number));
     const all = fullList.map((c) => ({ ...c, qty: ownedById.get(c.id)?.qty || 0, price: ownedById.get(c.id)?.price }));
     return filter === 'missing' ? all.filter((c) => !c.qty) : all;
   }, [filter, fullList, ownedById, mine]);

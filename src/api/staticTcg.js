@@ -8,6 +8,7 @@ import { versionsOfCard } from '../lib/masterSet';
 import { mainPrefix, parseNumber, sortByNumber } from '../lib/cardOrder';
 import { historyFile } from '../lib/priceHistory';
 import { iconKey } from '../lib/iconKey';
+import { compareText } from '../lib/compare';
 
 const fileId = (id) => String(id).replace(/[^A-Za-z0-9._-]/g, '_');
 
@@ -265,7 +266,7 @@ function characterMethods({ label, of, keyLang, resolveSuffix }, loadSets, loadS
     // Groupes de types (Événements, Lieux…) : après les personnages.
     return [...groups.values()]
       .map(({ spellings, ...g }) => ({ ...g, name: [...spellings].sort((a, b) => b[1] - a[1])[0][0] }))
-      .sort((a, b) => (a.group - b.group) || a.name.localeCompare(b.name, 'fr'));
+      .sort((a, b) => (a.group - b.group) || compareText(a.name, b.name));
   }
 
   // Cartes de chaque personnage (id → cartes, de la plus récente à la plus ancienne), en un seul passage.

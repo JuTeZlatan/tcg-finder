@@ -1,7 +1,7 @@
 // Pokémon via TCGdex (https://tcgdex.dev) : données FR/EN et prix Cardmarket.
 // Les prix TCGplayer (que TCGdex ne fournit plus pour la plupart des extensions) viennent du script de collecte
 // (pipeline/pokemon.mjs), intégrés à l'appli ou publiés chaque jour.
-import { getJSON, memo, num, clean } from './http';
+import { cachedJSON, fetchWithTimeout, getJSON, memo, num, clean } from './http';
 import { loadBundledFile } from './bundledData';
 import { loadData } from './dataSource';
 import { cardmarketRef } from '../lib/priceRef';
@@ -38,14 +38,19 @@ const TCP_VARIANTS = {
 
 // La liste REST des extensions n'a ni dates ni série : on les récupère en une requête via l'API GraphQL de TCGdex.
 // Les extensions de Pokémon TCG Pocket (série « tcgp », jeu mobile, cartes numériques sans prix) sont écartées.
+// Gardée sur le téléphone (copie rafraîchie en arrière-plan) : plus de requête à attendre à chaque démarrage.
 const setsMeta = memo(async () => {
   try {
-    const res = await fetch('https://api.tcgdex.net/v2/graphql', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: '{ sets { id releaseDate serie { id } } }' }),
+    const data = await cachedJSON('tcgdex-sets-meta', async () => {
+      const res = await fetchWithTimeout('https://api.tcgdex.net/v2/graphql', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: '{ sets { id releaseDate serie { id } } }' }),
+      });
+      const json = await res.json();
+      if (!Array.isArray(json?.data?.sets)) throw new Error('réponse TCGdex incomplète');
+      return json.data;
     });
-    const { data } = await res.json();
     return {
       dates: new Map(data.sets.map((s) => [s.id, s.releaseDate])),
       pocket: new Set(data.sets.filter((s) => s.serie?.id === 'tcgp').map((s) => s.id)),

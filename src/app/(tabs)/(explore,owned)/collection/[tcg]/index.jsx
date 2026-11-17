@@ -9,6 +9,7 @@ import { colors, radius, percent } from '../../../../../lib/theme';
 import { StatTile, ProgressBar } from '../../../../../components/collection';
 import { useSettings } from '../../../../../lib/settings';
 import { plural, t } from '../../../../../lib/i18n';
+import { compareText } from '../../../../../lib/compare';
 
 const SORTS = [
   ['value', 'Valeur'],
@@ -31,7 +32,7 @@ export default function CollectionTcgScreen() {
       value: (a, b) => b.value - a.value,
       completion: (a, b) => (b.completion ?? -1) - (a.completion ?? -1),
       recent: (a, b) => b.lastAdded - a.lastAdded,
-      name: (a, b) => a.setName.localeCompare(b.setName),
+      name: (a, b) => compareText(a.setName, b.setName),
     }[sort];
     return list.sort(by);
   }, [mine, sort]);

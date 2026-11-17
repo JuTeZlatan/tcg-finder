@@ -10,6 +10,7 @@ import { formatPrice } from '../../../../lib/prices';
 import { colors, radius } from '../../../../lib/theme';
 import { useSettings } from '../../../../lib/settings';
 import { plural, t } from '../../../../lib/i18n';
+import { compareText } from '../../../../lib/compare';
 
 const SORTS = [
   ['value', 'Valeur totale'],
@@ -23,7 +24,7 @@ const SORT_FNS = {
   value: (a, b) => (b.price ?? 0) * b.qty - (a.price ?? 0) * a.qty,
   price: (a, b) => (b.price ?? 0) - (a.price ?? 0),
   recent: (a, b) => b.addedAt - a.addedAt,
-  name: (a, b) => a.name.localeCompare(b.name),
+  name: (a, b) => compareText(a.name, b.name),
   qty: (a, b) => b.qty - a.qty,
 };
 
