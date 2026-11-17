@@ -325,6 +325,9 @@ export default function CardViewer3D({ visible, onClose, image, tcgId, prices, r
               source={backSource}
               style={StyleSheet.absoluteFill}
               contentFit={back.face ? 'contain' : 'cover'}
+              // Dos intégrés à l'appli : jamais en cache disque (clé = n° de ressource, qui change d'une version de
+              // l'appli à l'autre : l'ancien cache affichait le dos d'un autre jeu).
+              cachePolicy={typeof backSource === 'number' ? 'memory' : 'disk'}
               onError={() => setBackFailed(true)}
             />
           ) : null}

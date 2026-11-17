@@ -1,13 +1,14 @@
 // Dos de carte affiché quand on retourne une carte en 3D (src/components/CardViewer3D.jsx).
 // Images intégrées à l'appli (assets/backs, affichage instantané et hors ligne), une par dos réel de chaque jeu :
-// - Pokémon : dos international ; cartes japonaises sorties avant Pokémon Card★VS (19/07/2001) : ancien dos
-//   « Pocket Monsters Card Game » (旧裏).
+// - Pokémon : dos international (fr, en, de, it, es) ; dos japonais (ja, et zh : cartes de Taïwan) ; cartes
+//   japonaises sorties avant Pokémon Card★VS (19/07/2001) : ancien dos « Pocket Monsters Card Game » (旧裏).
 // - One Piece : bleu (deck), rouge (Leaders), blanc (cartes DON!!).
 // - Riftbound : bleu (deck principal), blanc (Runes), noir (Légendes et Champs de bataille).
 // - Magic, Yu-Gi-Oh!, Lorcana, Dragon Ball Fusion World, Star Wars Unlimited, Cyberpunk, Naruto : un dos par jeu.
 // Cartes recto-verso : leur vraie seconde face (`card.back`, ou adresse officielle pour les Leaders Dragon Ball).
 const BACKS = {
   pokemon: require('../../assets/backs/pokemon.webp'),
+  'pokemon-jp': require('../../assets/backs/pokemon-jp.webp'),
   'pokemon-jp-old': require('../../assets/backs/pokemon-jp-old.webp'),
   magic: require('../../assets/backs/magic.webp'),
   yugioh: require('../../assets/backs/yugioh.webp'),
@@ -38,7 +39,9 @@ export function backOf(tcgId, card, { lang, setDate } = {}) {
   const type = typeOf(card);
   switch (tcgId) {
     case 'pokemon':
-      return { source: BACKS[lang === 'ja' && setDate && setDate < '2001-07-19' ? 'pokemon-jp-old' : 'pokemon'] };
+      // Japonais et chinois (Taïwan) : dos japonais ; toutes les autres langues : dos international.
+      if (lang === 'ja' && setDate && setDate < '2001-07-19') return { source: BACKS['pokemon-jp-old'] };
+      return { source: BACKS[lang === 'ja' || lang === 'zh' ? 'pokemon-jp' : 'pokemon'] };
     case 'onepiece':
       if (/leader/i.test(type)) return { source: BACKS['onepiece-leader'] };
       if (/don!!/i.test(`${type} ${card?.name || ''}`)) return { source: BACKS['onepiece-don'] };
