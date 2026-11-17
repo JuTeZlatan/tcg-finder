@@ -1,4 +1,6 @@
-// Carte en grand, en 3D : elle s'incline en suivant le doigt (glisser) et revient de face une fois lâchée.
+// Carte en grand, en 3D : elle tourne librement en suivant le doigt, dans tous les sens (haut, bas, gauche, droite,
+// en diagonale), continue sur sa lancée une fois lâchée et reste où on la laisse. Retournée, elle montre son dos :
+// le dos réel du jeu (src/lib/cardBacks.js) ou la seconde face des cartes recto-verso (Leaders, cartes double face).
 // Rendu des finitions au plus près d'une vraie carte : la brillance n'est pas une couche uniforme, c'est la lumière
 // qui « accroche » une zone de la surface brillante et se déplace avec l'inclinaison. Chaque effet est donc :
 // - limité à la zone brillante de la carte : l'illustration (holo), tout sauf l'illustration (reverse) ou toute la
@@ -7,15 +9,31 @@
 //   scripts/make-foil-textures.mjs) qui traversent la carte à l'opposé de l'inclinaison, chacune à sa vitesse :
 //   de face, presque rien ; inclinée, la lumière accroche la surface et glisse dessus. Aucun bord net.
 // Finitions de chaque jeu : voir finishEffect. Les versions de la carte se choisissent en bas pour comparer.
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Animated, Image as RNImage, Modal, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { finishesOf, finishLabel, defaultFinish } from '../lib/finishes';
+import { backOf } from '../lib/cardBacks';
 import { t } from '../lib/i18n';
 import { colors } from '../lib/theme';
 
-const MAX_TILT = 22; // degrés
+const MAX_TILT = 22; // degrés : inclinaison qui donne la brillance maximale
+const TURNS = 20; // tours couverts par les interpolations (angles ramenés entre -180° et 180° à chaque geste)
+// Brillance selon l'orientation : de face 0, de profil (90°) le maximum, de nouveau 0 à 180° (la face est cachée),
+// motif répété tous les 360° (courbe en zigzag : l'interpolation d'Animated n'a pas de sinus).
+const zigzag = (max) => {
+  const inputRange = [];
+  const outputRange = [];
+  for (let a = -360 * TURNS; a <= 360 * TURNS; a += 90) {
+    inputRange.push(a);
+    outputRange.push([0, max, 0, -max][((a / 90) % 4 + 4) % 4]);
+  }
+  return { inputRange, outputRange, extrapolate: 'clamp' };
+};
+const DEG = { inputRange: [-360 * TURNS, 360 * TURNS], outputRange: [`${-360 * TURNS}deg`, `${360 * TURNS}deg`] };
+// Angle ramené entre -180° et 180° (même orientation).
+const wrap = (a) => ((((a + 180) % 360) + 360) % 360) - 180;
 const RATIO = 88 / 63;
 // Taches de lumière texturées (texture × fondu rond, transparentes sur les bords).
 const SPOT = {
@@ -142,7 +160,7 @@ function soleFinish(prices) {
   return variants.length && variants.every((v) => /foil|holo/i.test(v)) ? 'foil' : null;
 }
 
-export default function CardViewer3D({ visible, onClose, image, tcgId, prices, rarity, treatment, initialFinish }) {
+export default function CardViewer3D({ visible, onClose, image, tcgId, prices, rarity, treatment, initialFinish, card, lang, setDate }) {
   const { width, height } = useWindowDimensions();
   // Proportions de l'image (hauteur / largeur) : cartes en hauteur, ou en largeur (Leaders et Bases de Star Wars).
   const [ratio, setRatio] = useState(RATIO);
@@ -155,23 +173,69 @@ export default function CardViewer3D({ visible, onClose, image, tcgId, prices, r
   const shown = finish || soleFinish(prices);
   const effect = EFFECTS[finishEffect(tcgId, shown, shown ? finishLabel(prices, shown) : '', rarity, treatment)];
 
-  // Inclinaison en degrés (x : haut / bas, y : gauche / droite), pilotée par le doigt.
-  const [tilt] = useState(() => new Animated.ValueXY({ x: 0, y: 0 }));
-  const pan = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => true,
-    onMoveShouldSetPanResponder: () => true,
-    onPanResponderMove: (_, g) => {
-      tilt.setValue({
-        x: Math.max(-MAX_TILT, Math.min(MAX_TILT, (-g.dy / cardH) * MAX_TILT * 2.2)),
-        y: Math.max(-MAX_TILT, Math.min(MAX_TILT, (g.dx / cardW) * MAX_TILT * 2.2)),
-      });
-    },
-    // Lâchée : la carte revient de face.
-    onPanResponderRelease: () => Animated.spring(tilt, { toValue: { x: 0, y: 0 }, useNativeDriver: false, friction: 5 }).start(),
-  }), [tilt, cardW, cardH]);
+  // Dos : image intégrée du jeu, ou seconde face (adresse) ; repli sur le dos du jeu si elle ne se charge pas.
+  const back = useMemo(() => backOf(tcgId, card, { lang, setDate }), [tcgId, card, lang, setDate]);
+  const [backFailed, setBackFailed] = useState(false);
+  const [frontFailed, setFrontFailed] = useState(false);
+  const backSource = backFailed ? back.fallback : back.source;
 
-  const rotateX = tilt.x.interpolate({ inputRange: [-MAX_TILT, MAX_TILT], outputRange: [`${-MAX_TILT}deg`, `${MAX_TILT}deg`] });
-  const rotateY = tilt.y.interpolate({ inputRange: [-MAX_TILT, MAX_TILT], outputRange: [`${-MAX_TILT}deg`, `${MAX_TILT}deg`] });
+  // Orientation en degrés (x : autour de l'axe horizontal, haut / bas ; y : autour de l'axe vertical, gauche / droite),
+  // pilotée par le doigt : un glissé sur toute la largeur de la carte la fait tourner d'un demi-tour.
+  const [rot] = useState(() => ({ x: new Animated.Value(0), y: new Animated.Value(0) }));
+  const pan = useMemo(() => {
+    const start = { x: 0, y: 0 };
+    const k = 180 / Math.max(1, cardW);
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        rot.x.stopAnimation((v) => { start.x = wrap(v); rot.x.setValue(start.x); });
+        rot.y.stopAnimation((v) => { start.y = wrap(v); rot.y.setValue(start.y); });
+      },
+      onPanResponderMove: (_, g) => {
+        rot.x.setValue(start.x - g.dy * k);
+        rot.y.setValue(start.y + g.dx * k);
+      },
+      // Lâchée : elle continue sur sa lancée, ralentit et reste dans la position atteinte.
+      onPanResponderRelease: (_, g) => {
+        Animated.parallel([
+          Animated.decay(rot.x, { velocity: -g.vy * k, deceleration: 0.994, useNativeDriver: false }),
+          Animated.decay(rot.y, { velocity: g.vx * k, deceleration: 0.994, useNativeDriver: false }),
+        ]).start();
+      },
+    });
+  }, [rot, cardW]);
+  // Boutons : retourner (demi-tour) et remettre de face, en douceur.
+  const turnTo = (toX, toY) => {
+    rot.x.stopAnimation((vx) => {
+      rot.y.stopAnimation((vy) => {
+        rot.x.setValue(wrap(vx));
+        rot.y.setValue(wrap(vy));
+        Animated.parallel([
+          Animated.spring(rot.x, { toValue: toX(wrap(vx)), useNativeDriver: false, friction: 7 }),
+          Animated.spring(rot.y, { toValue: toY(wrap(vy)), useNativeDriver: false, friction: 7 }),
+        ]).start();
+      });
+    });
+  };
+  const flip = () => turnTo((x) => Math.round(x / 180) * 180, (y) => Math.round(y / 180) * 180 + 180);
+  const face = () => turnTo(() => 0, () => 0);
+
+  const rotateX = rot.x.interpolate(DEG);
+  const rotateY = rot.y.interpolate(DEG);
+  // Inclinaison équivalente pour la brillance (même effet qu'avant : ±MAX_TILT), maximale de profil.
+  const tilt = { x: rot.x.interpolate(zigzag(MAX_TILT)), y: rot.y.interpolate(zigzag(MAX_TILT)) };
+  // Face tournée vers l'écran, calculée d'après l'orientation (Android ne cache pas la face arrière d'une vue placée
+  // dans une vue qui tourne) : la normale de la carte pointe vers nous tant que cos(x) × cos(y) > 0.
+  const [showBack, setShowBack] = useState(false);
+  useEffect(() => {
+    const angle = { x: 0, y: 0 };
+    const update = () => setShowBack(Math.cos((angle.x * Math.PI) / 180) * Math.cos((angle.y * Math.PI) / 180) < 0);
+    const ix = rot.x.addListener(({ value }) => { angle.x = value; update(); });
+    const iy = rot.y.addListener(({ value }) => { angle.y = value; update(); });
+    return () => { rot.x.removeListener(ix); rot.y.removeListener(iy); };
+  }, [rot]);
   // Part d'inclinaison (0 de face → 1 au maximum).
   const amount = Animated.add(
     tilt.x.interpolate({ inputRange: [-MAX_TILT, 0, MAX_TILT], outputRange: [0.5, 0, 0.5] }),
@@ -231,12 +295,25 @@ export default function CardViewer3D({ visible, onClose, image, tcgId, prices, r
         <Pressable style={styles.close} onPress={onClose} hitSlop={12} accessibilityLabel={t('Fermer')}>
           <Ionicons name="close" size={28} color="#fff" />
         </Pressable>
-        <Animated.View
-          {...pan.panHandlers}
-          style={[styles.card, { width: cardW, height: cardH, transform: [{ perspective: 900 }, { rotateX }, { rotateY }] }]}
-        >
+        <Animated.View {...pan.panHandlers} style={{ width: cardW, height: cardH, transform: [{ perspective: 1100 }, { rotateX }, { rotateY }] }}>
+        {/* Dos (ou seconde face), tourné d'un demi-tour derrière la face : visible une fois la carte retournée. */}
+        <View style={[styles.card, styles.side, { width: cardW, height: cardH, opacity: showBack ? 1 : 0, transform: [{ rotateY: '180deg' }] }]}>
+          {backSource ? (
+            <Image
+              source={backSource}
+              style={StyleSheet.absoluteFill}
+              contentFit={back.face ? 'contain' : 'cover'}
+              onError={() => setBackFailed(true)}
+            />
+          ) : null}
+          <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+            {spot('glare', glare, -1.2, 1.1, 0, 0, 'glare-back')}
+          </View>
+        </View>
+        <View style={[styles.card, styles.side, { width: cardW, height: cardH, opacity: showBack ? 0 : 1 }]}>
           <Image
-            source={image}
+            source={frontFailed || !back.front ? image : back.front}
+            onError={() => setFrontFailed(true)}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             onLoad={(e) => {
@@ -253,9 +330,18 @@ export default function CardViewer3D({ visible, onClose, image, tcgId, prices, r
           <View pointerEvents="none" style={StyleSheet.absoluteFill}>
             {spot('glare', glare, 1.2, 1.1, 0, 0, 'glare')}
           </View>
+        </View>
         </Animated.View>
 
-        <Text style={styles.hint}>{t('Fais glisser la carte pour l’incliner')}</Text>
+        <Text style={styles.hint}>{t('Fais glisser la carte pour la tourner dans tous les sens')}</Text>
+        <View style={styles.chips}>
+          <Pressable onPress={flip} style={styles.chip} accessibilityLabel={t('Retourner la carte')}>
+            <Text style={styles.chipText}><Ionicons name="sync" size={13} color="#fff" /> {t('Retourner')}</Text>
+          </Pressable>
+          <Pressable onPress={face} style={styles.chip}>
+            <Text style={styles.chipText}><Ionicons name="scan-outline" size={13} color="#fff" /> {t('De face')}</Text>
+          </Pressable>
+        </View>
         {finishes.length > 1 ? (
           <View style={styles.chips}>
             {finishes.map((f) => (
@@ -273,7 +359,9 @@ export default function CardViewer3D({ visible, onClose, image, tcgId, prices, r
 const styles = StyleSheet.create({
   page: { flex: 1, backgroundColor: 'rgba(5,6,10,0.96)', alignItems: 'center', justifyContent: 'center', gap: 22, padding: 16 },
   close: { position: 'absolute', top: 48, right: 20, zIndex: 2 },
-  card: { borderRadius: 16, overflow: 'hidden', backgroundColor: '#111', shadowColor: '#000', shadowOpacity: 0.6, shadowRadius: 24, shadowOffset: { width: 0, height: 18 }, elevation: 18 },
+  card: { borderRadius: 16, overflow: 'hidden', backgroundColor: '#111' },
+  // Deux faces dos à dos ; celle qui est tournée vers l'écran est choisie d'après l'orientation (showBack).
+  side: { position: 'absolute', left: 0, top: 0 },
   fill: { width: '100%', height: '100%' },
   hint: { color: colors.muted, fontSize: 13 },
   chips: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, maxWidth: 560 },

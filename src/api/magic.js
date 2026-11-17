@@ -129,6 +129,8 @@ const adapter = {
       setId: c.set,
       setName: c.set_name,
       image: imageOf(shown, 'large') || imageOf(c, 'large') || imageOf(c),
+      // Cartes double face (transformables, modales…) : la seconde face sert de verso dans la carte en 3D.
+      back: shown.card_faces?.[1]?.image_uris?.large || c.card_faces?.[1]?.image_uris?.large || null,
       details: clean([
         ['set', `${c.set_name} (${c.set.toUpperCase()})`],
         ['number', c.collector_number],

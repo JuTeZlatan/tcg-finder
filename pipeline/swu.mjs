@@ -40,6 +40,46 @@ const imageOf = (c) => {
   const f = c.artFront?.data?.attributes;
   return f?.formats?.card?.url || f?.url || null;
 };
+// Verso officiel des cartes recto-verso (Leaders : face Unité ; jetons…), sinon null (dos commun du jeu dans l'appli).
+const backOf = (c) => {
+  const b = c.artBack?.data?.attributes;
+  return b?.formats?.card?.url || b?.url || null;
+};
+
+// Carte officielle d'une carte TCGplayer : même code d'extension, numéro et total imprimé ; sans total (variantes
+// Hyperspace 285…), la carte de la série principale (plus grand total).
+function officialIndex(list) {
+  const byExact = new Map();
+  const byNumber = new Map();
+  for (const c of list) {
+    const code = c.expansion?.data?.attributes?.code;
+    if (!code || c.cardNumber == null) continue;
+    byExact.set(`${code}|${Number(c.cardNumber)}|${Number(c.cardCount)}`, c);
+    const k = `${code}|${Number(c.cardNumber)}`;
+    const prev = byNumber.get(k);
+    if (!prev || Number(c.cardCount) > Number(prev.cardCount)) byNumber.set(k, c);
+  }
+  return (code, number) => {
+    const [n, total] = String(number).split('/').map((v) => parseInt(v, 10));
+    return total ? byExact.get(`${code}|${n}|${total}`) : byNumber.get(`${code}|${n}`);
+  };
+}
+
+// Versos officiels ajoutés aux cartes anglaises (les autres langues les reprennent, voir buildLocale).
+function addBacks(sets, official) {
+  const officialOf = officialIndex(official);
+  let n = 0;
+  for (const set of sets) {
+    const code = String(set.id).replace(/-d+$/, '');
+    for (const card of set.cards) {
+      const f = officialOf(code, card.number);
+      const back = f && backOf(f);
+      if (back) { card.back = back; n++; }
+    }
+  }
+  if (n) console.log(`  swu/en : ${n} carte(s) recto-verso avec leur verso officiel`);
+  return n;
+}
 
 export async function build(outDir) {
   const sets = await buildTcgcsvGame(outDir, {
@@ -55,7 +95,9 @@ export async function build(outDir) {
   // Cartes de la base officielle absentes de TCGplayer (ex. versions Hyperspace pas encore listées) : ajoutées à leur
   // extension, sans prix, pour que chaque extension soit complète. Les langues sont dérivées de l'anglais complété.
   try {
-    if (addOfficialMissing(sets, await officialCards('en'))) await writeTcg(outDir, 'swu', 'en', sets);
+    const official = await officialCards('en');
+    const added = addOfficialMissing(sets, official);
+    if (addBacks(sets, official) || added) await writeTcg(outDir, 'swu', 'en', sets);
   } catch (e) {
     console.error(`✗ swu : liste officielle anglaise indisponible (${e.message})`);
   }
@@ -81,12 +123,13 @@ function addOfficialMissing(sets, official) {
     for (const c of missing) {
       present.add(Number(c.cardNumber));
       const image = imageOf(c);
+      const back = backOf(c);
       const variant = c.variantTypes?.data?.map((v) => v.attributes?.name).filter((n) => n && n !== 'Standard').join(', ');
       set.cards.push({
         id: `swu-${code}-${c.cardNumber}`,
         name: `${c.title}${c.subtitle ? ` - ${c.subtitle}` : ''}${variant ? ` (${variant})` : ''}`,
         number: c.cardCount && Number(c.cardNumber) <= Number(c.cardCount) ? `${String(c.cardNumber).padStart(3, '0')}/${c.cardCount}` : String(c.cardNumber),
-        image, thumb: image,
+        image, thumb: image, ...(back ? { back } : {}),
         details: clean([['set', set.name], ['number', String(c.cardNumber)], ['type', c.type?.data?.attributes?.name], ['rarity', c.rarity?.data?.attributes?.name]]),
         texts: c.text ? [{ titleKey: 'effect', body: htmlToText(c.text) }] : [],
         prices: [],
@@ -103,25 +146,14 @@ function addOfficialMissing(sets, official) {
 async function buildLocale(outDir, sets, locale) {
   console.log(`Star Wars Unlimited (${locale})…`);
   const fr = await officialCards(locale);
-  // Les promos d'une extension partagent son code et ses numéros (« 3/20 » contre « 003/252 ») : on relie par code,
-  // numéro ET total imprimé ; sans total (variantes Hyperspace 285…), la carte de la série principale (plus grand total).
-  const byExact = new Map();
-  const byNumber = new Map();
+  // Les promos d'une extension partagent son code et ses numéros (« 3/20 » contre « 003/252 ») : voir officialIndex.
+  const officialOf = officialIndex(fr);
   const setNames = new Map();
   for (const c of fr) {
     const code = c.expansion?.data?.attributes?.code;
-    if (!code || c.cardNumber == null) continue;
-    byExact.set(`${code}|${Number(c.cardNumber)}|${Number(c.cardCount)}`, c);
-    const k = `${code}|${Number(c.cardNumber)}`;
-    const prev = byNumber.get(k);
-    if (!prev || Number(c.cardCount) > Number(prev.cardCount)) byNumber.set(k, c);
     const setName = c.expansion?.data?.attributes?.name;
-    if (setName) setNames.set(code, setName);
+    if (code && setName) setNames.set(code, setName);
   }
-  const officialOf = (code, number) => {
-    const [n, total] = String(number).split('/').map((v) => parseInt(v, 10));
-    return total ? byExact.get(`${code}|${n}|${total}`) : byNumber.get(`${code}|${n}`);
-  };
   let matched = 0;
   const frSets = sets.map((s) => {
     const code = String(s.id).replace(/-\d+$/, '');
@@ -137,7 +169,7 @@ async function buildLocale(outDir, sets, locale) {
         ['deploy', f.deployBox && htmlToText(f.deployBox)],
         ['epic', f.epicAction && htmlToText(f.epicAction)],
       ]).map(([titleKey, body]) => ({ titleKey, body }));
-      return { ...card, name, nameEn: card.name, image: imageOf(f) || card.image, thumb: imageOf(f) || card.thumb, texts: texts.length ? texts : card.texts };
+      return { ...card, name, nameEn: card.name, image: imageOf(f) || card.image, thumb: imageOf(f) || card.thumb, ...(backOf(f) || card.back ? { back: backOf(f) || card.back } : {}), texts: texts.length ? texts : card.texts };
     });
     return { ...s, name: setNames.get(code) || s.name, cards };
   });

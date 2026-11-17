@@ -550,5 +550,9 @@ export default {
   "Japon": "Japan",
   "Incline ton téléphone ou fais glisser la carte": "Tilt your phone or drag the card",
   "Fermer": "Close",
+  "Fais glisser la carte pour la tourner dans tous les sens": "Drag the card to turn it in every direction",
+  "Retourner la carte": "Flip the card",
+  "Retourner": "Flip",
+  "De face": "Front",
   "Fais glisser la carte pour l’incliner": "Drag the card to tilt it",
 };

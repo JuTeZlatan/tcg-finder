@@ -109,6 +109,10 @@ export default function CardScreen() {
                 rarity={c.details?.find(([k]) => /^rarity$/i.test(k))?.[1]}
                 treatment={c.treatment || c.details?.filter(([k]) => /^(variant|artwork)$/i.test(k)).map(([, v]) => v).join(' ')}
                 initialFinish={chosen || defaultFinish(finishesOf(c.prices)) || null}
+                // Dos de la carte (selon le jeu, le type, la langue et l'époque) ou sa seconde face.
+                card={c}
+                lang={lang}
+                setDate={set?.date}
               />
             ) : null}
 
